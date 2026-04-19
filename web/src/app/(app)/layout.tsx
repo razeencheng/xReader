@@ -40,26 +40,31 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (isLoading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#fbfaf7]">
-        <p className="text-sm text-[#8a8275]">Loading…</p>
+      <div className="flex min-h-screen items-center justify-center bg-[var(--bg-body)]">
+        <p className="text-sm text-[var(--text-muted)]">Loading…</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#fdfbf6] text-[#1f1f1f]">
-      <div className="border-b border-[#ece6d8] bg-[#fdfbf6]/95">
+    <div className="min-h-screen bg-[var(--bg-card)] text-[var(--text-body)]">
+      <div className="border-b border-[var(--border-default)] bg-[var(--bg-card)]/95">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
-          <Link href="/" className="font-serif text-lg font-semibold tracking-tight text-[#1f1f1f]">
+          <Link href="/" className="font-serif text-lg font-semibold tracking-tight text-[var(--text-body)]">
             xReader
           </Link>
-          <nav className="flex items-center gap-4 font-[system-ui] text-sm text-[#8a8275]">
-            <Link href="/sources" className="transition-colors hover:text-[#1f1f1f]">
+          <nav className="flex items-center gap-4 font-[system-ui] text-sm text-[var(--text-muted)]">
+            <Link href="/sources" className="transition-colors hover:text-[var(--text-body)]">
               订阅源
             </Link>
-            <Link href="/settings" className="transition-colors hover:text-[#1f1f1f]">
+            <Link href="/settings" className="transition-colors hover:text-[var(--text-body)]">
               设置
             </Link>
+            {user.role === 'admin' ? (
+              <Link href="/admin" className="transition-colors hover:text-[var(--text-body)]">
+                管理
+              </Link>
+            ) : null}
           </nav>
         </div>
       </div>
