@@ -56,12 +56,12 @@ function ReaderContent({ id }: { id: string }) {
   const { prev, next, position, total } = useArticleNeighbors(articleId, tab);
 
   const navigateTo = useCallback(
-    (article: ArticleItem | null, fallback?: () => void) => {
-      if (article) {
+    (a: ArticleItem | null, fallback?: () => void) => {
+      if (a) {
         const params = new URLSearchParams();
         const ctx = searchParams.get('ctx');
         if (ctx) params.set('tab', ctx);
-        router.push(`/read/${article.id}${params.toString() ? `?${params.toString()}` : ''}`);
+        router.push(`/read/${a.id}${params.toString() ? `?${params.toString()}` : ''}`);
         return;
       }
 
@@ -69,6 +69,39 @@ function ReaderContent({ id }: { id: string }) {
     },
     [router, searchParams],
   );
+
+  const readerShortcuts = useMemo(
+    () => ({
+      arrowleft: () => navigateTo(prev),
+      k: () => navigateTo(prev),
+      arrowright: () => navigateTo(next),
+      j: () => navigateTo(next),
+      s: () => {
+        if (!article) return;
+        void (async () => {
+          try {
+            const nextStarred = !article.is_starred;
+            await apiFetch(`/api/articles/${id}/state`, {
+              method: 'PATCH',
+              body: JSON.stringify({ is_starred: nextStarred }),
+            });
+            broadcast({ type: 'state-change', articleId, is_starred: nextStarred });
+          } catch {
+            // Ignore failed background mutations.
+          }
+        })();
+      },
+      escape: () => {
+        const ctx = searchParams.get('ctx');
+        const params = new URLSearchParams();
+        if (ctx) params.set('tab', ctx);
+        router.push(`/?${params.toString()}`);
+      },
+    }),
+    [article, articleId, id, navigateTo, next, prev, router, searchParams],
+  );
+
+  useShortcuts(readerShortcuts);
 
   const markRead = async (articleToMarkReadId: number) => {
     try {
@@ -95,37 +128,6 @@ function ReaderContent({ id }: { id: string }) {
   const isNative = article.language.toLowerCase().startsWith(nativeLanguage.toLowerCase().slice(0, 2));
   const showOriginal = !isNative && displayTitle !== originalTitle;
   const summary = ai?.summary || article.summary || '';
-  const readerShortcuts = useMemo(
-    () => ({
-      arrowleft: () => navigateTo(prev),
-      k: () => navigateTo(prev),
-      arrowright: () => navigateTo(next),
-      j: () => navigateTo(next),
-      s: () => {
-        void (async () => {
-          try {
-            const nextStarred = !article.is_starred;
-            await apiFetch(`/api/articles/${id}/state`, {
-              method: 'PATCH',
-              body: JSON.stringify({ is_starred: nextStarred }),
-            });
-            broadcast({ type: 'state-change', articleId, is_starred: nextStarred });
-          } catch {
-            // Ignore failed background mutations.
-          }
-        })();
-      },
-      escape: () => {
-        const ctx = searchParams.get('ctx');
-        const params = new URLSearchParams();
-        if (ctx) params.set('tab', ctx);
-        router.push(`/?${params.toString()}`);
-      },
-    }),
-    [article.is_starred, articleId, id, navigateTo, next, prev, router, searchParams],
-  );
-
-  useShortcuts(readerShortcuts);
 
   return (
     <div className="min-h-screen bg-[var(--bg-body)]">
