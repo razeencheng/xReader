@@ -8,6 +8,7 @@ import { apiFetch } from '@/lib/api-client';
 import { useUIStore } from '@/stores/useUIStore';
 import { ReaderHeader } from '@/components/reader/ReaderHeader';
 import { KeyPointsCallout } from '@/components/reader/KeyPointsCallout';
+import { BilingualBody } from '@/components/reader/BilingualBody';
 import type { ArticleItem } from '@/lib/types';
 
 interface ArticleDetail extends ArticleItem {
@@ -92,9 +93,11 @@ function ReaderContent({ id }: { id: string }) {
         {summary && <KeyPointsCallout text={summary} />}
 
         {article.content_html ? (
-          <div
-            className="prose prose-lg leading-[1.8] text-[#1f1f1f]"
-            dangerouslySetInnerHTML={{ __html: article.content_html }}
+          <BilingualBody
+            articleId={article.id}
+            contentHtml={article.content_html}
+            language={article.language}
+            nativeLanguage={nativeLanguage}
           />
         ) : (
           <p className="text-base leading-[1.8] text-[#1f1f1f]">
