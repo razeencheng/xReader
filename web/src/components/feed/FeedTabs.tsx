@@ -1,33 +1,49 @@
 'use client';
 
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import type { ArticleTab } from '@/lib/types';
 
-const TABS = [
+const TABS: Array<{ key: ArticleTab; label: string }> = [
   { key: 'today', label: '今日' },
   { key: 'stream', label: '全部' },
   { key: 'starred', label: '收藏' },
-] as const;
+];
+
+function normalizeTab(value: string | null): ArticleTab {
+  return value === 'stream' || value === 'starred' ? value : 'today';
+}
 
 export function FeedTabs() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const currentTab = searchParams.get('tab') ?? 'today';
+  const currentTab = normalizeTab(searchParams.get('tab'));
+
+  const handleTabChange = (tab: ArticleTab) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set('tab', tab);
+    router.replace(`/?${nextParams.toString()}`, { scroll: false });
+  };
 
   return (
-    <div className="flex gap-1">
-      {TABS.map(({ key, label }) => (
-        <button
-          key={key}
-          onClick={() => router.push(`/?tab=${key}`)}
-          className={`px-3 py-1 text-sm rounded-md transition-colors ${
-            currentTab === key
-              ? 'bg-[#1f1f1f] text-white'
-              : 'text-[#8a8275] hover:text-[#4a4338] hover:bg-[#f5f0e8]'
-          }`}
-        >
-          {label}
-        </button>
-      ))}
+    <div className="flex items-center gap-2 text-[13px] leading-none font-normal">
+      {TABS.map(({ key, label }) => {
+        const active = currentTab === key;
+
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => handleTabChange(key)}
+            className={`rounded-full px-3.5 py-1.5 transition-colors ${
+              active
+                ? 'bg-[#2a2a2a] font-semibold text-[#fbfaf7]'
+                : 'opacity-55 hover:opacity-80'
+            }`}
+          >
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 }
