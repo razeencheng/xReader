@@ -211,22 +211,6 @@ export function SourcesPage() {
 
   return (
     <main className="min-h-screen bg-[var(--bg-body)] text-[var(--text-body)]">
-      <div className="border-b border-[var(--border-strong)] bg-[var(--bg-body)]/95">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
-          <Link href="/" className="font-serif text-lg font-semibold tracking-tight text-[var(--text-body)]">
-            xReader
-          </Link>
-          <nav className="flex items-center gap-4 font-[system-ui] text-sm text-[var(--text-muted)]">
-            <Link href="/sources" className="text-[var(--text-body)] transition-colors hover:text-[var(--text-accent)]">
-              订阅源
-            </Link>
-            <Link href="/settings" className="transition-colors hover:text-[var(--text-body)]">
-              设置
-            </Link>
-          </nav>
-        </div>
-      </div>
-
       <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8 flex items-start justify-between gap-4">
           <div className="space-y-3">
