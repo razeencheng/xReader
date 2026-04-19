@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { computeAnchor, type HighlightAnchor } from './highlightAnchor';
 import { createHighlight } from '@/lib/queries/highlights';
 
@@ -13,41 +13,52 @@ export function HighlightToolbar({ articleId, onHighlightCreated }: Props) {
   const [anchor, setAnchor] = useState<HighlightAnchor | null>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
 
-  const handleMouseUp = useCallback(() => {
-    const selection = window.getSelection();
-    if (!selection || selection.isCollapsed || !selection.rangeCount) {
-      setAnchor(null);
-      setPosition(null);
-      return;
-    }
-
-    const range = selection.getRangeAt(0);
-    const computed = computeAnchor(range);
-    if (!computed) {
-      setAnchor(null);
-      setPosition(null);
-      return;
-    }
-
-    const rect = range.getBoundingClientRect();
-    setAnchor(computed);
-    setPosition({
-      top: rect.top + window.scrollY - 40,
-      left: rect.left + rect.width / 2,
-    });
-  }, []);
-
   useEffect(() => {
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => document.removeEventListener('mouseup', handleMouseUp);
-  }, [handleMouseUp]);
+    const handlePointerUp = () => {
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed || !selection.rangeCount) {
+        setAnchor(null);
+        setPosition(null);
+        return;
+      }
+
+      const range = selection.getRangeAt(0);
+      const computed = computeAnchor(range);
+      if (!computed) {
+        setAnchor(null);
+        setPosition(null);
+        return;
+      }
+
+      const rect = range.getBoundingClientRect();
+      setAnchor(computed);
+      setPosition({
+        top: rect.top + window.scrollY - 40,
+        left: rect.left + rect.width / 2,
+      });
+    };
+
+    document.addEventListener('pointerup', handlePointerUp);
+    document.addEventListener('mouseup', handlePointerUp);
+    document.addEventListener('touchend', handlePointerUp);
+
+    return () => {
+      document.removeEventListener('pointerup', handlePointerUp);
+      document.removeEventListener('mouseup', handlePointerUp);
+      document.removeEventListener('touchend', handlePointerUp);
+    };
+  }, []);
 
   const save = async (withNote: boolean) => {
     if (!anchor) return;
     const note = withNote ? prompt('添加笔记：') ?? undefined : undefined;
     await createHighlight({
       article_id: articleId,
-      ...anchor,
+      layer: anchor.layer,
+      paragraph_index: anchor.paragraph_index,
+      text_start_offset: anchor.text_start_offset,
+      text_end_offset: anchor.text_end_offset,
+      quoted_text: anchor.quoted_text,
       note,
     });
     setAnchor(null);
@@ -64,12 +75,14 @@ export function HighlightToolbar({ articleId, onHighlightCreated }: Props) {
       style={{ top: position.top, left: position.left, transform: 'translateX(-50%)' }}
     >
       <button
+        type="button"
         onClick={() => save(false)}
         className="rounded px-2 py-1 text-xs font-medium text-[#4a4338] hover:bg-[#f5f0e8]"
       >
         高亮
       </button>
       <button
+        type="button"
         onClick={() => save(true)}
         className="rounded px-2 py-1 text-xs font-medium text-[#4a4338] hover:bg-[#f5f0e8]"
       >

@@ -11,7 +11,8 @@ import (
 
 func TestHealth_ReturnsOK(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	r := NewRouter()
+	r := gin.New()
+	r.GET("/health", healthHandler)
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	r.ServeHTTP(w, req)

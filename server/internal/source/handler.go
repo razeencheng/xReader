@@ -8,17 +8,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jin/xreader-web/internal/middleware"
-	"github.com/jin/xreader-web/internal/platform"
 )
 
 type SourceHandler struct {
 	Service  *SourceService
-	JobStore platform.JobStore
+	JobStore JobStore
 }
 
-func NewSourceHandler(svc *SourceService, jobStore platform.JobStore) *SourceHandler {
+func NewSourceHandler(svc *SourceService, jobStore JobStore) *SourceHandler {
 	if jobStore == nil {
-		jobStore = platform.NewMemoryJobStore()
+		jobStore = NewMemoryJobStore()
 	}
 	return &SourceHandler{Service: svc, JobStore: jobStore}
 }
@@ -132,7 +131,7 @@ func (h *SourceHandler) ImportOPML(c *gin.Context) {
 }
 
 func (h *SourceHandler) GetJob(c *gin.Context) {
-	jobID := c.Param("id")
+	jobID := c.Param("jobID")
 	status, ok := h.JobStore.Get(jobID)
 	if !ok {
 		c.JSON(http.StatusNotFound, gin.H{"error": "job not found"})

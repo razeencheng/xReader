@@ -76,7 +76,8 @@ type Highlight struct {
 	TextStartOffset int32              `json:"text_start_offset"`
 	TextEndOffset   int32              `json:"text_end_offset"`
 	QuotedText      string             `json:"quoted_text"`
-	Note            pgtype.Text        `json:"note"`
+	Note            string             `json:"note"`
+	Color           string             `json:"color"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }

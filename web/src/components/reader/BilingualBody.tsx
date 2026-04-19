@@ -151,37 +151,35 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
     };
   }, [articleId, paragraphs.length, sameLanguage]);
 
-  if (sameLanguage) {
-    return (
-      <div
-        className="text-[18px] leading-[1.8] text-[#6a6252]"
-        style={{ fontFamily: originalFont }}
-        dangerouslySetInnerHTML={{ __html: contentHtml }}
-      />
-    );
-  }
-
   return (
     <div className="text-[18px] leading-[1.8]">
       {paragraphs.map((paragraph, index) => {
         const translation = translations.get(index);
+        const paragraphProps = {
+          'data-paragraph-index': index,
+          'data-highlight-source': encodeURIComponent(paragraph),
+        };
 
         return (
-          <div key={index} data-paragraph-index={index} className="pb-4">
+          <div key={index} className="pb-4" {...paragraphProps}>
             <div
+              data-layer="original"
               className="text-[#6a6252]"
               style={{ fontFamily: originalFont }}
               dangerouslySetInnerHTML={{ __html: paragraph }}
             />
-            {translation ? (
-              <div
-                className="mt-2 text-[#1f1f1f]"
-                style={{ fontFamily: translationFont }}
-              >
-                {translation}
-              </div>
-            ) : !isDone ? (
-              <LoadingPulse />
+            {!sameLanguage ? (
+              translation ? (
+                <div
+                  data-layer="translation"
+                  className="mt-2 text-[#1f1f1f]"
+                  style={{ fontFamily: translationFont }}
+                >
+                  {translation}
+                </div>
+              ) : !isDone ? (
+                <LoadingPulse />
+              ) : null
             ) : null}
           </div>
         );

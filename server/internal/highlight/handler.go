@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jin/xreader-web/db/gen"
 	"github.com/jin/xreader-web/internal/middleware"
 )
@@ -28,6 +27,7 @@ type createHighlightRequest struct {
 	TextEndOffset   int32   `json:"text_end_offset"`
 	QuotedText      string  `json:"quoted_text"`
 	Note            *string `json:"note,omitempty"`
+	TargetLanguage  string  `json:"target_language,omitempty"`
 }
 
 type updateHighlightNoteRequest struct {
@@ -44,6 +44,7 @@ type highlightResponse struct {
 	TextEndOffset   int32   `json:"text_end_offset"`
 	QuotedText      string  `json:"quoted_text"`
 	Note            *string `json:"note,omitempty"`
+	Color           string  `json:"color"`
 	CreatedAt       string  `json:"created_at"`
 	UpdatedAt       string  `json:"updated_at"`
 }
@@ -75,6 +76,7 @@ func (h *HighlightHandler) Create(c *gin.Context) {
 		TextEndOffset:   req.TextEndOffset,
 		QuotedText:      req.QuotedText,
 		Note:            req.Note,
+		TargetLanguage:  strings.TrimSpace(req.TargetLanguage),
 	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -139,7 +141,8 @@ func (h *HighlightHandler) ListByUser(c *gin.Context) {
 					TextStartOffset: item.TextStartOffset,
 					TextEndOffset:   item.TextEndOffset,
 					QuotedText:      item.QuotedText,
-					Note:            textFromPG(item.Note),
+					Note:            textFromValue(item.Note),
+					Color:           item.Color,
 					CreatedAt:       item.CreatedAt.Time.UTC().Format(time.RFC3339Nano),
 					UpdatedAt:       item.UpdatedAt.Time.UTC().Format(time.RFC3339Nano),
 				},
@@ -169,7 +172,8 @@ func (h *HighlightHandler) ListByUser(c *gin.Context) {
 				TextStartOffset: item.TextStartOffset,
 				TextEndOffset:   item.TextEndOffset,
 				QuotedText:      item.QuotedText,
-				Note:            textFromPG(item.Note),
+				Note:            textFromValue(item.Note),
+				Color:           item.Color,
 				CreatedAt:       item.CreatedAt.Time.UTC().Format(time.RFC3339Nano),
 				UpdatedAt:       item.UpdatedAt.Time.UTC().Format(time.RFC3339Nano),
 			},
@@ -262,17 +266,19 @@ func toHighlightResponse(item gen.Highlight) highlightResponse {
 		TextStartOffset: item.TextStartOffset,
 		TextEndOffset:   item.TextEndOffset,
 		QuotedText:      item.QuotedText,
-		Note:            textFromPG(item.Note),
+		Note:            textFromValue(item.Note),
+		Color:           item.Color,
 		CreatedAt:       item.CreatedAt.Time.UTC().Format(time.RFC3339Nano),
 		UpdatedAt:       item.UpdatedAt.Time.UTC().Format(time.RFC3339Nano),
 	}
 	return resp
 }
 
-func textFromPG(v pgtype.Text) *string {
-	if !v.Valid {
+func textFromValue(v string) *string {
+	if strings.TrimSpace(v) == "" {
 		return nil
 	}
-	value := v.String
+	value := v
 	return &value
 }
+

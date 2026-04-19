@@ -4,16 +4,14 @@ import (
 	"context"
 	"fmt"
 	"strings"
-
-	"github.com/jin/xreader-web/internal/platform"
 )
 
-func (s *SourceService) ImportOPML(ctx context.Context, userID int64, feeds []FlatFeed, jobID string, store platform.JobStore) {
+func (s *SourceService) ImportOPML(ctx context.Context, userID int64, feeds []FlatFeed, jobID string, store JobStore) {
 	if store == nil {
 		return
 	}
 
-	status := platform.JobStatus{Status: "running", Total: len(feeds)}
+	status := JobStatus{Status: "running", Total: len(feeds)}
 	store.Set(jobID, status)
 
 	go func() {
@@ -55,8 +53,8 @@ func isUniqueViolation(err error) bool {
 	return strings.Contains(msg, "23505") || strings.Contains(msg, "duplicate key") || strings.Contains(msg, "already exists")
 }
 
-func (s *SourceService) ImportOPMLSync(ctx context.Context, userID int64, feeds []OPMLFeed) (platform.JobStatus, error) {
-	status := platform.JobStatus{Status: "running", Total: len(feeds)}
+func (s *SourceService) ImportOPMLSync(ctx context.Context, userID int64, feeds []OPMLFeed) (JobStatus, error) {
+	status := JobStatus{Status: "running", Total: len(feeds)}
 	for _, feed := range feeds {
 		if strings.TrimSpace(feed.XMLURL) == "" {
 			status.Failed++

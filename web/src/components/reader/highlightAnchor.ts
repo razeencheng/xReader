@@ -7,27 +7,34 @@ export interface HighlightAnchor {
 }
 
 export function computeAnchor(range: Range): HighlightAnchor | null {
-  const startContainer = range.startContainer;
-  const paragraphEl = findParagraphElement(startContainer);
-  if (!paragraphEl) return null;
+  if (range.collapsed) return null;
 
-  const indexStr = paragraphEl.getAttribute('data-paragraph-index');
+  const startParagraph = findParagraphElement(range.startContainer);
+  const endParagraph = findParagraphElement(range.endContainer);
+  if (!startParagraph || startParagraph !== endParagraph) return null;
+
+  const indexStr = startParagraph.getAttribute('data-paragraph-index');
   if (indexStr == null) return null;
 
-  const layer = paragraphEl.closest('[data-layer]')?.getAttribute('data-layer') as 'original' | 'translation' | null;
+  const layer =
+    (startParagraph.closest('[data-layer]')?.getAttribute('data-layer') as
+      | 'original'
+      | 'translation'
+      | null) ?? 'original';
 
-  const fullText = paragraphEl.textContent ?? '';
   const quotedText = range.toString();
   if (!quotedText.trim()) return null;
 
-  const textOffset = getTextOffset(paragraphEl, range.startContainer, range.startOffset);
-  const endOffset = textOffset + quotedText.length;
+  const textStartOffset = getTextOffset(startParagraph, range.startContainer, range.startOffset);
+  const textEndOffset = getTextOffset(startParagraph, range.endContainer, range.endOffset);
+
+  if (textStartOffset >= textEndOffset) return null;
 
   return {
-    layer: layer ?? 'original',
-    paragraph_index: parseInt(indexStr, 10),
-    text_start_offset: textOffset,
-    text_end_offset: endOffset,
+    layer,
+    paragraph_index: Number.parseInt(indexStr, 10),
+    text_start_offset: textStartOffset,
+    text_end_offset: textEndOffset,
     quoted_text: quotedText,
   };
 }
@@ -47,11 +54,13 @@ function getTextOffset(root: Node, targetNode: Node, targetOffset: number): numb
   let offset = 0;
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let node: Node | null;
+
   while ((node = walker.nextNode())) {
     if (node === targetNode) {
       return offset + targetOffset;
     }
-    offset += (node.textContent ?? '').length;
+    offset += node.textContent?.length ?? 0;
   }
+
   return offset + targetOffset;
 }

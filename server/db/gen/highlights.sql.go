@@ -14,18 +14,18 @@ import (
 const createHighlight = `-- name: CreateHighlight :one
 INSERT INTO highlights (user_id, article_id, layer, paragraph_index, text_start_offset, text_end_offset, quoted_text, note)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, user_id, article_id, layer, paragraph_index, text_start_offset, text_end_offset, quoted_text, note, created_at, updated_at
+RETURNING id, user_id, article_id, layer, paragraph_index, text_start_offset, text_end_offset, quoted_text, note, color, created_at, updated_at
 `
 
 type CreateHighlightParams struct {
-	UserID          int64       `json:"user_id"`
-	ArticleID       int64       `json:"article_id"`
-	Layer           string      `json:"layer"`
-	ParagraphIndex  int32       `json:"paragraph_index"`
-	TextStartOffset int32       `json:"text_start_offset"`
-	TextEndOffset   int32       `json:"text_end_offset"`
-	QuotedText      string      `json:"quoted_text"`
-	Note            pgtype.Text `json:"note"`
+	UserID          int64  `json:"user_id"`
+	ArticleID       int64  `json:"article_id"`
+	Layer           string `json:"layer"`
+	ParagraphIndex  int32  `json:"paragraph_index"`
+	TextStartOffset int32  `json:"text_start_offset"`
+	TextEndOffset   int32  `json:"text_end_offset"`
+	QuotedText      string `json:"quoted_text"`
+	Note            string `json:"note"`
 }
 
 func (q *Queries) CreateHighlight(ctx context.Context, arg CreateHighlightParams) (Highlight, error) {
@@ -50,6 +50,7 @@ func (q *Queries) CreateHighlight(ctx context.Context, arg CreateHighlightParams
 		&i.TextEndOffset,
 		&i.QuotedText,
 		&i.Note,
+		&i.Color,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -57,20 +58,31 @@ func (q *Queries) CreateHighlight(ctx context.Context, arg CreateHighlightParams
 }
 
 const deleteHighlight = `-- name: DeleteHighlight :exec
-DELETE FROM highlights WHERE id = $1
+DELETE FROM highlights
+WHERE id = $1 AND user_id = $2
 `
 
-func (q *Queries) DeleteHighlight(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, deleteHighlight, id)
+type DeleteHighlightParams struct {
+	ID     int64 `json:"id"`
+	UserID int64 `json:"user_id"`
+}
+
+func (q *Queries) DeleteHighlight(ctx context.Context, arg DeleteHighlightParams) error {
+	_, err := q.db.Exec(ctx, deleteHighlight, arg.ID, arg.UserID)
 	return err
 }
 
-const getHighlightByID = `-- name: GetHighlightByID :one
-SELECT id, user_id, article_id, layer, paragraph_index, text_start_offset, text_end_offset, quoted_text, note, created_at, updated_at FROM highlights WHERE id = $1
+const getHighlight = `-- name: GetHighlight :one
+SELECT id, user_id, article_id, layer, paragraph_index, text_start_offset, text_end_offset, quoted_text, note, color, created_at, updated_at FROM highlights WHERE id = $1 AND user_id = $2
 `
 
-func (q *Queries) GetHighlightByID(ctx context.Context, id int64) (Highlight, error) {
-	row := q.db.QueryRow(ctx, getHighlightByID, id)
+type GetHighlightParams struct {
+	ID     int64 `json:"id"`
+	UserID int64 `json:"user_id"`
+}
+
+func (q *Queries) GetHighlight(ctx context.Context, arg GetHighlightParams) (Highlight, error) {
+	row := q.db.QueryRow(ctx, getHighlight, arg.ID, arg.UserID)
 	var i Highlight
 	err := row.Scan(
 		&i.ID,
@@ -82,6 +94,7 @@ func (q *Queries) GetHighlightByID(ctx context.Context, id int64) (Highlight, er
 		&i.TextEndOffset,
 		&i.QuotedText,
 		&i.Note,
+		&i.Color,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -89,7 +102,9 @@ func (q *Queries) GetHighlightByID(ctx context.Context, id int64) (Highlight, er
 }
 
 const listHighlightsByArticle = `-- name: ListHighlightsByArticle :many
-SELECT id, user_id, article_id, layer, paragraph_index, text_start_offset, text_end_offset, quoted_text, note, created_at, updated_at FROM highlights WHERE user_id = $1 AND article_id = $2 ORDER BY paragraph_index, text_start_offset
+SELECT id, user_id, article_id, layer, paragraph_index, text_start_offset, text_end_offset, quoted_text, note, color, created_at, updated_at FROM highlights
+WHERE user_id = $1 AND article_id = $2
+ORDER BY paragraph_index, text_start_offset
 `
 
 type ListHighlightsByArticleParams struct {
@@ -116,6 +131,7 @@ func (q *Queries) ListHighlightsByArticle(ctx context.Context, arg ListHighlight
 			&i.TextEndOffset,
 			&i.QuotedText,
 			&i.Note,
+			&i.Color,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -130,7 +146,7 @@ func (q *Queries) ListHighlightsByArticle(ctx context.Context, arg ListHighlight
 }
 
 const listHighlightsByUser = `-- name: ListHighlightsByUser :many
-SELECT h.id, h.user_id, h.article_id, h.layer, h.paragraph_index, h.text_start_offset, h.text_end_offset, h.quoted_text, h.note, h.created_at, h.updated_at, a.title as article_title, a.link as article_link
+SELECT h.id, h.user_id, h.article_id, h.layer, h.paragraph_index, h.text_start_offset, h.text_end_offset, h.quoted_text, h.note, h.color, h.created_at, h.updated_at, a.title as article_title, a.link as article_link
 FROM highlights h
 JOIN articles a ON h.article_id = a.id
 WHERE h.user_id = $1
@@ -153,7 +169,8 @@ type ListHighlightsByUserRow struct {
 	TextStartOffset int32              `json:"text_start_offset"`
 	TextEndOffset   int32              `json:"text_end_offset"`
 	QuotedText      string             `json:"quoted_text"`
-	Note            pgtype.Text        `json:"note"`
+	Note            string             `json:"note"`
+	Color           string             `json:"color"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 	ArticleTitle    string             `json:"article_title"`
@@ -179,6 +196,7 @@ func (q *Queries) ListHighlightsByUser(ctx context.Context, arg ListHighlightsBy
 			&i.TextEndOffset,
 			&i.QuotedText,
 			&i.Note,
+			&i.Color,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArticleTitle,
@@ -195,7 +213,7 @@ func (q *Queries) ListHighlightsByUser(ctx context.Context, arg ListHighlightsBy
 }
 
 const searchHighlights = `-- name: SearchHighlights :many
-SELECT h.id, h.user_id, h.article_id, h.layer, h.paragraph_index, h.text_start_offset, h.text_end_offset, h.quoted_text, h.note, h.created_at, h.updated_at, a.title as article_title, a.link as article_link
+SELECT h.id, h.user_id, h.article_id, h.layer, h.paragraph_index, h.text_start_offset, h.text_end_offset, h.quoted_text, h.note, h.color, h.created_at, h.updated_at, a.title as article_title, a.link as article_link
 FROM highlights h
 JOIN articles a ON h.article_id = a.id
 WHERE h.user_id = $1
@@ -220,7 +238,8 @@ type SearchHighlightsRow struct {
 	TextStartOffset int32              `json:"text_start_offset"`
 	TextEndOffset   int32              `json:"text_end_offset"`
 	QuotedText      string             `json:"quoted_text"`
-	Note            pgtype.Text        `json:"note"`
+	Note            string             `json:"note"`
+	Color           string             `json:"color"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 	ArticleTitle    string             `json:"article_title"`
@@ -251,6 +270,7 @@ func (q *Queries) SearchHighlights(ctx context.Context, arg SearchHighlightsPara
 			&i.TextEndOffset,
 			&i.QuotedText,
 			&i.Note,
+			&i.Color,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArticleTitle,
@@ -267,15 +287,19 @@ func (q *Queries) SearchHighlights(ctx context.Context, arg SearchHighlightsPara
 }
 
 const updateHighlightNote = `-- name: UpdateHighlightNote :exec
-UPDATE highlights SET note = $2, updated_at = now() WHERE id = $1
+UPDATE highlights
+SET note = $3,
+    updated_at = now()
+WHERE id = $1 AND user_id = $2
 `
 
 type UpdateHighlightNoteParams struct {
-	ID   int64       `json:"id"`
-	Note pgtype.Text `json:"note"`
+	ID     int64  `json:"id"`
+	UserID int64  `json:"user_id"`
+	Note   string `json:"note"`
 }
 
 func (q *Queries) UpdateHighlightNote(ctx context.Context, arg UpdateHighlightNoteParams) error {
-	_, err := q.db.Exec(ctx, updateHighlightNote, arg.ID, arg.Note)
+	_, err := q.db.Exec(ctx, updateHighlightNote, arg.ID, arg.UserID, arg.Note)
 	return err
 }

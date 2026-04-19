@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jin/xreader-web/internal/admin"
 	"github.com/jin/xreader-web/internal/platform"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -18,7 +19,33 @@ func main() {
 		return
 	}
 
-	r := platform.NewRouter()
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		log.Fatal("DATABASE_URL not set")
+	}
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		redisURL = "redis://localhost:6379"
+	}
+
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dbURL)
+	if err != nil {
+		log.Fatalf("connect to database: %v", err)
+	}
+	defer pool.Close()
+
+	opts, err := redis.ParseURL(redisURL)
+	if err != nil {
+		log.Fatalf("parse redis URL: %v", err)
+	}
+	rdb := redis.NewClient(opts)
+	defer rdb.Close()
+
+	r := platform.NewRouter(platform.RouterDeps{
+		Pool:  pool,
+		Redis: rdb,
+	})
 	if err := r.Run(":8080"); err != nil {
 		log.Fatal(err)
 	}

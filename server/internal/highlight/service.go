@@ -2,15 +2,21 @@ package highlight
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
+	"unicode/utf16"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jin/xreader-web/db/gen"
+	"github.com/jin/xreader-web/internal/ai"
 )
 
 var errNotFound = errors.New("not found")
+
+const defaultTargetLanguage = "zh-CN"
 
 type CreateParams struct {
 	ArticleID       int64
@@ -20,6 +26,7 @@ type CreateParams struct {
 	TextEndOffset   int32
 	QuotedText      string
 	Note            *string
+	TargetLanguage  string
 }
 
 type HighlightService struct {
@@ -32,10 +39,14 @@ func NewHighlightService(pool *pgxpool.Pool) *HighlightService {
 }
 
 func (s *HighlightService) Create(ctx context.Context, userID int64, params CreateParams) (*gen.Highlight, error) {
+	params.Layer = strings.TrimSpace(params.Layer)
 	if err := validateLayer(params.Layer); err != nil {
 		return nil, err
 	}
 	if err := validateOffsets(params.TextStartOffset, params.TextEndOffset); err != nil {
+		return nil, err
+	}
+	if err := s.validateQuotedText(ctx, userID, params); err != nil {
 		return nil, err
 	}
 
@@ -47,7 +58,7 @@ func (s *HighlightService) Create(ctx context.Context, userID int64, params Crea
 		TextStartOffset: params.TextStartOffset,
 		TextEndOffset:   params.TextEndOffset,
 		QuotedText:      params.QuotedText,
-		Note:            textPtr(params.Note),
+		Note:            noteOrEmpty(params.Note),
 	})
 	if err != nil {
 		return nil, err
@@ -64,23 +75,89 @@ func (s *HighlightService) ListByUser(ctx context.Context, userID int64, limit, 
 }
 
 func (s *HighlightService) Search(ctx context.Context, userID int64, query string, limit, offset int32) ([]gen.SearchHighlightsRow, error) {
-	return s.queries.SearchHighlights(ctx, gen.SearchHighlightsParams{UserID: userID, Column2: pgtype.Text{String: query, Valid: true}, Limit: clampLimit(limit), Offset: clampOffset(offset)})
+	return s.queries.SearchHighlights(ctx, gen.SearchHighlightsParams{UserID: userID, Column2: pgtype.Text{String: strings.TrimSpace(query), Valid: strings.TrimSpace(query) != ""}, Limit: clampLimit(limit), Offset: clampOffset(offset)})
 }
 
 func (s *HighlightService) UpdateNote(ctx context.Context, userID, highlightID int64, note string) error {
-	highlight, err := s.queries.GetHighlightByID(ctx, highlightID)
-	if err != nil || highlight.UserID != userID {
+	if _, err := s.queries.GetHighlight(ctx, gen.GetHighlightParams{ID: highlightID, UserID: userID}); err != nil {
 		return errNotFound
 	}
-	return s.queries.UpdateHighlightNote(ctx, gen.UpdateHighlightNoteParams{ID: highlightID, Note: pgtype.Text{String: note, Valid: true}})
+	return s.queries.UpdateHighlightNote(ctx, gen.UpdateHighlightNoteParams{ID: highlightID, UserID: userID, Note: note})
 }
 
 func (s *HighlightService) Delete(ctx context.Context, userID, highlightID int64) error {
-	highlight, err := s.queries.GetHighlightByID(ctx, highlightID)
-	if err != nil || highlight.UserID != userID {
+	if _, err := s.queries.GetHighlight(ctx, gen.GetHighlightParams{ID: highlightID, UserID: userID}); err != nil {
 		return errNotFound
 	}
-	return s.queries.DeleteHighlight(ctx, highlightID)
+	return s.queries.DeleteHighlight(ctx, gen.DeleteHighlightParams{ID: highlightID, UserID: userID})
+}
+
+func (s *HighlightService) validateQuotedText(ctx context.Context, userID int64, params CreateParams) error {
+	paragraphText, err := s.paragraphText(ctx, userID, params)
+	if err != nil {
+		return err
+	}
+
+	expected, err := utf16Substring(paragraphText, params.TextStartOffset, params.TextEndOffset)
+	if err != nil {
+		return err
+	}
+	if expected != params.QuotedText {
+		return fmt.Errorf("quoted_text does not match selected text")
+	}
+	return nil
+}
+
+func (s *HighlightService) paragraphText(ctx context.Context, userID int64, params CreateParams) (string, error) {
+	article, err := s.queries.GetArticleByID(ctx, params.ArticleID)
+	if err != nil {
+		return "", errNotFound
+	}
+
+	source, err := s.queries.GetSourceByID(ctx, article.SourceID)
+	if err != nil || source.UserID != userID {
+		return "", errNotFound
+	}
+
+	switch params.Layer {
+	case "translation":
+		targetLanguage := params.TargetLanguage
+		if targetLanguage == "" {
+			targetLanguage = defaultTargetLanguage
+		}
+		aiRow, err := s.queries.GetArticleAI(ctx, gen.GetArticleAIParams{ArticleID: params.ArticleID, TargetLanguage: targetLanguage})
+		if err != nil {
+			return "", errNotFound
+		}
+
+		var paragraphs []ai.TranslatedParagraph
+		if len(aiRow.BodyTranslationContent) > 0 {
+			if err := json.Unmarshal(aiRow.BodyTranslationContent, &paragraphs); err != nil {
+				return "", fmt.Errorf("parse translation content: %w", err)
+			}
+		}
+		if params.ParagraphIndex < 0 || int(params.ParagraphIndex) >= len(paragraphs) {
+			return "", fmt.Errorf("paragraph index out of range")
+		}
+		text := strings.TrimSpace(paragraphs[params.ParagraphIndex].Translation)
+		if text == "" {
+			return "", fmt.Errorf("translation paragraph is empty")
+		}
+		return text, nil
+	default:
+		paragraphs := ai.SplitParagraphs(article.ContentHtml)
+		if len(paragraphs) == 0 && article.ContentText != "" {
+			paragraphs = ai.SplitParagraphs(article.ContentText)
+		}
+		if params.ParagraphIndex < 0 || int(params.ParagraphIndex) >= len(paragraphs) {
+			return "", fmt.Errorf("paragraph index out of range")
+		}
+		text := strings.TrimSpace(paragraphs[params.ParagraphIndex].Original)
+		if text == "" {
+			return "", fmt.Errorf("paragraph is empty")
+		}
+		return text, nil
+	}
 }
 
 func validateLayer(layer string) error {
@@ -119,9 +196,24 @@ func clampOffset(offset int32) int32 {
 	return offset
 }
 
-func textPtr(v *string) pgtype.Text {
+func noteOrEmpty(v *string) string {
 	if v == nil {
-		return pgtype.Text{}
+		return ""
 	}
-	return pgtype.Text{String: *v, Valid: true}
+	return strings.TrimSpace(*v)
+}
+
+func utf16Substring(text string, start, end int32) (string, error) {
+	if start < 0 || end < 0 {
+		return "", fmt.Errorf("offsets must be non-negative")
+	}
+	if start >= end {
+		return "", fmt.Errorf("text_start_offset must be less than text_end_offset")
+	}
+
+	units := utf16.Encode([]rune(text))
+	if int(end) > len(units) {
+		return "", fmt.Errorf("offsets out of range")
+	}
+	return string(utf16.Decode(units[start:end])), nil
 }

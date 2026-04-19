@@ -76,10 +76,10 @@ func insertHighlight(t *testing.T, svc *HighlightService, ctx context.Context, u
 	created, err := svc.Create(ctx, userID, CreateParams{
 		ArticleID:       articleID,
 		Layer:           "original",
-		ParagraphIndex:  1,
-		TextStartOffset: 3,
-		TextEndOffset:   9,
-		QuotedText:      "example",
+		ParagraphIndex:  0,
+		TextStartOffset: 0,
+		TextEndOffset:   5,
+		QuotedText:      "Hello",
 		Note:            &note,
 	})
 	require.NoError(t, err)
@@ -102,14 +102,13 @@ func TestHighlightService_CRUD(t *testing.T) {
 	note := "updated note"
 	require.NoError(t, svc.UpdateNote(ctx, userID, created.ID, note))
 
-	updated, err := queries.GetHighlightByID(ctx, created.ID)
+	updated, err := queries.GetHighlight(ctx, gen.GetHighlightParams{ID: created.ID, UserID: userID})
 	require.NoError(t, err)
-	require.True(t, updated.Note.Valid)
-	require.Equal(t, note, updated.Note.String)
+	require.Equal(t, note, updated.Note)
 
 	require.NoError(t, svc.Delete(ctx, userID, created.ID))
 
-	_, err = queries.GetHighlightByID(ctx, created.ID)
+	_, err = queries.GetHighlight(ctx, gen.GetHighlightParams{ID: created.ID, UserID: userID})
 	require.Error(t, err)
 }
 
