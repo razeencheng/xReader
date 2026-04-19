@@ -1,0 +1,16 @@
+provider:
+  base_url: "https://relay.example.com/v1"   # OpenAI-compatible endpoint
+  api_key_env: "XREADER_AI_API_KEY"          # which env var holds the key
+  timeout_seconds: 60
+  max_retries: 2
+
+models:
+  summary: "deepseek-chat"
+  title_translation: "deepseek-chat"
+  body_translation: "deepseek-chat"
+
+limits:
+  max_tokens_summary: 400
+  max_tokens_title: 60
+  max_tokens_body_paragraph: 600
+  temperature: 0.2

@@ -1,0 +1,81 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: xreader
+      POSTGRES_PASSWORD: xreader
+      POSTGRES_DB: xreader
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xreader"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build: ./server
+    command: ["/app/api"]
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      XREADER_AI_CONFIG: /etc/xreader/ai.yaml
+      XREADER_AI_API_KEY: ${XREADER_AI_API_KEY}
+      SESSION_SECRET: ${SESSION_SECRET}
+    volumes:
+      - ./config/ai.yaml:/etc/xreader/ai.yaml:ro
+
+  worker:
+    build: ./server
+    command: ["/app/worker"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      XREADER_AI_CONFIG: /etc/xreader/ai.yaml
+      XREADER_AI_API_KEY: ${XREADER_AI_API_KEY}
+      SESSION_SECRET: ${SESSION_SECRET}
+    volumes:
+      - ./config/ai.yaml:/etc/xreader/ai.yaml:ro
+
+  web:
+    build: ./web
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_BASE: ""
+    depends_on:
+      - api
+
+volumes:
+  pgdata: {}
+  redisdata: {}

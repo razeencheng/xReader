@@ -1,0 +1,119 @@
+<h2>Q7 · Reader view · prev/next navigation</h2>
+<p class="subtitle">Reader page now with bottom nav bar, end-of-article "next up" card, and keyboard hints. Scroll the mockup to see the flow.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Reader · prev/next article navigation</div>
+  <div class="mockup-body" style="padding:0;background:#fdfbf6">
+
+    <!-- Top bar -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 48px;border-bottom:1px solid #ece6d8;font-family:system-ui;font-size:12px;color:#8a8275">
+      <div>← 返回 Feed</div>
+      <div style="display:flex;gap:12px;align-items:center">
+        <span style="opacity:0.6">2 / 142</span>
+        <span>📰 はてなブログ · JA → 中</span>
+      </div>
+      <div style="display:flex;gap:14px">
+        <span>⭐ 收藏</span>
+        <span>🖍 高亮</span>
+        <span>📝 笔记</span>
+        <span>🔗 原文</span>
+      </div>
+    </div>
+
+    <!-- Article body -->
+    <div style="max-width:680px;margin:0 auto;padding:36px 48px 24px 48px;font-family:'Iowan Old Style',Georgia,serif;color:#1f1f1f">
+
+      <h3 style="margin:0 0 6px 0;font-size:32px;line-height:1.25;font-weight:700">为什么我把家用服务器全部迁到了 NixOS</h3>
+      <div style="font-family:system-ui;font-size:13px;color:#8a8275;margin-bottom:6px;font-style:italic">nixosサーバー管理に移行した理由</div>
+      <div style="font-family:system-ui;font-size:13px;color:#8a8275;margin-bottom:24px">jnkmr · 2 小时前 · 9 分钟阅读</div>
+
+      <div style="background:#fff8e6;border-left:3px solid #d4a24c;padding:14px 18px;margin-bottom:30px;font-family:system-ui;font-size:14px;line-height:1.6;color:#3b3628">
+        <div style="font-size:10px;letter-spacing:2px;color:#a07a20;font-weight:700;margin-bottom:6px">要点</div>
+        ① 从 Ubuntu 迁移到 NixOS 的核心动机是配置可复现。② 最大代价是前三周的学习曲线。③ 一年后作者认为值得，并给出推荐给哪类人、不推荐给哪类人的清单。
+      </div>
+
+      <p style="margin:0 0 8px 0;font-size:16px;line-height:1.8;color:#6a6252;font-family:'Hiragino Mincho ProN',Georgia,serif">一年前、私は家にある 4 台のサーバーすべてで Ubuntu を使っていました。アップデートのたびに、どこかが壊れる。</p>
+      <p style="margin:0 0 24px 0;font-size:16px;line-height:1.8;color:#1f1f1f;font-family:'Source Han Serif',Georgia,serif">一年前，我家里四台服务器全部跑着 Ubuntu。每次升级总有东西坏掉。</p>
+
+      <p style="margin:0 0 8px 0;font-size:16px;line-height:1.8;color:#6a6252;font-family:'Hiragino Mincho ProN',Georgia,serif">NixOS を推薦できる人：家に 2 台以上のサーバー、Git と Linux に慣れている。</p>
+      <p style="margin:0 0 24px 0;font-size:16px;line-height:1.8;color:#1f1f1f;font-family:'Source Han Serif',Georgia,serif">适合用 NixOS 的人：家里有两台以上服务器，熟悉 Git 和 Linux。</p>
+
+      <div style="text-align:center;margin:16px 0;font-family:system-ui;font-size:12px;color:#b5aea0">— 文末 —</div>
+    </div>
+
+    <!-- End-of-article "next up" card -->
+    <div style="max-width:680px;margin:0 auto 40px auto;padding:0 48px;font-family:system-ui">
+      <div style="background:#fbf7ec;border:1px solid #e6dec8;border-radius:10px;padding:20px 24px;cursor:pointer;display:flex;gap:18px;align-items:flex-start">
+        <div style="flex-shrink:0;background:#2a2a2a;color:#fdfbf6;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700">→</div>
+        <div style="flex:1">
+          <div style="font-size:10px;letter-spacing:2px;color:#8a8275;font-weight:700;margin-bottom:6px">下一篇 · 按 J 或点击继续</div>
+          <div style="display:flex;gap:8px;align-items:baseline;margin-bottom:4px">
+            <div style="font-family:'Iowan Old Style',Georgia,serif;font-size:19px;color:#1f1f1f;font-weight:700;line-height:1.3">nanoGPT 刚发布更新：H100 上 15 分钟训练完</div>
+          </div>
+          <div style="font-size:12px;color:#8a8275;margin-bottom:8px">
+            <span style="padding:1px 6px;background:#1d1d1d;color:#fff;border-radius:8px;font-weight:600;margin-right:6px">𝕏 karpathy</span>
+            2h · EN → 中
+          </div>
+          <div style="font-size:13px;color:#4a4338;line-height:1.6">
+            <span style="color:#8a8275;font-weight:600;font-size:11px;letter-spacing:1.5px;margin-right:6px">要点</span>
+            nanoGPT 发布新版，15 分钟即可在 H100 上完成训练。配置简化，演示仓库同步更新。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sticky bottom nav bar -->
+    <div style="position:sticky;bottom:0;background:#fdfbf6;border-top:1px solid #ece6d8;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;font-family:system-ui;font-size:13px">
+      <div style="display:flex;align-items:center;gap:10px;max-width:44%;cursor:pointer;opacity:0.8">
+        <span style="color:#8a8275;flex-shrink:0">← K</span>
+        <div style="overflow:hidden">
+          <div style="font-size:10px;letter-spacing:1.5px;color:#8a8275">上一篇</div>
+          <div style="color:#1f1f1f;font-weight:500;white-space:nowrap;text-overflow:ellipsis;overflow:hidden">Vercel AI SDK 为何周下载量突破 200 万</div>
+        </div>
+      </div>
+      <div style="color:#8a8275;font-size:11px;flex-shrink:0;padding:0 16px">2 / 142</div>
+      <div style="display:flex;align-items:center;gap:10px;max-width:44%;cursor:pointer;text-align:right">
+        <div style="overflow:hidden">
+          <div style="font-size:10px;letter-spacing:1.5px;color:#8a8275">下一篇</div>
+          <div style="color:#1f1f1f;font-weight:500;white-space:nowrap;text-overflow:ellipsis;overflow:hidden">nanoGPT 刚发布更新：H100 上 15 分钟训练完</div>
+        </div>
+        <span style="color:#8a8275;flex-shrink:0">J →</span>
+      </div>
+    </div>
+
+    <!-- Keyboard hint strip -->
+    <div style="padding:8px 28px;background:#f4efe3;border-top:1px solid #ece6d8;font-family:system-ui;font-size:11px;color:#8a8275;display:flex;gap:20px;justify-content:center">
+      <span>J / → 下一篇</span>
+      <span>K / ← 上一篇</span>
+      <span>S 收藏</span>
+      <span>H 高亮</span>
+      <span>E 标记已读返回</span>
+      <span>Esc 返回 Feed</span>
+    </div>
+
+  </div>
+</div>
+
+<div class="pros-cons" style="margin-top:1.5rem">
+  <div class="pros">
+    <h4>What's added</h4>
+    <ul>
+      <li>Sticky bottom nav bar — <strong>prev + next titles always visible</strong> as you scroll</li>
+      <li>End-of-article "next up" card — promotes continuous reading at the natural stopping point</li>
+      <li>Index indicator "2 / 142" — you know where you are in the queue</li>
+      <li>Keyboard <strong>J/→ next, K/← prev</strong> — matches feed navigation keys</li>
+      <li>Title truncates with ellipsis in the nav bar so long titles don't break layout</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>Small decisions still to make</h4>
+    <ul>
+      <li>When you move to next article, should the current one <strong>auto mark-as-read</strong>, or only on explicit E key?</li>
+      <li>On mobile, should swiping left/right also navigate prev/next? (risks conflict with text selection)</li>
+      <li>Should <strong>"next up" card at the bottom</strong> also show when the article is short (above-fold)? Or only after scroll?</li>
+      <li>In the nav bar, prev/next title from <strong>the current filter</strong> (e.g., within "Today" tab) or from the unified stream?</li>
+    </ul>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:1.5rem">Refresh <strong>http://localhost:61136</strong>. Tell me if this matches what you wanted, and answer any of the 4 small decisions you have opinions on.</p>

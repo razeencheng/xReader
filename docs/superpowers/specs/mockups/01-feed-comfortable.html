@@ -1,0 +1,174 @@
+<h2>Q6' · Refined feed · Comfortable + Compact modes</h2>
+<p class="subtitle">Updated with all four of your refinements. Two density modes shown side-by-side. This mockup becomes the <strong>visual anchor</strong> for the design doc — react with any last nitpicks before I move to architecture.</p>
+
+<!-- ========== UPDATED COMFORTABLE MODE ========== -->
+<div class="mockup">
+  <div class="mockup-header">① Comfortable mode (default) · label "AI 摘要" removed, replaced with neutral "要点"</div>
+  <div class="mockup-body" style="padding:0;background:#fbfaf7">
+
+    <!-- Top bar: tabs + density toggle + language chip -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 28px;border-bottom:1px solid #ece6d8;font-family:system-ui;font-size:13px">
+      <div style="display:flex;gap:6px">
+        <div style="background:#2a2a2a;color:#fbfaf7;padding:5px 14px;border-radius:16px;font-weight:600">今日</div>
+        <div style="padding:5px 14px;opacity:0.55">全部</div>
+        <div style="padding:5px 14px;opacity:0.55">收藏</div>
+      </div>
+      <div style="display:flex;gap:14px;align-items:center;font-size:12px">
+        <div style="display:flex;background:#ece6d8;border-radius:14px;padding:3px">
+          <span style="background:#fbfaf7;padding:3px 10px;border-radius:11px;font-weight:600">舒适</span>
+          <span style="padding:3px 10px;opacity:0.55">紧凑</span>
+        </div>
+        <span style="opacity:0.7">母语：中文（简体）⚙</span>
+      </div>
+    </div>
+
+    <!-- Feed items -->
+    <div style="padding:6px 28px 20px 28px;font-family:'Iowan Old Style',Georgia,serif">
+
+      <!-- Item 1: English source, native EN user would have no translation; this demo native = 中, so EN → 中 -->
+      <article style="padding:20px 0;border-bottom:1px solid #ece6d8">
+        <div style="display:flex;justify-content:space-between;font-family:system-ui;font-size:12px;color:#8a8275;margin-bottom:8px">
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="padding:1px 8px;background:#eee7d8;color:#5b5444;border-radius:10px;font-weight:600">📰 Vercel Blog</span>
+            <span>Lee Robinson · 3h · EN → 中</span>
+          </div>
+          <div style="opacity:0.5">6 min · ⭐</div>
+        </div>
+        <h3 style="margin:0 0 4px 0;font-size:22px;line-height:1.3;color:#1f1f1f">Vercel AI SDK 为何周下载量突破 200 万</h3>
+        <div style="font-family:system-ui;font-size:12px;color:#8a8275;margin-bottom:8px;font-style:italic">原标题：Why Vercel's AI SDK hit 2M weekly downloads</div>
+        <div style="font-family:system-ui;font-size:14px;line-height:1.6;color:#4a4338">
+          <span style="color:#8a8275;font-weight:600;font-size:11px;letter-spacing:1.5px;margin-right:6px">要点</span>
+          统一流式/工具调用/错误处理 API 是 AI SDK 胜出的关键。v5 beta 新增 Generative UI，让模型直接产出 React 组件。代价：锁进 Vercel 心智模型。
+        </div>
+      </article>
+
+      <!-- Item 2: Japanese -->
+      <article style="padding:20px 0;border-bottom:1px solid #ece6d8">
+        <div style="display:flex;justify-content:space-between;font-family:system-ui;font-size:12px;color:#8a8275;margin-bottom:8px">
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="padding:1px 8px;background:#eee7d8;color:#5b5444;border-radius:10px;font-weight:600">📰 はてなブログ</span>
+            <span>jnkmr · 2h · JA → 中</span>
+          </div>
+          <div style="opacity:0.5">9 min</div>
+        </div>
+        <h3 style="margin:0 0 4px 0;font-size:22px;line-height:1.3;color:#1f1f1f">为什么我把家用服务器全部迁到了 NixOS</h3>
+        <div style="font-family:system-ui;font-size:12px;color:#8a8275;margin-bottom:8px;font-style:italic">原标题：nixosサーバー管理に移行した理由</div>
+        <div style="font-family:system-ui;font-size:14px;line-height:1.6;color:#4a4338">
+          <span style="color:#8a8275;font-weight:600;font-size:11px;letter-spacing:1.5px;margin-right:6px">要点</span>
+          一年前作者把家里四台服务器从 Ubuntu 迁到 NixOS。核心收益：配置可复现、回滚容易、跨机器一致。代价：学习曲线陡，第一个稳定配置花了三周。
+        </div>
+      </article>
+
+      <!-- Item 3: short tweet -->
+      <article style="padding:20px 0;border-bottom:1px solid #ece6d8">
+        <div style="display:flex;justify-content:space-between;font-family:system-ui;font-size:12px;color:#8a8275;margin-bottom:8px">
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="padding:1px 8px;background:#1d1d1d;color:#fff;border-radius:10px;font-weight:600">𝕏 @karpathy</span>
+            <span>2h · EN → 中</span>
+          </div>
+          <div style="opacity:0.5">&lt; 1 min</div>
+        </div>
+        <div style="font-family:system-ui;font-size:15px;line-height:1.6;color:#2a2a2a;margin-bottom:4px">nanoGPT 刚发布了更新 — 现在在单张 H100 上 15 分钟就能训练完。配置文件比以前更简洁，演示仓库也一并更新。</div>
+        <div style="font-family:system-ui;font-size:12px;color:#8a8275;font-style:italic">原文：nanoGPT update is out! Now trains in 15 minutes on an H100...</div>
+      </article>
+
+      <!-- Item 4: V2EX native Chinese — now WITH 要点 summary (per your feedback) -->
+      <article style="padding:20px 0">
+        <div style="display:flex;justify-content:space-between;font-family:system-ui;font-size:12px;color:#8a8275;margin-bottom:8px">
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="padding:1px 8px;background:#a5d5a5;color:#2a4a2a;border-radius:10px;font-weight:600">💬 V2EX</span>
+            <span>热帖 · 5h · 中文</span>
+          </div>
+          <div style="opacity:0.5">282 回复</div>
+        </div>
+        <h3 style="margin:0 0 6px 0;font-size:22px;line-height:1.3;color:#1f1f1f">在北京租房踩的 12 个坑，写给和我一样第一次租房的人</h3>
+        <div style="font-family:system-ui;font-size:14px;line-height:1.6;color:#4a4338">
+          <span style="color:#8a8275;font-weight:600;font-size:11px;letter-spacing:1.5px;margin-right:6px">要点</span>
+          作者复盘今年租房踩过的坑：中介费、押金、电费转账、甲醛、朝向。评论区扩展了电梯、物业、邻居、代办合同、退租时间节点 5 个注意点。
+        </div>
+      </article>
+
+    </div>
+
+    <div style="padding:10px 28px;background:#f4efe3;border-top:1px solid #ece6d8;font-family:system-ui;font-size:11px;color:#8a8275;display:flex;gap:20px;justify-content:center">
+      <span>J / K 导航</span><span>Enter 打开</span><span>E 已读</span><span>S 收藏</span><span>C 切换密度</span><span>/ 搜索</span>
+    </div>
+  </div>
+</div>
+
+<!-- ========== COMPACT MODE ========== -->
+<div class="mockup" style="margin-top:1.5rem">
+  <div class="mockup-header">② Compact mode · titles only · same items, ~4× density for power-scanning</div>
+  <div class="mockup-body" style="padding:0;background:#fbfaf7">
+
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 28px;border-bottom:1px solid #ece6d8;font-family:system-ui;font-size:13px">
+      <div style="display:flex;gap:6px">
+        <div style="background:#2a2a2a;color:#fbfaf7;padding:5px 14px;border-radius:16px;font-weight:600">今日</div>
+        <div style="padding:5px 14px;opacity:0.55">全部</div>
+        <div style="padding:5px 14px;opacity:0.55">收藏</div>
+      </div>
+      <div style="display:flex;gap:14px;align-items:center;font-size:12px">
+        <div style="display:flex;background:#ece6d8;border-radius:14px;padding:3px">
+          <span style="padding:3px 10px;opacity:0.55">舒适</span>
+          <span style="background:#fbfaf7;padding:3px 10px;border-radius:11px;font-weight:600">紧凑</span>
+        </div>
+        <span style="opacity:0.7">母语：中文 ⚙</span>
+      </div>
+    </div>
+
+    <div style="padding:4px 28px 8px 28px;font-family:system-ui">
+      <!-- Compact row 1 -->
+      <div style="padding:8px 0;border-bottom:1px solid #ece6d8;display:flex;gap:10px;align-items:baseline">
+        <span style="padding:1px 6px;background:#eee7d8;color:#5b5444;border-radius:8px;font-size:10px;font-weight:600;flex-shrink:0">📰 Vercel</span>
+        <span style="font-size:14px;color:#1f1f1f;font-weight:500;flex:1">Vercel AI SDK 为何周下载量突破 200 万</span>
+        <span style="font-size:11px;color:#8a8275;flex-shrink:0">3h · 6min · ⭐</span>
+      </div>
+      <!-- Compact row 2 -->
+      <div style="padding:8px 0;border-bottom:1px solid #ece6d8;display:flex;gap:10px;align-items:baseline">
+        <span style="padding:1px 6px;background:#eee7d8;color:#5b5444;border-radius:8px;font-size:10px;font-weight:600;flex-shrink:0">📰 はてな</span>
+        <span style="font-size:14px;color:#1f1f1f;font-weight:500;flex:1">为什么我把家用服务器全部迁到了 NixOS</span>
+        <span style="font-size:11px;color:#8a8275;flex-shrink:0">2h · 9min</span>
+      </div>
+      <!-- Compact row 3 -->
+      <div style="padding:8px 0;border-bottom:1px solid #ece6d8;display:flex;gap:10px;align-items:baseline">
+        <span style="padding:1px 6px;background:#1d1d1d;color:#fff;border-radius:8px;font-size:10px;font-weight:600;flex-shrink:0">𝕏 karpathy</span>
+        <span style="font-size:14px;color:#1f1f1f;font-weight:500;flex:1">nanoGPT 刚发布更新：H100 上 15 分钟训练完</span>
+        <span style="font-size:11px;color:#8a8275;flex-shrink:0">2h</span>
+      </div>
+      <!-- Compact row 4 -->
+      <div style="padding:8px 0;border-bottom:1px solid #ece6d8;display:flex;gap:10px;align-items:baseline">
+        <span style="padding:1px 6px;background:#d4e5ef;color:#2a4a6a;border-radius:8px;font-size:10px;font-weight:600;flex-shrink:0">🧠 arXiv</span>
+        <span style="font-size:14px;color:#1f1f1f;font-weight:500;flex:1">通过混合稀疏注意力实现高效 Transformer</span>
+        <span style="font-size:11px;color:#8a8275;flex-shrink:0">17h · 论文</span>
+      </div>
+      <!-- Compact row 5 -->
+      <div style="padding:8px 0;border-bottom:1px solid #ece6d8;display:flex;gap:10px;align-items:baseline">
+        <span style="padding:1px 6px;background:#a5d5a5;color:#2a4a2a;border-radius:8px;font-size:10px;font-weight:600;flex-shrink:0">💬 V2EX</span>
+        <span style="font-size:14px;color:#1f1f1f;font-weight:500;flex:1">在北京租房踩的 12 个坑，写给和我一样第一次租房的人</span>
+        <span style="font-size:11px;color:#8a8275;flex-shrink:0">5h · 282 回复</span>
+      </div>
+      <!-- Compact row 6 -->
+      <div style="padding:8px 0;border-bottom:1px solid #ece6d8;display:flex;gap:10px;align-items:baseline">
+        <span style="padding:1px 6px;background:#eee7d8;color:#5b5444;border-radius:8px;font-size:10px;font-weight:600;flex-shrink:0">📰 Fly.io</span>
+        <span style="font-size:14px;color:#1f1f1f;font-weight:500;flex:1">在边缘节点跑 Postgres 的正确姿势</span>
+        <span style="font-size:11px;color:#8a8275;flex-shrink:0">7h · 12min</span>
+      </div>
+      <!-- Compact row 7 -->
+      <div style="padding:8px 0;border-bottom:1px solid #ece6d8;display:flex;gap:10px;align-items:baseline">
+        <span style="padding:1px 6px;background:#1d1d1d;color:#fff;border-radius:8px;font-size:10px;font-weight:600;flex-shrink:0">𝕏 simonw</span>
+        <span style="font-size:14px;color:#1f1f1f;font-weight:500;flex:1">本周 LLM 值得关注的 8 个工具链更新</span>
+        <span style="font-size:11px;color:#8a8275;flex-shrink:0">9h</span>
+      </div>
+      <!-- Compact row 8 -->
+      <div style="padding:8px 0;display:flex;gap:10px;align-items:baseline">
+        <span style="padding:1px 6px;background:#d4e5ef;color:#2a4a6a;border-radius:8px;font-size:10px;font-weight:600;flex-shrink:0">🧠 HF</span>
+        <span style="font-size:14px;color:#1f1f1f;font-weight:500;flex:1">Mistral 发布新一代多模态模型权重</span>
+        <span style="font-size:11px;color:#8a8275;flex-shrink:0">11h</span>
+      </div>
+    </div>
+
+    <div style="padding:8px 28px;background:#f4efe3;border-top:1px solid #ece6d8;font-family:system-ui;font-size:11px;color:#8a8275;text-align:center">Hover 显示要点 · Enter 进入阅读 · 空格预览摘要</div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:1.5rem"><strong>Any last visual nitpicks?</strong> If this feels done, I'll lock it in as the visual anchor and we'll move off mockups into <strong>scope/architecture</strong> — which means one more terminal question about source adapter coverage, then I decompose the platform into sub-projects and we start a design doc.</p>

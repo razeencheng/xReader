@@ -1,0 +1,11 @@
+.superpowers/
+.env
+.env.local
+node_modules/
+*.log
+.DS_Store
+dist/
+build/
+config/ai.yaml
+web/.next/
+web/out/
