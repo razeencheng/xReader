@@ -35,9 +35,9 @@ const THEME_OPTIONS: { value: Theme; label: string; description: string }[] = [
 ];
 
 const SELECT_CLASS =
-  'w-full rounded-2xl border border-[#ece6d8] bg-[#fbfaf7] px-4 py-3 font-[system-ui] text-sm text-[#1f1f1f] outline-none transition-colors focus:border-[#d4a24c] focus:ring-2 focus:ring-[#d4a24c]/20';
+  'w-full rounded-2xl border border-[var(--border-default)] bg-[var(--bg-body)] px-4 py-3 font-[system-ui] text-sm text-[var(--text-body)] outline-none transition-colors focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--accent)]/20';
 const SEGMENT_CLASS =
-  'rounded-full border border-[#ece6d8] px-4 py-2 font-[system-ui] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4a24c] focus-visible:ring-offset-2 focus-visible:ring-offset-[#fdfbf6]';
+  'rounded-full border border-[var(--border-default)] px-4 py-2 font-[system-ui] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-card)]';
 
 function buildPatchPayload(current: UserSettings, initial: UserSettings) {
   const payload: Partial<Record<SettingKey, string>> = {};
@@ -65,10 +65,10 @@ function SettingsSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-3xl border border-[#ece6d8] bg-white/80 p-6 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+    <section className="rounded-3xl border border-[var(--border-default)] bg-[var(--bg-input)]/80 p-6 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
       <div className="mb-4 space-y-1">
-        <h2 className="font-serif text-xl font-semibold tracking-tight text-[#1f1f1f]">{title}</h2>
-        <p className="font-[system-ui] text-sm leading-6 text-[#8a8275]">{description}</p>
+        <h2 className="font-serif text-xl font-semibold tracking-tight text-[var(--text-body)]">{title}</h2>
+        <p className="font-[system-ui] text-sm leading-6 text-[var(--text-muted)]">{description}</p>
       </div>
       {children}
     </section>
@@ -156,34 +156,34 @@ export default function SettingsPage() {
 
   if (isLoading || !formSettings || !initialSettings) {
     return (
-      <main className="min-h-screen bg-[#fdfbf6] text-[#1f1f1f]">
+      <main className="min-h-screen bg-[var(--bg-body)] text-[var(--text-body)]">
         <div className="mx-auto flex min-h-screen max-w-3xl items-center justify-center px-4">
-          <p className="font-[system-ui] text-sm text-[#8a8275]">加载设置中…</p>
+          <p className="font-[system-ui] text-sm text-[var(--text-muted)]">加载设置中…</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#fdfbf6] text-[#1f1f1f]">
+    <main className="min-h-screen bg-[var(--bg-body)] text-[var(--text-body)]">
       <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-6 flex items-center justify-between gap-4">
-          <Link href="/" className="font-[system-ui] text-sm text-[#8a8275] transition-colors hover:text-[#1f1f1f]">
+          <Link href="/" className="font-[system-ui] text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-body)]">
             ← 返回首页
           </Link>
-          <div className="font-[system-ui] text-sm text-[#8a8275]">
+          <div className="font-[system-ui] text-sm text-[var(--text-muted)]">
             主页 / 设置
           </div>
         </div>
 
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#ece6d8] bg-white px-3 py-1.5 font-[system-ui] text-xs text-[#8a8275]">
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--border-default)] bg-[var(--bg-input)] px-3 py-1.5 font-[system-ui] text-xs text-[var(--text-muted)]">
           <span aria-hidden="true">⚙</span>
           <span>偏好设置</span>
         </div>
 
         <header className="mb-8 space-y-3">
-          <h1 className="font-serif text-4xl font-semibold tracking-tight text-[#1f1f1f]">设置</h1>
-          <p className="max-w-2xl font-[system-ui] text-sm leading-6 text-[#8a8275]">
+          <h1 className="font-serif text-4xl font-semibold tracking-tight text-[var(--text-body)]">设置</h1>
+          <p className="max-w-2xl font-[system-ui] text-sm leading-6 text-[var(--text-muted)]">
             调整母语、显示密度与主题偏好。更改后点击保存即可同步到账户。
           </p>
         </header>
@@ -194,7 +194,7 @@ export default function SettingsPage() {
             description="切换后会影响翻译、摘要和正文语言的展示。"
           >
             <label className="block space-y-2">
-              <span className="font-[system-ui] text-sm font-medium text-[#1f1f1f]">母语</span>
+              <span className="font-[system-ui] text-sm font-medium text-[var(--text-body)]">母语</span>
               <select
                 value={formSettings.native_language}
                 onChange={(event) => setSetting('native_language', event.target.value)}
@@ -209,7 +209,7 @@ export default function SettingsPage() {
             </label>
 
             {formSettings.native_language !== initialSettings.native_language ? (
-              <div className="mt-3 rounded-2xl border border-[#e4c27a] bg-[#fff8e8] px-4 py-3 font-[system-ui] text-sm leading-6 text-[#7d5a1a]">
+              <div className="mt-3 rounded-2xl border border-[var(--border-callout)] bg-[var(--bg-badge-unread)] px-4 py-3 font-[system-ui] text-sm leading-6 text-[var(--text-warning)]">
                 切换母语后，已生成的翻译结果需要重新生成才会显示新语言。已有文章的翻译不会自动重翻。
               </div>
             ) : null}
@@ -231,12 +231,12 @@ export default function SettingsPage() {
                     aria-pressed={active}
                     className={`${SEGMENT_CLASS} text-left ${
                       active
-                        ? 'border-[#1f1f1f] bg-[#1f1f1f] text-white'
-                        : 'bg-[#fbfaf7] text-[#4a4338] hover:bg-[#f5f0e6]'
+                        ? 'border-[var(--bg-nav)] bg-[var(--bg-nav)] text-[var(--text-inverse)]'
+                        : 'bg-[var(--bg-body)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                     }`}
                   >
                     <div className="font-semibold">{option.label}</div>
-                    <div className={`mt-1 text-xs leading-5 ${active ? 'text-white/75' : 'text-[#8a8275]'}`}>
+                    <div className={`mt-1 text-xs leading-5 ${active ? 'text-[var(--text-inverse)]/75' : 'text-[var(--text-muted)]'}`}>
                       {option.description}
                     </div>
                   </button>
@@ -258,8 +258,8 @@ export default function SettingsPage() {
                     aria-pressed={active}
                     className={`${SEGMENT_CLASS} ${
                       active
-                        ? 'border-[#d4a24c] bg-[#d4a24c] text-[#1f1f1f]'
-                        : 'bg-[#fbfaf7] text-[#4a4338] hover:bg-[#f5f0e6]'
+                        ? 'border-[var(--border-accent)] bg-[var(--accent)] text-[var(--text-body)]'
+                        : 'bg-[var(--bg-body)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                     }`}
                   >
                     {option.label}
@@ -270,8 +270,8 @@ export default function SettingsPage() {
           </SettingsSection>
         </div>
 
-        <div className="mt-8 flex items-center justify-between gap-4 border-t border-[#ece6d8] pt-6">
-          <div className="font-[system-ui] text-sm text-[#8a8275]">
+        <div className="mt-8 flex items-center justify-between gap-4 border-t border-[var(--border-default)] pt-6">
+          <div className="font-[system-ui] text-sm text-[var(--text-muted)]">
             {hasChanges ? '有未保存的更改。' : '所有设置已保存。'}
             {isError ? ' 设置加载失败，请稍后重试。' : ''}
           </div>
@@ -279,7 +279,7 @@ export default function SettingsPage() {
             type="button"
             onClick={onSave}
             disabled={!hasChanges || saveMutation.isPending}
-            className="rounded-full bg-[#1f1f1f] px-5 py-2.5 font-[system-ui] text-sm font-medium text-white transition-colors hover:bg-[#353535] disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-full bg-[var(--bg-nav)] px-5 py-2.5 font-[system-ui] text-sm font-medium text-[var(--text-inverse)] transition-colors hover:bg-[var(--bg-surface)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saveMutation.isPending ? '保存中…' : '保存设置'}
           </button>

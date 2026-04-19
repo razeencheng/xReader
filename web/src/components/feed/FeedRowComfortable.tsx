@@ -57,9 +57,10 @@ function langTag(language: string): string | null {
 interface Props {
   item: ArticleItem;
   onClick?: () => void;
+  selected?: boolean;
 }
 
-export function FeedRowComfortable({ item, onClick }: Props) {
+export function FeedRowComfortable({ item, onClick, selected = false }: Props) {
   const article = item as FeedArticleItem;
   const contentText = article.content_text?.trim();
   const summary = article.summary?.trim();
@@ -70,12 +71,12 @@ export function FeedRowComfortable({ item, onClick }: Props) {
 
   return (
     <article
-      className={`border-b border-[#ece6d8] py-5 ${onClick ? 'cursor-pointer' : ''}`}
+      className={`border-b border-[var(--border-default)] px-4 py-3 md:px-0 md:py-5 ${onClick ? 'cursor-pointer' : ''} ${selected ? 'bg-[var(--bg-badge-starred)]' : ''}`}
       onClick={onClick}
     >
-      <div className="flex items-center justify-between gap-4 text-[12px] text-[#8a8275]">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-[system-ui]">
-          <span className="shrink-0 rounded-[10px] bg-[#eee7d8] px-2 py-px font-semibold text-[#5b5444]">
+      <div className="flex flex-col gap-2 text-[12px] text-[var(--text-muted)] md:flex-row md:items-start md:justify-between md:gap-4">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-[system-ui] md:max-w-[72%]">
+          <span className="shrink-0 rounded-[10px] bg-[var(--bg-surface)] px-2 py-px font-semibold text-[var(--text-link)]">
             {article.source_title || 'Source'}
           </span>
           {article.author ? <span className="truncate">{article.author}</span> : null}
@@ -88,22 +89,24 @@ export function FeedRowComfortable({ item, onClick }: Props) {
         </div>
       </div>
 
-      <div className="mt-2">
+      <div className="mt-2.5">
         {contentText ? (
-          <div className="font-[system-ui] text-[15px] leading-[1.6] text-[#1f1f1f]">{contentText}</div>
+          <div className="font-[system-ui] text-[15px] leading-[1.6] text-[var(--text-body)] md:text-[16px]">
+            {contentText}
+          </div>
         ) : (
           <>
-            <h3 className="m-0 mb-1 font-[Iowan Old Style,Georgia,serif] text-[22px] leading-[1.3] text-[#1f1f1f]">
+            <h3 className="m-0 mb-1 font-[Iowan Old Style,Georgia,serif] text-[18px] leading-[1.3] text-[var(--text-body)] md:text-[22px]">
               {displayTitle}
             </h3>
             {hasTranslatedTitle ? (
-              <div className="mb-2 font-[system-ui] text-xs italic text-[#8a8275]">
+              <div className="mb-2 font-[system-ui] text-xs italic text-[var(--text-muted)]">
                 原标题：{article.title}
               </div>
             ) : null}
             {summary ? (
-              <div className="font-[system-ui] text-[14px] leading-[1.6] text-[#4a4338]">
-                <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-[1.5px] text-[#8a8275]">
+              <div className="font-[system-ui] text-[14px] leading-[1.6] text-[var(--text-secondary)]">
+                <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-[1.5px] text-[var(--text-muted)]">
                   要点
                 </span>
                 {summary}

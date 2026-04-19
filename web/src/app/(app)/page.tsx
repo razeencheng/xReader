@@ -23,13 +23,13 @@ function FeedPageContent() {
   const nativeLanguage = useUIStore((state) => state.nativeLanguage);
 
   return (
-    <main className="min-h-screen bg-[#fbfaf7] text-[#1f1f1f]">
-      <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 border-b border-[#ece6d8] px-4 py-3">
+    <main className="min-h-screen bg-[var(--bg-body)] text-[var(--text-body)]">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 border-b border-[var(--border-default)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <FeedTabs />
-        <div className="flex items-center gap-3 text-[13px] leading-none text-[#8a8275]">
+        <div className="flex flex-wrap items-center gap-3 text-[13px] leading-none text-[var(--text-muted)]">
           <span>母语：{getNativeLanguageLabel(nativeLanguage)}</span>
           <DensityToggle />
-          <Link href="/settings" className="hover:text-[#1f1f1f]" aria-label="设置">
+          <Link href="/settings" className="hover:text-[var(--text-body)]" aria-label="设置">
             ⚙
           </Link>
         </div>

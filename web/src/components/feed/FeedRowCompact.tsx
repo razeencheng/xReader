@@ -18,26 +18,27 @@ function timeAgo(dateStr?: string): string {
 interface FeedRowCompactProps {
   item: ArticleItem;
   onClick?: () => void;
+  selected?: boolean;
 }
 
-export function FeedRowCompact({ item, onClick }: FeedRowCompactProps) {
+export function FeedRowCompact({ item, onClick, selected = false }: FeedRowCompactProps) {
   const displayTitle = item.title_translated ?? item.title;
   const starred = (item as ArticleItem & { starred?: boolean }).starred;
 
   return (
     <div
       onClick={onClick}
-      className="flex items-baseline gap-[10px] border-b border-[#ece6d8] py-[10px]"
+      className={`flex items-center gap-2 border-b border-[var(--border-default)] px-4 py-2.5 md:px-0 md:py-[10px] ${selected ? 'bg-[var(--bg-badge-starred)]' : ''}`}
     >
-      <span className="shrink-0 rounded-[8px] bg-[#eee7d8] px-1.5 py-px text-[10px] font-semibold text-[#5b5444]">
+      <span className="shrink-0 rounded-[8px] bg-[var(--bg-surface)] px-1.5 py-px text-[10px] font-semibold text-[var(--text-link)]">
         {item.source_title || 'Source'}
       </span>
 
-      <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-[#1f1f1f]">
+      <span className="min-w-0 flex-1 truncate text-[13px] font-medium leading-[1.35] text-[var(--text-body)] md:text-[14px]">
         {displayTitle}
       </span>
 
-      <span className="ml-auto shrink-0 whitespace-nowrap text-[11px] text-[#8a8275]">
+      <span className="ml-auto shrink-0 whitespace-nowrap text-[11px] text-[var(--text-muted)]">
         {timeAgo(item.published_at)}
         {starred ? ' ★' : ''}
       </span>

@@ -1,26 +1,174 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-body: #fdfbf6;
+  --text-body: #1f1f1f;
+  --muted: #8a8275;
+  --callout-bg: #fff8e6;
+  --border: #e8e0d4;
+  --accent: #d4a24c;
+
+  --bg-card: #fdfbf6;
+  --bg-callout: #f5f0e6;
+  --bg-hover: #f5f0e8;
+  --bg-surface: #eee7d8;
+  --bg-input: #ffffff;
+  --bg-badge-unread: #fff8e6;
+  --bg-badge-starred: #fbf7ec;
+  --bg-badge-today: #f4fbef;
+  --bg-toast: #1f1f1f;
+  --bg-highlight-yellow: #fff1a8;
+  --bg-highlight-error: #fff3f3;
+  --bg-nav: #1f1f1f;
+  --text-secondary: #4a4338;
+  --text-muted: var(--muted);
+  --text-faint: #b5aea0;
+  --text-accent: var(--accent);
+  --text-link: #5b5444;
+  --text-inverse: #fbfaf7;
+  --text-error: #9b3f3f;
+  --text-success: #4a6b31;
+  --text-warning: #7d5a1a;
+  --text-toast: #fdfbf6;
+  --border-default: var(--border);
+  --border-strong: #e6dec8;
+  --border-accent: var(--accent);
+  --border-callout: #e4c27a;
+  --border-error: #f1d2d2;
+  --border-success: #d9e8cf;
+}
+
+html.theme-dark {
+  --bg-body: #0f0f10;
+  --text-body: #e8e8e8;
+  --muted: #8a8275;
+  --callout-bg: #1a1a1e;
+  --border: #2a2a2e;
+  --accent: #d4a24c;
+
+  --bg-card: #1a1a1b;
+  --bg-callout: #1e1c17;
+  --bg-hover: #2a2a2b;
+  --bg-surface: #333334;
+  --bg-input: #1a1a1b;
+  --bg-badge-unread: #2a2518;
+  --bg-badge-starred: #2a2518;
+  --bg-badge-today: #1a2514;
+  --bg-toast: #e8e8e8;
+  --bg-highlight-yellow: #4a3f10;
+  --bg-highlight-error: #3a1a1a;
+  --bg-nav: #0f0f10;
+  --text-secondary: #c8c0b4;
+  --text-muted: var(--muted);
+  --text-faint: #5a5448;
+  --text-accent: #e4c27a;
+  --text-link: #c8c0b4;
+  --text-inverse: #0f0f10;
+  --text-error: #e07070;
+  --text-success: #70b050;
+  --text-warning: #d4a24c;
+  --text-toast: #0f0f10;
+  --border-default: var(--border);
+  --border-strong: #3a3a3b;
+  --border-accent: #e4c27a;
+  --border-callout: #5a4a20;
+  --border-error: #5a2a2a;
+  --border-success: #2a4a1a;
+}
+
+html.theme-light {
+  --bg-body: #fdfbf6;
+  --text-body: #1f1f1f;
+  --muted: #8a8275;
+  --callout-bg: #fff8e6;
+  --border: #e8e0d4;
+  --accent: #d4a24c;
+
+  --bg-card: #fdfbf6;
+  --bg-callout: #f5f0e6;
+  --bg-hover: #f5f0e8;
+  --bg-surface: #eee7d8;
+  --bg-input: #ffffff;
+  --bg-badge-unread: #fff8e6;
+  --bg-badge-starred: #fbf7ec;
+  --bg-badge-today: #f4fbef;
+  --bg-toast: #1f1f1f;
+  --bg-highlight-yellow: #fff1a8;
+  --bg-highlight-error: #fff3f3;
+  --bg-nav: #1f1f1f;
+  --text-secondary: #4a4338;
+  --text-muted: var(--muted);
+  --text-faint: #b5aea0;
+  --text-accent: var(--accent);
+  --text-link: #5b5444;
+  --text-inverse: #fbfaf7;
+  --text-error: #9b3f3f;
+  --text-success: #4a6b31;
+  --text-warning: #7d5a1a;
+  --text-toast: #fdfbf6;
+  --border-default: var(--border);
+  --border-strong: #e6dec8;
+  --border-accent: var(--accent);
+  --border-callout: #e4c27a;
+  --border-error: #f1d2d2;
+  --border-success: #d9e8cf;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.theme-light):not(.theme-dark) {
+    --bg-body: #0f0f10;
+    --text-body: #e8e8e8;
+    --muted: #8a8275;
+    --callout-bg: #1a1a1e;
+    --border: #2a2a2e;
+    --accent: #d4a24c;
+
+    --bg-card: #1a1a1b;
+    --bg-callout: #1e1c17;
+    --bg-hover: #2a2a2b;
+    --bg-surface: #333334;
+    --bg-input: #1a1a1b;
+    --bg-badge-unread: #2a2518;
+    --bg-badge-starred: #2a2518;
+    --bg-badge-today: #1a2514;
+    --bg-toast: #e8e8e8;
+    --bg-highlight-yellow: #4a3f10;
+    --bg-highlight-error: #3a1a1a;
+    --bg-nav: #0f0f10;
+    --text-secondary: #c8c0b4;
+    --text-muted: var(--muted);
+    --text-faint: #5a5448;
+    --text-accent: #e4c27a;
+    --text-link: #c8c0b4;
+    --text-inverse: #0f0f10;
+    --text-error: #e07070;
+    --text-success: #70b050;
+    --text-warning: #d4a24c;
+    --text-toast: #0f0f10;
+    --border-default: var(--border);
+    --border-strong: #3a3a3b;
+    --border-accent: #e4c27a;
+    --border-callout: #5a4a20;
+    --border-error: #5a2a2a;
+    --border-success: #2a4a1a;
+  }
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--bg-body);
+  --color-foreground: var(--text-body);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background: var(--bg-body);
+  color: var(--text-body);
+  font-family: Arial, Helvetica, sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none !important;
+  }
 }

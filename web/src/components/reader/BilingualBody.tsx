@@ -37,9 +37,6 @@ const BLOCK_TAGS = new Set([
 
 const WRAPPER_TAGS = new Set(['article', 'aside', 'div', 'footer', 'header', 'main', 'section']);
 
-const ORIGINAL_COLOR = '#6a6252';
-const TRANSLATION_COLOR = '#1f1f1f';
-
 function normalizeLanguage(language: string) {
   return language.toLowerCase().split('-')[0];
 }
@@ -102,9 +99,9 @@ function splitContentHtml(contentHtml: string) {
 function LoadingPulse() {
   return (
     <div className="mt-2 flex gap-1.5 pb-4">
-      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#d4d0c8]" />
-      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#d4d0c8] [animation-delay:150ms]" />
-      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#d4d0c8] [animation-delay:300ms]" />
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--border-default)]" />
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--border-default)] [animation-delay:150ms]" />
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--border-default)] [animation-delay:300ms]" />
     </div>
   );
 }
@@ -152,7 +149,7 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
   }, [articleId, paragraphs.length, sameLanguage]);
 
   return (
-    <div className="text-[18px] leading-[1.8]">
+    <div className="text-[16px] leading-[1.8] md:text-[18px]">
       {paragraphs.map((paragraph, index) => {
         const translation = translations.get(index);
         const paragraphProps = {
@@ -164,7 +161,7 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
           <div key={index} className="pb-4" {...paragraphProps}>
             <div
               data-layer="original"
-              className="text-[#6a6252]"
+              className="text-[var(--text-muted)]"
               style={{ fontFamily: originalFont }}
               dangerouslySetInnerHTML={{ __html: paragraph }}
             />
@@ -172,7 +169,7 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
               translation ? (
                 <div
                   data-layer="translation"
-                  className="mt-2 text-[#1f1f1f]"
+                  className="mt-2 text-[var(--text-body)]"
                   style={{ fontFamily: translationFont }}
                 >
                   {translation}

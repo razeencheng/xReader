@@ -51,7 +51,7 @@ export default function AdminPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[var(--bg-card)] text-[var(--text-body)]">
+    <main className="min-h-screen bg-[var(--bg-body)] text-[var(--text-body)]">
       <div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-4">
           <Link href="/" className="text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-body)]">
@@ -78,7 +78,7 @@ export default function AdminPage() {
               value={newUsername}
               onChange={(e) => setNewUsername(e.target.value)}
               placeholder="GitHub 用户名"
-              className="min-w-0 flex-1 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-card)] px-4 py-2.5 text-sm outline-none transition focus:border-[var(--border-accent)]"
+              className="min-w-0 flex-1 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-body)] px-4 py-2.5 text-sm outline-none transition focus:border-[var(--border-accent)]"
             />
             <button
               type="submit"

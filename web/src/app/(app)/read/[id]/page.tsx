@@ -1,11 +1,12 @@
 'use client';
 
-import { use } from 'react';
+import { use, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { apiFetch } from '@/lib/api-client';
 import { broadcast } from '@/lib/broadcast';
+import { useShortcuts } from '@/hooks/useShortcuts';
 import { useUIStore } from '@/stores/useUIStore';
 import { ReaderHeader } from '@/components/reader/ReaderHeader';
 import { KeyPointsCallout } from '@/components/reader/KeyPointsCallout';
@@ -54,6 +55,21 @@ function ReaderContent({ id }: { id: string }) {
 
   const { prev, next, position, total } = useArticleNeighbors(articleId, tab);
 
+  const navigateTo = useCallback(
+    (article: ArticleItem | null, fallback?: () => void) => {
+      if (article) {
+        const params = new URLSearchParams();
+        const ctx = searchParams.get('ctx');
+        if (ctx) params.set('tab', ctx);
+        router.push(`/read/${article.id}${params.toString() ? `?${params.toString()}` : ''}`);
+        return;
+      }
+
+      fallback?.();
+    },
+    [router, searchParams],
+  );
+
   const markRead = async (articleToMarkReadId: number) => {
     try {
       await apiFetch(`/api/articles/${articleToMarkReadId}/state`, {
@@ -68,7 +84,7 @@ function ReaderContent({ id }: { id: string }) {
 
   if (isLoading || !article) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--bg-card)]">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--bg-body)]">
         <p className="text-sm text-[var(--text-muted)]">Loading…</p>
       </div>
     );
@@ -79,9 +95,40 @@ function ReaderContent({ id }: { id: string }) {
   const isNative = article.language.toLowerCase().startsWith(nativeLanguage.toLowerCase().slice(0, 2));
   const showOriginal = !isNative && displayTitle !== originalTitle;
   const summary = ai?.summary || article.summary || '';
+  const readerShortcuts = useMemo(
+    () => ({
+      arrowleft: () => navigateTo(prev),
+      k: () => navigateTo(prev),
+      arrowright: () => navigateTo(next),
+      j: () => navigateTo(next),
+      s: () => {
+        void (async () => {
+          try {
+            const nextStarred = !article.is_starred;
+            await apiFetch(`/api/articles/${id}/state`, {
+              method: 'PATCH',
+              body: JSON.stringify({ is_starred: nextStarred }),
+            });
+            broadcast({ type: 'state-change', articleId, is_starred: nextStarred });
+          } catch {
+            // Ignore failed background mutations.
+          }
+        })();
+      },
+      escape: () => {
+        const ctx = searchParams.get('ctx');
+        const params = new URLSearchParams();
+        if (ctx) params.set('tab', ctx);
+        router.push(`/?${params.toString()}`);
+      },
+    }),
+    [article.is_starred, articleId, id, navigateTo, next, prev, router, searchParams],
+  );
+
+  useShortcuts(readerShortcuts);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-card)]">
+    <div className="min-h-screen bg-[var(--bg-body)]">
       <ReaderHeader
         article={{ ...article, title_translated: displayTitle }}
         nativeLanguage={nativeLanguage}
@@ -107,7 +154,7 @@ function ReaderContent({ id }: { id: string }) {
         }}
       />
 
-      <article className="mx-auto max-w-[680px] px-12 pb-6 pt-9 font-serif text-[var(--text-body)]">
+      <article className="mx-auto max-w-[680px] px-5 pb-6 pt-9 font-serif text-[var(--text-body)] md:px-12">
         <h1 className="mb-1.5 text-[32px] font-bold leading-[1.25]">{displayTitle}</h1>
         {showOriginal ? (
           <div className="mb-1.5 font-[system-ui] text-[13px] italic text-[var(--text-muted)]">{originalTitle}</div>
@@ -153,7 +200,7 @@ export default function ReaderPage({ params }: { params: Promise<{ id: string }>
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[var(--bg-card)]">
+        <div className="flex min-h-screen items-center justify-center bg-[var(--bg-body)]">
           <p className="text-sm text-[var(--text-muted)]">Loading…</p>
         </div>
       }

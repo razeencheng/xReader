@@ -59,14 +59,14 @@ function ProgressBar({ progress }: { progress: number | null }) {
 
   return (
     <div className="mt-3 space-y-2">
-      <div className="h-2 overflow-hidden rounded-full bg-[#f2eadc]">
+      <div className="h-2 overflow-hidden rounded-full bg-[var(--bg-callout)]">
         <div
-          className="h-full rounded-full bg-[#d4a24c] transition-all"
+          className="h-full rounded-full bg-[var(--accent)] transition-all"
           style={{ width: `${percent ?? 18}%` }}
           aria-hidden="true"
         />
       </div>
-      <p className="font-[system-ui] text-xs text-[#8a8275]">
+      <p className="font-[system-ui] text-xs text-[var(--text-muted)]">
         {percent == null ? '正在导入…' : `导入进度 ${Math.round(percent)}%`}
       </p>
     </div>
@@ -210,17 +210,17 @@ export function SourcesPage() {
           : '选择文件后上传';
 
   return (
-    <main className="min-h-screen bg-[#fdfbf6] text-[#1f1f1f]">
-      <div className="border-b border-[#e8e0d4] bg-[#fdfbf6]/95">
+    <main className="min-h-screen bg-[var(--bg-body)] text-[var(--text-body)]">
+      <div className="border-b border-[var(--border-strong)] bg-[var(--bg-body)]/95">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
-          <Link href="/" className="font-serif text-lg font-semibold tracking-tight text-[#1f1f1f]">
+          <Link href="/" className="font-serif text-lg font-semibold tracking-tight text-[var(--text-body)]">
             xReader
           </Link>
-          <nav className="flex items-center gap-4 font-[system-ui] text-sm text-[#8a8275]">
-            <Link href="/sources" className="text-[#1f1f1f] transition-colors hover:text-[#d4a24c]">
+          <nav className="flex items-center gap-4 font-[system-ui] text-sm text-[var(--text-muted)]">
+            <Link href="/sources" className="text-[var(--text-body)] transition-colors hover:text-[var(--text-accent)]">
               订阅源
             </Link>
-            <Link href="/settings" className="transition-colors hover:text-[#1f1f1f]">
+            <Link href="/settings" className="transition-colors hover:text-[var(--text-body)]">
               设置
             </Link>
           </nav>
@@ -230,31 +230,31 @@ export function SourcesPage() {
       <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8 flex items-start justify-between gap-4">
           <div className="space-y-3">
-            <Link href="/" className="font-[system-ui] text-sm text-[#8a8275] transition-colors hover:text-[#1f1f1f]">
+            <Link href="/" className="font-[system-ui] text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-body)]">
               ← 返回首页
             </Link>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#e8e0d4] bg-white px-3 py-1.5 font-[system-ui] text-xs text-[#8a8275]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border-strong)] bg-[var(--bg-input)] px-3 py-1.5 font-[system-ui] text-xs text-[var(--text-muted)]">
               <span aria-hidden="true">☰</span>
               <span>订阅源管理</span>
             </div>
             <header className="space-y-3">
-              <h1 className="font-serif text-4xl font-semibold tracking-tight text-[#1f1f1f]">订阅源</h1>
-              <p className="max-w-2xl font-[system-ui] text-sm leading-6 text-[#8a8275]">
+              <h1 className="font-serif text-4xl font-semibold tracking-tight text-[var(--text-body)]">订阅源</h1>
+              <p className="max-w-2xl font-[system-ui] text-sm leading-6 text-[var(--text-muted)]">
                 管理 RSS 订阅、导入导出 OPML、快速刷新抓取结果，保持阅读流始终新鲜。
               </p>
             </header>
           </div>
-          <div className="rounded-2xl border border-[#e8e0d4] bg-white px-4 py-3 text-right font-[system-ui] text-xs text-[#8a8275] shadow-sm shadow-[#ece6d8]/30">
+          <div className="rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-input)] px-4 py-3 text-right font-[system-ui] text-xs text-[var(--text-muted)] shadow-sm shadow-[var(--border-default)]/30">
             <div>{isFetching ? '同步中…' : '已同步'}</div>
-            <div className="mt-1 text-[#1f1f1f]">{visibleSources.length} 个订阅源</div>
+            <div className="mt-1 text-[var(--text-body)]">{visibleSources.length} 个订阅源</div>
           </div>
         </div>
 
-        <section className="rounded-3xl border border-[#e8e0d4] bg-white/80 p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+        <section className="rounded-3xl border border-[var(--border-strong)] bg-[var(--bg-input)]/80 p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
           <div className="mb-4 flex items-center justify-between gap-4">
             <div>
-              <h2 className="font-serif text-xl font-semibold tracking-tight text-[#1f1f1f]">添加订阅源</h2>
-              <p className="font-[system-ui] text-sm text-[#8a8275]">输入 RSS 或 Atom 地址后点击添加。</p>
+              <h2 className="font-serif text-xl font-semibold tracking-tight text-[var(--text-body)]">添加订阅源</h2>
+              <p className="font-[system-ui] text-sm text-[var(--text-muted)]">输入 RSS 或 Atom 地址后点击添加。</p>
             </div>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -268,30 +268,30 @@ export function SourcesPage() {
                 }
               }}
               placeholder="https://example.com/feed.xml"
-              className="min-w-0 flex-1 rounded-2xl border border-[#e8e0d4] bg-[#fdfbf6] px-4 py-3 font-[system-ui] text-sm text-[#1f1f1f] outline-none transition focus:border-[#d4a24c] focus:ring-2 focus:ring-[#d4a24c]/20"
+              className="min-w-0 flex-1 rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-body)] px-4 py-3 font-[system-ui] text-sm text-[var(--text-body)] outline-none transition focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--accent)]/20"
             />
             <button
               type="button"
               onClick={() => void handleCreateSource()}
               disabled={createSource.isPending}
-              className="rounded-2xl bg-[#1f1f1f] px-5 py-3 font-[system-ui] text-sm text-white transition-colors hover:bg-[#333] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-2xl bg-[var(--bg-nav)] px-5 py-3 font-[system-ui] text-sm text-[var(--text-inverse)] transition-colors hover:bg-[var(--bg-surface)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               添加
             </button>
           </div>
         </section>
 
-        <section className="mt-6 overflow-hidden rounded-3xl border border-[#e8e0d4] bg-white/80 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
-          <div className="border-b border-[#e8e0d4] px-5 py-4">
-            <h2 className="font-serif text-xl font-semibold tracking-tight text-[#1f1f1f]">订阅源列表</h2>
+        <section className="mt-6 overflow-hidden rounded-3xl border border-[var(--border-strong)] bg-[var(--bg-input)]/80 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+          <div className="border-b border-[var(--border-strong)] px-5 py-4">
+            <h2 className="font-serif text-xl font-semibold tracking-tight text-[var(--text-body)]">订阅源列表</h2>
           </div>
 
           {isLoading ? (
-            <div className="px-5 py-10 font-[system-ui] text-sm text-[#8a8275]">加载中…</div>
+            <div className="px-5 py-10 font-[system-ui] text-sm text-[var(--text-muted)]">加载中…</div>
           ) : visibleSources.length === 0 ? (
-            <div className="px-5 py-10 font-[system-ui] text-sm text-[#8a8275]">还没有添加任何订阅源。</div>
+            <div className="px-5 py-10 font-[system-ui] text-sm text-[var(--text-muted)]">还没有添加任何订阅源。</div>
           ) : (
-            <ul className="divide-y divide-[#e8e0d4]">
+            <ul className="divide-y divide-[var(--border-strong)]">
               {visibleSources.map((source) => {
                 const health = healthState(source);
                 return (
@@ -315,24 +315,24 @@ export function SourcesPage() {
                                 setEditingId(null);
                               }
                             }}
-                            className="min-w-0 flex-1 rounded-xl border border-[#e8e0d4] bg-[#fdfbf6] px-3 py-2 font-[system-ui] text-sm text-[#1f1f1f] outline-none focus:border-[#d4a24c] focus:ring-2 focus:ring-[#d4a24c]/20"
+                            className="min-w-0 flex-1 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-body)] px-3 py-2 font-[system-ui] text-sm text-[var(--text-body)] outline-none focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--accent)]/20"
                           />
                         ) : (
                           <button
                             type="button"
                             onClick={() => startRename(source)}
-                            className="min-w-0 truncate text-left font-serif text-base font-semibold tracking-tight text-[#1f1f1f] transition-colors hover:text-[#d4a24c]"
+                            className="min-w-0 truncate text-left font-serif text-base font-semibold tracking-tight text-[var(--text-body)] transition-colors hover:text-[var(--text-accent)]"
                             title="点击重命名"
                           >
                             {source.title}
                           </button>
                         )}
-                        <span className="rounded-full border border-[#e8e0d4] px-2.5 py-1 font-[system-ui] text-[11px] text-[#8a8275]">
+                        <span className="rounded-full border border-[var(--border-strong)] px-2.5 py-1 font-[system-ui] text-[11px] text-[var(--text-muted)]">
                           {health.label === 'healthy' ? 'healthy' : health.label === 'degraded' ? 'degraded' : 'error'}
                         </span>
                       </div>
 
-                      <div className="space-y-1 font-[system-ui] text-xs text-[#8a8275]">
+                      <div className="space-y-1 font-[system-ui] text-xs text-[var(--text-muted)]">
                         <div className="truncate" title={source.feed_url}>
                           {truncateUrl(source.feed_url)}
                         </div>
@@ -345,14 +345,14 @@ export function SourcesPage() {
                         type="button"
                         onClick={() => void handleRefresh(source.id)}
                         disabled={refreshSource.isPending}
-                        className="rounded-xl border border-[#e8e0d4] px-3 py-1.5 font-[system-ui] text-xs text-[#8a8275] transition-colors hover:bg-[#f5f0e6] hover:text-[#1f1f1f] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="rounded-xl border border-[var(--border-strong)] px-3 py-1.5 font-[system-ui] text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-callout)] hover:text-[var(--text-body)] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         刷新
                       </button>
                       <button
                         type="button"
                         onClick={() => queueDelete(source)}
-                        className="rounded-xl border border-[#e8e0d4] px-3 py-1.5 font-[system-ui] text-xs text-[#8a8275] transition-colors hover:bg-[#f5f0e6] hover:text-[#1f1f1f]"
+                        className="rounded-xl border border-[var(--border-strong)] px-3 py-1.5 font-[system-ui] text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-callout)] hover:text-[var(--text-body)]"
                       >
                         删除
                       </button>
@@ -364,11 +364,11 @@ export function SourcesPage() {
           )}
         </section>
 
-        <section className="mt-6 rounded-3xl border border-[#e8e0d4] bg-white/80 p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+        <section className="mt-6 rounded-3xl border border-[var(--border-strong)] bg-[var(--bg-input)]/80 p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0 flex-1">
-              <h2 className="font-serif text-xl font-semibold tracking-tight text-[#1f1f1f]">OPML 导入 / 导出</h2>
-              <p className="mt-1 font-[system-ui] text-sm text-[#8a8275]">上传 OPML 后会自动轮询任务状态直到完成。</p>
+              <h2 className="font-serif text-xl font-semibold tracking-tight text-[var(--text-body)]">OPML 导入 / 导出</h2>
+              <p className="mt-1 font-[system-ui] text-sm text-[var(--text-muted)]">上传 OPML 后会自动轮询任务状态直到完成。</p>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -379,33 +379,33 @@ export function SourcesPage() {
                   const file = event.target.files?.[0] ?? null;
                   setSelectedFile(file);
                 }}
-                className="block w-full text-sm text-[#8a8275] file:mr-4 file:rounded-2xl file:border-0 file:bg-[#1f1f1f] file:px-4 file:py-2 file:font-[system-ui] file:text-sm file:text-white hover:file:bg-[#333]"
+                className="block w-full text-sm text-[var(--text-muted)] file:mr-4 file:rounded-2xl file:border-0 file:bg-[var(--bg-nav)] file:px-4 file:py-2 file:font-[system-ui] file:text-sm file:text-[var(--text-inverse)] hover:file:bg-[var(--bg-surface)]"
               />
               <button
                 type="button"
                 onClick={() => void handleImport()}
                 disabled={!selectedFile || importBusy}
-                className="rounded-2xl border border-[#e8e0d4] px-4 py-3 font-[system-ui] text-sm text-[#8a8275] transition-colors hover:bg-[#f5f0e6] disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-2xl border border-[var(--border-strong)] px-4 py-3 font-[system-ui] text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-callout)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 上传导入
               </button>
               <button
                 type="button"
                 onClick={() => void handleExport()}
-                className="rounded-2xl border border-[#e8e0d4] px-4 py-3 font-[system-ui] text-sm text-[#8a8275] transition-colors hover:bg-[#f5f0e6]"
+                className="rounded-2xl border border-[var(--border-strong)] px-4 py-3 font-[system-ui] text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-callout)]"
               >
                 导出 OPML
               </button>
             </div>
           </div>
 
-          <div className="mt-4 rounded-2xl border border-[#e8e0d4] bg-[#fdfbf6] px-4 py-3 font-[system-ui] text-sm text-[#8a8275]">
+          <div className="mt-4 rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-body)] px-4 py-3 font-[system-ui] text-sm text-[var(--text-muted)]">
             <div className="flex items-center justify-between gap-3">
               <span>{importStatusLabel}</span>
               {importJob.data?.status ? <span className="text-xs uppercase tracking-wide">{importJob.data.status}</span> : null}
             </div>
             {message.kind === 'loading' ? (
-              <p className="mt-2 font-[system-ui] text-xs text-[#8a8275]">{message.text}</p>
+              <p className="mt-2 font-[system-ui] text-xs text-[var(--text-muted)]">{message.text}</p>
             ) : null}
             {importBusy ? <ProgressBar progress={importProgress} /> : null}
           </div>
@@ -415,8 +415,8 @@ export function SourcesPage() {
           <div
             className={`mt-6 rounded-2xl border px-4 py-3 font-[system-ui] text-sm ${
               message.kind === 'success'
-                ? 'border-[#d9e8cf] bg-[#f4fbef] text-[#4a6b31]'
-                : 'border-[#f1d2d2] bg-[#fff3f3] text-[#9b3f3f]'
+                ? 'border-[var(--border-success)] bg-[var(--bg-badge-today)] text-[var(--text-success)]'
+                : 'border-[var(--border-error)] bg-[var(--bg-highlight-error)] text-[var(--text-error)]'
             }`}
           >
             {message.text}
@@ -425,12 +425,12 @@ export function SourcesPage() {
       </div>
 
       {pendingDelete ? (
-        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl bg-[#1f1f1f] px-4 py-3 font-[system-ui] text-sm text-white shadow-lg shadow-black/20">
+        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl bg-[var(--bg-nav)] px-4 py-3 font-[system-ui] text-sm text-[var(--text-inverse)] shadow-lg shadow-black/20">
           <span>已删除 {pendingDelete.source.title}</span>
           <button
             type="button"
             onClick={undoDelete}
-            className="rounded-full border border-white/20 px-3 py-1 text-xs font-medium text-[#f3dd9b] transition-colors hover:bg-white/10"
+            className="rounded-full border border-[var(--border-default)]/20 px-3 py-1 text-xs font-medium text-[var(--text-accent)] transition-colors hover:bg-[var(--bg-input)]/10"
           >
             撤销
           </button>
