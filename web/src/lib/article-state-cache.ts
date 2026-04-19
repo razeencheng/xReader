@@ -1,0 +1,91 @@
+import { type InfiniteData, type QueryClient } from '@tanstack/react-query';
+import type { ArticleItem, ArticleTab, ArticleListResponse } from '@/lib/types';
+
+export interface ArticleStateChange {
+  articleId: number;
+  is_read?: boolean;
+  is_starred?: boolean;
+}
+
+type ArticleListData = InfiniteData<ArticleListResponse>;
+const ARTICLE_TABS: ArticleTab[] = ['today', 'stream', 'starred'];
+
+function mergeArticleItem<T extends { id: number; is_read?: boolean; is_starred?: boolean }>(
+  item: T,
+  change: ArticleStateChange,
+): T {
+  return {
+    ...item,
+    ...(change.is_read === undefined ? {} : { is_read: change.is_read }),
+    ...(change.is_starred === undefined ? {} : { is_starred: change.is_starred }),
+  };
+}
+
+function updateArticlePage(
+  page: ArticleListResponse,
+  change: ArticleStateChange,
+  tab: ArticleTab,
+  articleDetail?: ArticleItem,
+) {
+  const itemIndex = page.items.findIndex((item) => item.id === change.articleId);
+  if (itemIndex < 0) {
+    if (tab === 'starred' && change.is_starred === true && articleDetail) {
+      return {
+        ...page,
+        items: [mergeArticleItem(articleDetail, change), ...page.items],
+      };
+    }
+
+    return page;
+  }
+
+  if (tab === 'starred' && change.is_starred === false) {
+    return {
+      ...page,
+      items: page.items.filter((item) => item.id !== change.articleId),
+    };
+  }
+
+  return {
+    ...page,
+    items: page.items.map((item) =>
+      item.id === change.articleId ? mergeArticleItem(item, change) : item,
+    ),
+  };
+}
+
+function updateArticleListData(
+  existing: ArticleListData | undefined,
+  change: ArticleStateChange,
+  tab: ArticleTab,
+  articleDetail?: ArticleItem,
+) {
+  if (!existing) {
+    return existing;
+  }
+
+  const pages = existing.pages.map((page) => updateArticlePage(page, change, tab, articleDetail));
+  return {
+    ...existing,
+    pages,
+  };
+}
+
+export function applyArticleStateChange(queryClient: QueryClient, change: ArticleStateChange) {
+  const detailKey = ['article', String(change.articleId)] as const;
+  const articleDetail = queryClient.getQueryData<ArticleItem>(detailKey);
+
+  queryClient.setQueryData<ArticleItem | undefined>(detailKey, (existing) => {
+    if (!existing) {
+      return existing;
+    }
+
+    return mergeArticleItem(existing, change);
+  });
+
+  for (const tab of ARTICLE_TABS) {
+    queryClient.setQueryData<ArticleListData | undefined>(['articles', tab], (existing) =>
+      updateArticleListData(existing, change, tab, articleDetail),
+    );
+  }
+}

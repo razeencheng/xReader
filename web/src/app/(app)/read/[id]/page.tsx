@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { apiFetch } from '@/lib/api-client';
+import { broadcast } from '@/lib/broadcast';
 import { useUIStore } from '@/stores/useUIStore';
 import { ReaderHeader } from '@/components/reader/ReaderHeader';
 import { KeyPointsCallout } from '@/components/reader/KeyPointsCallout';
@@ -53,17 +54,22 @@ function ReaderContent({ id }: { id: string }) {
 
   const { prev, next, position, total } = useArticleNeighbors(articleId, tab);
 
-  const markRead = (articleToMarkReadId: number) => {
-    void apiFetch(`/api/articles/${articleToMarkReadId}/state`, {
-      method: 'PATCH',
-      body: JSON.stringify({ is_read: true }),
-    }).catch(() => undefined);
+  const markRead = async (articleToMarkReadId: number) => {
+    try {
+      await apiFetch(`/api/articles/${articleToMarkReadId}/state`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_read: true }),
+      });
+      broadcast({ type: 'state-change', articleId: articleToMarkReadId, is_read: true });
+    } catch {
+      // Ignore failed background mutations.
+    }
   };
 
   if (isLoading || !article) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#fdfbf6]">
-        <p className="text-sm text-[#8a8275]">Loading…</p>
+      <div className="flex min-h-screen items-center justify-center bg-[var(--bg-card)]">
+        <p className="text-sm text-[var(--text-muted)]">Loading…</p>
       </div>
     );
   }
@@ -75,7 +81,7 @@ function ReaderContent({ id }: { id: string }) {
   const summary = ai?.summary || article.summary || '';
 
   return (
-    <div className="min-h-screen bg-[#fdfbf6]">
+    <div className="min-h-screen bg-[var(--bg-card)]">
       <ReaderHeader
         article={{ ...article, title_translated: displayTitle }}
         nativeLanguage={nativeLanguage}
@@ -87,20 +93,26 @@ function ReaderContent({ id }: { id: string }) {
           if (ctx) params.set('tab', ctx);
           router.push(`/?${params.toString()}`);
         }}
-        onToggleStar={() => {
-          apiFetch(`/api/articles/${id}/state`, {
-            method: 'PATCH',
-            body: JSON.stringify({ is_starred: !article.is_starred }),
-          });
+        onToggleStar={async () => {
+          try {
+            const nextStarred = !article.is_starred;
+            await apiFetch(`/api/articles/${id}/state`, {
+              method: 'PATCH',
+              body: JSON.stringify({ is_starred: nextStarred }),
+            });
+            broadcast({ type: 'state-change', articleId, is_starred: nextStarred });
+          } catch {
+            // Ignore failed background mutations.
+          }
         }}
       />
 
-      <article className="mx-auto max-w-[680px] px-12 pb-6 pt-9 font-serif text-[#1f1f1f]">
+      <article className="mx-auto max-w-[680px] px-12 pb-6 pt-9 font-serif text-[var(--text-body)]">
         <h1 className="mb-1.5 text-[32px] font-bold leading-[1.25]">{displayTitle}</h1>
         {showOriginal ? (
-          <div className="mb-1.5 font-[system-ui] text-[13px] italic text-[#8a8275]">{originalTitle}</div>
+          <div className="mb-1.5 font-[system-ui] text-[13px] italic text-[var(--text-muted)]">{originalTitle}</div>
         ) : null}
-        <div className="mb-6 font-[system-ui] text-[13px] text-[#8a8275]">
+        <div className="mb-6 font-[system-ui] text-[13px] text-[var(--text-muted)]">
           {article.author && `${article.author} · `}
           {article.published_at && new Date(article.published_at).toLocaleString()}
         </div>
@@ -115,12 +127,12 @@ function ReaderContent({ id }: { id: string }) {
             nativeLanguage={nativeLanguage}
           />
         ) : (
-          <p className="text-base leading-[1.8] text-[#1f1f1f]">{article.content_text}</p>
+          <p className="text-base leading-[1.8] text-[var(--text-body)]">{article.content_text}</p>
         )}
 
         {next ? <NextUpCard next={next} currentId={article.id} markRead={markRead} /> : null}
 
-        <div className="mt-8 text-center font-[system-ui] text-xs text-[#b5aea0]">— 文末 —</div>
+        <div className="mt-8 text-center font-[system-ui] text-xs text-[var(--text-faint)]">— 文末 —</div>
       </article>
 
       <PrevNextBar
@@ -141,8 +153,8 @@ export default function ReaderPage({ params }: { params: Promise<{ id: string }>
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#fdfbf6]">
-          <p className="text-sm text-[#8a8275]">Loading…</p>
+        <div className="flex min-h-screen items-center justify-center bg-[var(--bg-card)]">
+          <p className="text-sm text-[var(--text-muted)]">Loading…</p>
         </div>
       }
     >
