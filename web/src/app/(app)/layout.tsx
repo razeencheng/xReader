@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useBroadcastSync } from '@/hooks/useBroadcastSync';
 import { useCrossDevicePoll } from '@/hooks/useCrossDevicePoll';
@@ -45,5 +46,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <div className="min-h-screen bg-[#fdfbf6] text-[#1f1f1f]">
+      <div className="border-b border-[#ece6d8] bg-[#fdfbf6]/95">
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+          <Link href="/" className="font-serif text-lg font-semibold tracking-tight text-[#1f1f1f]">
+            xReader
+          </Link>
+          <nav className="flex items-center gap-4 font-[system-ui] text-sm text-[#8a8275]">
+            <Link href="/settings" className="transition-colors hover:text-[#1f1f1f]">
+              设置
+            </Link>
+          </nav>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
 }

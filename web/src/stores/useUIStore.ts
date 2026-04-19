@@ -15,6 +15,18 @@ interface UIState {
   hydrate: (prefs: { density_pref?: string; theme_pref?: string; native_language?: string }) => void;
 }
 
+function readStoredValue(key: string) {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return null;
+  }
+
+  try {
+    return localStorage.getItem(`xreader:${key}`);
+  } catch {
+    return null;
+  }
+}
+
 function persist(key: string, value: string) {
   localStorage.setItem(`xreader:${key}`, value);
   apiFetch('/api/users/me', {
@@ -23,10 +35,14 @@ function persist(key: string, value: string) {
   }).catch(() => {});
 }
 
+function persistLocal(key: string, value: string) {
+  localStorage.setItem(`xreader:${key}`, value);
+}
+
 export const useUIStore = create<UIState>((set, get) => ({
-  density: (typeof window !== 'undefined' && typeof localStorage !== 'undefined' && localStorage.getItem?.('xreader:density') as Density) || 'comfortable',
-  theme: (typeof window !== 'undefined' && typeof localStorage !== 'undefined' && localStorage.getItem?.('xreader:theme') as Theme) || 'system',
-  nativeLanguage: 'zh-CN',
+  density: (readStoredValue('density') as Density) || 'comfortable',
+  theme: (readStoredValue('theme') as Theme) || 'system',
+  nativeLanguage: readStoredValue('nativeLanguage') || 'zh-CN',
 
   toggleDensity: () => {
     const next = get().density === 'comfortable' ? 'compact' : 'comfortable';
@@ -41,9 +57,18 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   hydrate: (prefs) => {
     const update: Partial<UIState> = {};
-    if (prefs.density_pref) update.density = prefs.density_pref as Density;
-    if (prefs.theme_pref) update.theme = prefs.theme_pref as Theme;
-    if (prefs.native_language) update.nativeLanguage = prefs.native_language;
+    if (prefs.density_pref) {
+      update.density = prefs.density_pref as Density;
+      persistLocal('density', prefs.density_pref);
+    }
+    if (prefs.theme_pref) {
+      update.theme = prefs.theme_pref as Theme;
+      persistLocal('theme', prefs.theme_pref);
+    }
+    if (prefs.native_language) {
+      update.nativeLanguage = prefs.native_language;
+      persistLocal('nativeLanguage', prefs.native_language);
+    }
     set(update);
   },
 }));

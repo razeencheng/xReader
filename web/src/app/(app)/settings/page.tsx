@@ -1,210 +1,288 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { useQueryClient } from '@tanstack/react-query';
-import { useAuthStore } from '@/stores/useAuthStore';
-import { useUIStore, type Theme } from '@/stores/useUIStore';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { useUIStore, type Density, type Theme } from '@/stores/useUIStore';
+
+type SettingKey = 'native_language' | 'density_pref' | 'theme_pref';
+
+interface UserSettings {
+  native_language: string;
+  density_pref: Density;
+  theme_pref: Theme;
+}
 
 const LANGUAGES = [
-  { value: 'zh-CN', label: '中文（简体）' },
-  { value: 'zh-TW', label: '中文（繁體）' },
-  { value: 'en-US', label: 'English' },
-  { value: 'ja-JP', label: '日本語' },
-  { value: 'ko-KR', label: '한국어' },
+  { value: 'zh-CN', label: 'zh-CN' },
+  { value: 'zh-TW', label: 'zh-TW' },
+  { value: 'en-US', label: 'en-US' },
+  { value: 'ja-JP', label: 'ja-JP' },
+  { value: 'ko-KR', label: 'ko-KR' },
 ] as const;
 
-const THEMES: { value: Theme; label: string }[] = [
-  { value: 'light', label: '浅色' },
-  { value: 'dark', label: '深色' },
-  { value: 'system', label: '跟随系统' },
+const DENSITY_OPTIONS: { value: Density; label: string; description: string }[] = [
+  { value: 'comfortable', label: 'comfortable', description: '更松弛，适合长时间阅读。' },
+  { value: 'compact', label: 'compact', description: '更紧凑，适合快速扫读。' },
 ];
 
-const SHARED_BUTTON =
-  'px-4 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f1f1f] focus-visible:ring-offset-2 focus-visible:ring-offset-[#fbfaf7]';
+const THEME_OPTIONS: { value: Theme; label: string; description: string }[] = [
+  { value: 'light', label: '浅色', description: '明亮、清爽的浅色界面。' },
+  { value: 'dark', label: '深色', description: '夜间更舒适的深色界面。' },
+  { value: 'system', label: '跟随系统', description: '沿用设备或系统外观设置。' },
+];
 
-function getSegmentedButtonClass(isActive: boolean, isFirst: boolean, isLast: boolean) {
-  return [
-    SHARED_BUTTON,
-    'border border-[#ece6d8]',
-    isActive ? 'bg-[#1f1f1f] text-white' : 'bg-white text-[#8a8275] hover:bg-[#f5f0e6]',
-    isFirst ? 'rounded-l-full' : '',
-    isLast ? 'rounded-r-full' : '',
-    !isFirst ? '-ml-px' : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
+const SELECT_CLASS =
+  'w-full rounded-2xl border border-[#ece6d8] bg-[#fbfaf7] px-4 py-3 font-[system-ui] text-sm text-[#1f1f1f] outline-none transition-colors focus:border-[#d4a24c] focus:ring-2 focus:ring-[#d4a24c]/20';
+const SEGMENT_CLASS =
+  'rounded-full border border-[#ece6d8] px-4 py-2 font-[system-ui] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4a24c] focus-visible:ring-offset-2 focus-visible:ring-offset-[#fdfbf6]';
+
+function buildPatchPayload(current: UserSettings, initial: UserSettings) {
+  const payload: Partial<Record<SettingKey, string>> = {};
+
+  if (current.native_language !== initial.native_language) {
+    payload.native_language = current.native_language;
+  }
+  if (current.density_pref !== initial.density_pref) {
+    payload.density_pref = current.density_pref;
+  }
+  if (current.theme_pref !== initial.theme_pref) {
+    payload.theme_pref = current.theme_pref;
+  }
+
+  return payload;
+}
+
+function SettingsSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-3xl border border-[#ece6d8] bg-white/80 p-6 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+      <div className="mb-4 space-y-1">
+        <h2 className="font-serif text-xl font-semibold tracking-tight text-[#1f1f1f]">{title}</h2>
+        <p className="font-[system-ui] text-sm leading-6 text-[#8a8275]">{description}</p>
+      </div>
+      {children}
+    </section>
+  );
 }
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
-  const user = useAuthStore((state) => state.user);
-  const { density, theme, nativeLanguage, toggleDensity, setTheme } = useUIStore((state) => ({
-    density: state.density,
-    theme: state.theme,
-    nativeLanguage: state.nativeLanguage,
-    toggleDensity: state.toggleDensity,
-    setTheme: state.setTheme,
-  }));
-  const [pendingLanguage, setPendingLanguage] = useState<string | null>(null);
-  const [isLanguageWarningOpen, setIsLanguageWarningOpen] = useState(false);
-  const [isSavingLanguage, setIsSavingLanguage] = useState(false);
+  const hydrate = useUIStore((state) => state.hydrate);
+  const authFetchMe = useAuthStore((state) => state.fetchMe);
+  const [initialSettings, setInitialSettings] = useState<UserSettings | null>(null);
+  const [formSettings, setFormSettings] = useState<UserSettings | null>(null);
 
-  const handleLanguageSelect = (value: string) => {
-    if (value === nativeLanguage) {
+  const { data: settings, isLoading, isError } = useQuery({
+    queryKey: ['users', 'me'],
+    queryFn: () => apiFetch<UserSettings>('/api/users/me'),
+  });
+
+  useEffect(() => {
+    if (!settings) {
       return;
     }
 
-    setPendingLanguage(value);
-    setIsLanguageWarningOpen(true);
-  };
+    setInitialSettings(settings);
+    setFormSettings(settings);
+  }, [settings]);
 
-  const cancelLanguageChange = () => {
-    setIsLanguageWarningOpen(false);
-    setPendingLanguage(null);
-  };
-
-  const confirmLanguageChange = async () => {
-    if (!pendingLanguage) {
-      return;
+  const hasChanges = useMemo(() => {
+    if (!initialSettings || !formSettings) {
+      return false;
     }
 
-    setIsSavingLanguage(true);
+    return Object.keys(buildPatchPayload(formSettings, initialSettings)).length > 0;
+  }, [formSettings, initialSettings]);
 
-    try {
+  const saveMutation = useMutation({
+    mutationFn: async (nextSettings: UserSettings) => {
+      if (!initialSettings) {
+        return;
+      }
+
+      const payload = buildPatchPayload(nextSettings, initialSettings);
+      if (Object.keys(payload).length === 0) {
+        return;
+      }
+
       await apiFetch('/api/users/me', {
         method: 'PATCH',
-        body: JSON.stringify({ native_language: pendingLanguage }),
+        body: JSON.stringify(payload),
       });
-      await useAuthStore.getState().fetchMe();
-      await queryClient.invalidateQueries({ queryKey: ['articles'] });
-    } finally {
-      setIsSavingLanguage(false);
-      setIsLanguageWarningOpen(false);
-      setPendingLanguage(null);
-    }
+    },
+    onSuccess: async (_result, nextSettings) => {
+      hydrate({
+        native_language: nextSettings.native_language,
+        density_pref: nextSettings.density_pref,
+        theme_pref: nextSettings.theme_pref,
+      });
+      await Promise.all([
+        authFetchMe(),
+        queryClient.invalidateQueries({ queryKey: ['users', 'me'] }),
+        queryClient.invalidateQueries({ queryKey: ['articles'] }),
+        queryClient.invalidateQueries({ queryKey: ['article-ai'] }),
+      ]);
+      setInitialSettings(nextSettings);
+    },
+  });
+
+  const setSetting = <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
+    setFormSettings((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return { ...current, [key]: value };
+    });
   };
 
-  return (
-    <main className="min-h-screen bg-[#fbfaf7] text-[#1f1f1f]">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-        <Link href="/" className="text-sm text-[#8a8275] transition-colors hover:text-[#1f1f1f]">
-          ← 返回
-        </Link>
+  const onSave = () => {
+    if (!formSettings || !hasChanges) {
+      return;
+    }
 
-        <header className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight">设置</h1>
-          <p className="text-sm text-[#8a8275]">调整母语、显示密度与主题偏好。</p>
+    saveMutation.mutate(formSettings);
+  };
+
+  if (isLoading || !formSettings || !initialSettings) {
+    return (
+      <main className="min-h-screen bg-[#fdfbf6] text-[#1f1f1f]">
+        <div className="mx-auto flex min-h-screen max-w-3xl items-center justify-center px-4">
+          <p className="font-[system-ui] text-sm text-[#8a8275]">加载设置中…</p>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-[#fdfbf6] text-[#1f1f1f]">
+      <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <Link href="/" className="font-[system-ui] text-sm text-[#8a8275] transition-colors hover:text-[#1f1f1f]">
+            ← 返回首页
+          </Link>
+          <div className="font-[system-ui] text-sm text-[#8a8275]">
+            主页 / 设置
+          </div>
+        </div>
+
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#ece6d8] bg-white px-3 py-1.5 font-[system-ui] text-xs text-[#8a8275]">
+          <span aria-hidden="true">⚙</span>
+          <span>偏好设置</span>
+        </div>
+
+        <header className="mb-8 space-y-3">
+          <h1 className="font-serif text-4xl font-semibold tracking-tight text-[#1f1f1f]">设置</h1>
+          <p className="max-w-2xl font-[system-ui] text-sm leading-6 text-[#8a8275]">
+            调整母语、显示密度与主题偏好。更改后点击保存即可同步到账户。
+          </p>
         </header>
 
-        <div className="space-y-8">
-          <section className="space-y-3 rounded-2xl border border-[#ece6d8] bg-white p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
-            <div className="space-y-1">
-              <label htmlFor="native-language" className="block text-sm font-medium text-[#1f1f1f]">
-                母语
-              </label>
-              <p className="text-sm text-[#8a8275]">切换后会影响文章翻译与摘要的显示语言。</p>
-            </div>
+        <div className="space-y-6">
+          <SettingsSection
+            title="Native Language"
+            description="切换后会影响翻译、摘要和正文语言的展示。"
+          >
+            <label className="block space-y-2">
+              <span className="font-[system-ui] text-sm font-medium text-[#1f1f1f]">母语</span>
+              <select
+                value={formSettings.native_language}
+                onChange={(event) => setSetting('native_language', event.target.value)}
+                className={SELECT_CLASS}
+              >
+                {LANGUAGES.map((language) => (
+                  <option key={language.value} value={language.value}>
+                    {language.label}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-            <select
-              id="native-language"
-              value={isLanguageWarningOpen && pendingLanguage ? pendingLanguage : nativeLanguage}
-              onChange={(event) => handleLanguageSelect(event.target.value)}
-              className="w-full max-w-xs rounded-xl border border-[#ece6d8] bg-[#fbfaf7] px-3 py-2 text-sm text-[#1f1f1f] outline-none transition-colors focus:border-[#1f1f1f]"
-            >
-              {LANGUAGES.map((language) => (
-                <option key={language.value} value={language.value}>
-                  {language.label}
-                </option>
-              ))}
-            </select>
-
-            {isLanguageWarningOpen ? (
-              <div className="rounded-xl border border-[#ece6d8] bg-[#fbfaf7] p-4 text-sm text-[#8a8275]">
-                <p>
-                  切换母语后，已生成的翻译结果需要重新生成才会显示新语言。已有文章的翻译不会自动重翻。
-                </p>
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={confirmLanguageChange}
-                    disabled={isSavingLanguage}
-                    className="rounded-full bg-[#1f1f1f] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#353535] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isSavingLanguage ? '保存中…' : '确认切换'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={cancelLanguageChange}
-                    disabled={isSavingLanguage}
-                    className="rounded-full border border-[#ece6d8] bg-white px-4 py-2 text-sm font-medium text-[#8a8275] transition-colors hover:bg-[#f5f0e6] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    取消
-                  </button>
-                </div>
+            {formSettings.native_language !== initialSettings.native_language ? (
+              <div className="mt-3 rounded-2xl border border-[#e4c27a] bg-[#fff8e8] px-4 py-3 font-[system-ui] text-sm leading-6 text-[#7d5a1a]">
+                切换母语后，已生成的翻译结果需要重新生成才会显示新语言。已有文章的翻译不会自动重翻。
               </div>
             ) : null}
-          </section>
+          </SettingsSection>
 
-          <section className="space-y-3 rounded-2xl border border-[#ece6d8] bg-white p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
-            <div className="space-y-1">
-              <h2 className="text-sm font-medium text-[#1f1f1f]">显示密度</h2>
-              <p className="text-sm text-[#8a8275]">舒适模式适合长时间浏览，紧凑模式更适合快速扫读。</p>
+          <SettingsSection
+            title="Display Density"
+            description="舒适模式更适合长时间浏览，紧凑模式更适合快速扫读。"
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              {DENSITY_OPTIONS.map((option) => {
+                const active = formSettings.density_pref === option.value;
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setSetting('density_pref', option.value)}
+                    aria-pressed={active}
+                    className={`${SEGMENT_CLASS} text-left ${
+                      active
+                        ? 'border-[#1f1f1f] bg-[#1f1f1f] text-white'
+                        : 'bg-[#fbfaf7] text-[#4a4338] hover:bg-[#f5f0e6]'
+                    }`}
+                  >
+                    <div className="font-semibold">{option.label}</div>
+                    <div className={`mt-1 text-xs leading-5 ${active ? 'text-white/75' : 'text-[#8a8275]'}`}>
+                      {option.description}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
+          </SettingsSection>
 
-            <div className="inline-flex items-center">
-              <button
-                type="button"
-                onClick={() => {
-                  if (density !== 'comfortable') {
-                    toggleDensity();
-                  }
-                }}
-                className={getSegmentedButtonClass(density === 'comfortable', true, false)}
-              >
-                舒适
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (density !== 'compact') {
-                    toggleDensity();
-                  }
-                }}
-                className={getSegmentedButtonClass(density === 'compact', false, true)}
-              >
-                紧凑
-              </button>
+          <SettingsSection title="Theme" description="选择亮色、深色或跟随系统外观。">
+            <div className="flex flex-wrap gap-3">
+              {THEME_OPTIONS.map((option) => {
+                const active = formSettings.theme_pref === option.value;
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setSetting('theme_pref', option.value)}
+                    aria-pressed={active}
+                    className={`${SEGMENT_CLASS} ${
+                      active
+                        ? 'border-[#d4a24c] bg-[#d4a24c] text-[#1f1f1f]'
+                        : 'bg-[#fbfaf7] text-[#4a4338] hover:bg-[#f5f0e6]'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
             </div>
-          </section>
+          </SettingsSection>
+        </div>
 
-          <section className="space-y-3 rounded-2xl border border-[#ece6d8] bg-white p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
-            <div className="space-y-1">
-              <h2 className="text-sm font-medium text-[#1f1f1f]">主题</h2>
-              <p className="text-sm text-[#8a8275]">选择亮色、深色或跟随系统外观。</p>
-            </div>
-
-            <div className="inline-flex flex-wrap items-center">
-              {THEMES.map((option, index) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setTheme(option.value)}
-                  className={getSegmentedButtonClass(theme === option.value, index === 0, index === THEMES.length - 1)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="border-t border-[#ece6d8] pt-4 text-sm text-[#8a8275]">
-            <p>
-              当前登录账号：<span className="font-medium text-[#1f1f1f]">{user?.github_username ?? '未登录'}</span>
-            </p>
-            <p className="mt-1">母语、密度与主题设置会同步到你的账户与本地界面。</p>
-          </section>
+        <div className="mt-8 flex items-center justify-between gap-4 border-t border-[#ece6d8] pt-6">
+          <div className="font-[system-ui] text-sm text-[#8a8275]">
+            {hasChanges ? '有未保存的更改。' : '所有设置已保存。'}
+            {isError ? ' 设置加载失败，请稍后重试。' : ''}
+          </div>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={!hasChanges || saveMutation.isPending}
+            className="rounded-full bg-[#1f1f1f] px-5 py-2.5 font-[system-ui] text-sm font-medium text-white transition-colors hover:bg-[#353535] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {saveMutation.isPending ? '保存中…' : '保存设置'}
+          </button>
         </div>
       </div>
     </main>
