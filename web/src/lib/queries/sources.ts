@@ -2,6 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
 import type { Source } from '@/lib/types';
 
+export interface SourceImportJobStatus {
+  status: 'pending' | 'running' | 'done' | 'failed';
+  progress?: number;
+}
+
 export function useSources() {
   return useQuery<Source[]>({
     queryKey: ['sources'],
@@ -33,11 +38,31 @@ export function useRenameSource() {
   });
 }
 
+export function useRefreshSource() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiFetch<void>(`/api/sources/${id}/refresh`, {
+        method: 'POST',
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sources'] }),
+  });
+}
+
 export function useDeleteSource() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) =>
       apiFetch<void>(`/api/sources/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['sources'] }),
+  });
+}
+
+export function useSourceImportJob(jobId: string | null) {
+  return useQuery<SourceImportJobStatus>({
+    queryKey: ['sources', 'jobs', jobId],
+    queryFn: () => apiFetch<SourceImportJobStatus>(`/api/sources/jobs/${jobId}`),
+    enabled: Boolean(jobId),
+    refetchInterval: 1000,
   });
 }

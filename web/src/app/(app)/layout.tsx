@@ -54,6 +54,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             xReader
           </Link>
           <nav className="flex items-center gap-4 font-[system-ui] text-sm text-[#8a8275]">
+            <Link href="/sources" className="transition-colors hover:text-[#1f1f1f]">
+              订阅源
+            </Link>
             <Link href="/settings" className="transition-colors hover:text-[#1f1f1f]">
               设置
             </Link>
