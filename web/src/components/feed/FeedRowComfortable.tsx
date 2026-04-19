@@ -14,7 +14,7 @@ function timeAgo(dateString: string): string {
 
   const minutes = Math.floor(diffMs / 60000);
   if (minutes < 60) {
-    return '1h';
+    return `${minutes}m`;
   }
 
   const hours = Math.floor(minutes / 60);
@@ -34,26 +34,6 @@ function estimateReadTime(item: FeedArticleItem): string {
   return `${Math.max(1, Math.round(words / 200) || 1)}m`;
 }
 
-function langTag(language: string): string | null {
-  const normalized = language.trim().toLowerCase();
-  if (normalized.startsWith('zh')) {
-    return null;
-  }
-
-  const codeMap: Record<string, string> = {
-    en: 'EN',
-    ja: 'JA',
-    ko: 'KO',
-    fr: 'FR',
-    de: 'DE',
-    es: 'ES',
-    ru: 'RU',
-  };
-
-  const sourceCode = codeMap[normalized] ?? normalized.toUpperCase().slice(0, 2);
-  return `${sourceCode} → 中`;
-}
-
 interface Props {
   item: ArticleItem;
   onClick?: () => void;
@@ -67,7 +47,6 @@ export function FeedRowComfortable({ item, onClick, selected = false }: Props) {
   const translatedTitle = article.title_translated?.trim();
   const hasTranslatedTitle = Boolean(translatedTitle && translatedTitle !== article.title);
   const displayTitle = translatedTitle || article.title;
-  const language = langTag(article.language);
 
   return (
     <article
@@ -81,7 +60,6 @@ export function FeedRowComfortable({ item, onClick, selected = false }: Props) {
           </span>
           {article.author ? <span className="truncate">{article.author}</span> : null}
           {article.published_at ? <span className="shrink-0">{timeAgo(article.published_at)}</span> : null}
-          {language ? <span className="shrink-0">{language}</span> : null}
         </div>
         <div className="flex shrink-0 items-center gap-2 font-[system-ui]">
           <span>{estimateReadTime(article)}</span>
@@ -90,7 +68,7 @@ export function FeedRowComfortable({ item, onClick, selected = false }: Props) {
       </div>
 
       <div className="mt-2.5">
-        {contentText ? (
+        {contentText && contentText.length < 280 ? (
           <div className="font-[system-ui] text-[15px] leading-[1.6] text-[var(--text-body)] md:text-[16px]">
             {contentText}
           </div>
@@ -101,11 +79,11 @@ export function FeedRowComfortable({ item, onClick, selected = false }: Props) {
             </h3>
             {hasTranslatedTitle ? (
               <div className="mb-2 font-[system-ui] text-xs italic text-[var(--text-muted)]">
-                原标题：{article.title}
+                {article.title}
               </div>
             ) : null}
             {summary ? (
-              <div className="font-[system-ui] text-[14px] leading-[1.6] text-[var(--text-secondary)]">
+              <div className="truncate font-[system-ui] text-[14px] leading-[1.6] text-[var(--text-secondary)]">
                 <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-[1.5px] text-[var(--text-muted)]">
                   要点
                 </span>

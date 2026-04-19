@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jin/xreader-web/internal/ai"
 	"github.com/jin/xreader-web/internal/source"
 	syncpkg "github.com/jin/xreader-web/internal/sync"
 )
@@ -27,8 +28,17 @@ func main() {
 	}
 	defer pool.Close()
 
+	var aiClient ai.AIClient
+	if cfgPath := os.Getenv("XREADER_AI_CONFIG"); cfgPath != "" {
+		if cfg, err := ai.LoadConfig(cfgPath); err != nil {
+			log.Printf("ai config not loaded: %v (eager pipeline disabled)", err)
+		} else {
+			aiClient = ai.NewClient(cfg)
+		}
+	}
+
 	adapter := source.NewRSSAdapter()
-	worker := syncpkg.NewWorker(pool, adapter)
+	worker := syncpkg.NewWorker(pool, adapter, aiClient)
 
 	if err := worker.Run(ctx); err != nil && err != context.Canceled {
 		log.Fatalf("worker: %v", err)

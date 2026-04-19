@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jin/xreader-web/db/gen"
+	"github.com/jin/xreader-web/internal/ai"
 	"github.com/jin/xreader-web/internal/source"
 )
 
@@ -15,15 +16,19 @@ type Worker struct {
 	pool       *pgxpool.Pool
 	queries    *gen.Queries
 	job        *FetchJob
+	aiClient   ai.AIClient
+	targetLang string
 	interval   time.Duration
 	maxWorkers int
 }
 
-func NewWorker(pool *pgxpool.Pool, adapter source.SourceAdapter) *Worker {
+func NewWorker(pool *pgxpool.Pool, adapter source.SourceAdapter, aiClient ai.AIClient) *Worker {
 	return &Worker{
 		pool:       pool,
 		queries:    gen.New(pool),
 		job:        NewFetchJob(pool, adapter),
+		aiClient:   aiClient,
+		targetLang: "zh-CN",
 		interval:   60 * time.Second,
 		maxWorkers: 8,
 	}
@@ -68,13 +73,22 @@ func (w *Worker) tick(ctx context.Context) {
 			defer wg.Done()
 			defer func() { <-sem }()
 
-			inserted, err := w.job.Run(ctx, s)
+			inserted, articleIDs, err := w.job.Run(ctx, s)
 			if err != nil {
 				log.Printf("worker: source %d (%s): %v", s.ID, s.Title, err)
 				return
 			}
 			if inserted > 0 {
 				log.Printf("worker: source %d (%s): %d new articles", s.ID, s.Title, inserted)
+			}
+
+			if w.aiClient != nil {
+				for _, aid := range articleIDs {
+					job := ai.NewEagerJob(w.pool, w.aiClient, aid, w.targetLang)
+					if err := job.Run(ctx); err != nil {
+						log.Printf("worker: eager AI for article %d: %v", aid, err)
+					}
+				}
 			}
 		}(src)
 	}

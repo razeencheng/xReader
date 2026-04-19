@@ -142,20 +142,22 @@ export function FeedList() {
   }
 
   return (
-    <div className="divide-y divide-[var(--border-default)]">
-      {items.map((item, index) => (
-        <RowComponent
-          key={item.id}
-          item={item}
-          selected={index === selectedIndex}
-          onClick={() => {
-            setSelectedIndex(index);
-            openArticle(item);
-          }}
-        />
-      ))}
-      {isStreamTab ? <div ref={ref} className="h-10" /> : null}
-      {isFetchingNextPage ? <div className="py-4 text-center text-xs text-[var(--text-muted)]">Loading more…</div> : null}
+    <div className="mx-auto max-w-5xl px-4 py-1.5 md:px-7">
+      <div className="divide-y divide-[var(--border-default)]">
+        {items.map((item, index) => (
+          <RowComponent
+            key={item.id}
+            item={item}
+            selected={index === selectedIndex}
+            onClick={() => {
+              setSelectedIndex(index);
+              openArticle(item);
+            }}
+          />
+        ))}
+        {isStreamTab ? <div ref={ref} className="h-10" /> : null}
+        {isFetchingNextPage ? <div className="py-4 text-center text-xs text-[var(--text-muted)]">Loading more…</div> : null}
+      </div>
     </div>
   );
 }

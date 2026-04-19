@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { createSSEClient, type SSEParagraphEvent } from '@/lib/sse-client';
+import { useMemo } from 'react';
+import { useLazyTranslation } from '@/hooks/useLazyTranslation';
 import { fontForLang } from '@/lib/langFonts';
 
 interface Props {
@@ -35,7 +35,7 @@ const BLOCK_TAGS = new Set([
   'ul',
 ]);
 
-const WRAPPER_TAGS = new Set(['article', 'aside', 'div', 'footer', 'header', 'main', 'section']);
+const WRAPPER_TAGS = new Set(['article', 'aside', 'div', 'footer', 'header', 'main', 'ol', 'section', 'ul']);
 
 function normalizeLanguage(language: string) {
   return language.toLowerCase().split('-')[0];
@@ -106,77 +106,67 @@ function LoadingPulse() {
   );
 }
 
-export function BilingualBody({ articleId, contentHtml, language, nativeLanguage }: Props) {
-  const [translations, setTranslations] = useState<Map<number, string>>(new Map());
-  const [isDone, setIsDone] = useState(false);
+const CODE_TAG_RE = /^<(pre|code)[\s>]/i;
 
+function isCodeBlock(html: string): boolean {
+  return CODE_TAG_RE.test(html.trim());
+}
+
+export function BilingualBody({ articleId, contentHtml, language, nativeLanguage }: Props) {
   const paragraphs = useMemo(() => splitContentHtml(contentHtml), [contentHtml]);
   const sameLanguage = isSameLanguage(language, nativeLanguage);
   const originalFont = fontForLang(language);
   const translationFont = fontForLang(nativeLanguage);
 
-  useEffect(() => {
-    setTranslations(new Map());
-    setIsDone(sameLanguage || paragraphs.length === 0);
-
-    if (sameLanguage || paragraphs.length === 0) {
-      return;
-    }
-
-    const client = createSSEClient(`/api/articles/${articleId}/body-translation`);
-
-    client.onParagraph((paragraph: SSEParagraphEvent) => {
-      setTranslations((current) => {
-        const next = new Map(current);
-        next.set(paragraph.index, paragraph.translation);
-        return next;
-      });
-    });
-
-    client.onDone(() => {
-      setIsDone(true);
-      client.close();
-    });
-
-    client.onError(() => {
-      // Let the SSE wrapper retry once. Keep the loading indicator visible
-      // until the stream finishes or translations continue to arrive.
-    });
-
-    return () => {
-      client.close();
-    };
-  }, [articleId, paragraphs.length, sameLanguage]);
+  const { translations, observeRef } = useLazyTranslation({
+    articleId,
+    paragraphTexts: paragraphs,
+    enabled: !sameLanguage,
+  });
 
   return (
-    <div className="text-[16px] leading-[1.8] md:text-[18px]">
+    <div className="text-[17px] leading-[1.8] md:text-[18px] md:leading-[1.75]">
       {paragraphs.map((paragraph, index) => {
         const translation = translations.get(index);
+        const isCode = isCodeBlock(paragraph);
         const paragraphProps = {
           'data-paragraph-index': index,
           'data-highlight-source': encodeURIComponent(paragraph),
         };
 
+        if (isCode) {
+          return (
+            <div
+              key={index}
+              className="mb-[1.2em] overflow-x-auto rounded-md bg-[var(--bg-card)] p-4 font-mono text-[13px] leading-[1.6] text-[var(--text-body)]"
+              {...paragraphProps}
+              dangerouslySetInnerHTML={{ __html: paragraph }}
+            />
+          );
+        }
+
         return (
-          <div key={index} className="pb-4" {...paragraphProps}>
+          <div key={index} ref={observeRef(index)} className="mb-[1.2em]" {...paragraphProps}>
             <div
               data-layer="original"
-              className="text-[var(--text-muted)]"
+              className="text-[var(--text-body)]"
               style={{ fontFamily: originalFont }}
               dangerouslySetInnerHTML={{ __html: paragraph }}
             />
             {!sameLanguage ? (
-              translation ? (
-                <div
-                  data-layer="translation"
-                  className="mt-2 text-[var(--text-body)]"
-                  style={{ fontFamily: translationFont }}
-                >
-                  {translation}
-                </div>
-              ) : !isDone ? (
+              translations.has(index) ? (
+                translation ? (
+                  <div
+                    data-layer="translation"
+                    className="mt-2 text-[var(--text-muted)]"
+                    style={{ fontFamily: translationFont }}
+                  >
+                    {translation}
+                  </div>
+                ) : null
+              ) : (
                 <LoadingPulse />
-              ) : null
+              )
             ) : null}
           </div>
         );

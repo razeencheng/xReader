@@ -35,15 +35,18 @@ type articleDetailResponse struct {
 }
 
 type articleResponse struct {
-	ID          int64   `json:"id"`
-	SourceID    int64   `json:"source_id"`
-	Title       string  `json:"title"`
-	Link        string  `json:"link"`
-	Language    string  `json:"language"`
-	Author      *string `json:"author,omitempty"`
-	PublishedAt *string `json:"published_at,omitempty"`
-	ContentHtml string  `json:"content_html,omitempty"`
-	ContentText string  `json:"content_text,omitempty"`
+	ID              int64   `json:"id"`
+	SourceID        int64   `json:"source_id"`
+	Title           string  `json:"title"`
+	TitleTranslated string  `json:"title_translated,omitempty"`
+	Summary         string  `json:"summary,omitempty"`
+	SourceTitle     string  `json:"source_title,omitempty"`
+	Link            string  `json:"link"`
+	Language        string  `json:"language"`
+	Author          *string `json:"author,omitempty"`
+	PublishedAt     *string `json:"published_at,omitempty"`
+	ContentHtml     string  `json:"content_html,omitempty"`
+	ContentText     string  `json:"content_text,omitempty"`
 }
 
 type articleChangeResponse struct {
@@ -75,7 +78,7 @@ func (h *ArticleHandler) List(c *gin.Context) {
 	cursorRaw := c.Query("cursor")
 	limit := parseLimit(c.DefaultQuery("limit", "50"))
 
-	items, err := h.itemsForList(ctx, user.ID, tab, q, sourceIDRaw, cursorRaw, limit)
+	items, err := h.itemsForList(ctx, user.ID, user.NativeLanguage, tab, q, sourceIDRaw, cursorRaw, limit)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -240,7 +243,8 @@ func (h *ArticleHandler) Changes(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
 
-func (h *ArticleHandler) itemsForList(ctx context.Context, userID int64, tab, query, sourceIDRaw, cursorRaw string, limit int32) ([]articleResponse, error) {
+func (h *ArticleHandler) itemsForList(ctx context.Context, userID int64, lang, tab, query, sourceIDRaw, cursorRaw string, limit int32) ([]articleResponse, error) {
+
 	if strings.TrimSpace(query) != "" {
 		rows, err := h.Service.Search(ctx, userID, query)
 		if err != nil {
@@ -263,27 +267,27 @@ func (h *ArticleHandler) itemsForList(ctx context.Context, userID int64, tab, qu
 
 	switch tab {
 	case "", "today":
-		rows, err := h.Service.ListToday(ctx, userID)
+		rows, err := h.Service.ListTodayEnriched(ctx, userID, lang)
 		if err != nil {
 			return nil, err
 		}
-		return toArticleResponses(rows, false), nil
+		return enrichedToArticleResponses(rows), nil
 	case "starred":
-		rows, err := h.Service.ListStarred(ctx, userID)
+		rows, err := h.Service.ListStarredEnriched(ctx, userID, lang)
 		if err != nil {
 			return nil, err
 		}
-		return toArticleResponses(rows, false), nil
+		return enrichedToArticleResponses(rows), nil
 	case "stream":
 		cursor, err := parseTimePtr(cursorRaw)
 		if err != nil {
 			return nil, fmt.Errorf("invalid cursor")
 		}
-		rows, err := h.Service.ListStream(ctx, userID, cursor, clampListLimit(limit))
+		rows, err := h.Service.ListStreamEnriched(ctx, userID, cursor, clampListLimit(limit), lang)
 		if err != nil {
 			return nil, err
 		}
-		return toArticleResponses(rows, false), nil
+		return enrichedToArticleResponses(rows), nil
 	default:
 		return nil, fmt.Errorf("invalid tab")
 	}
@@ -293,6 +297,27 @@ func toArticleResponses(items []gen.Article, detail bool) []articleResponse {
 	resp := make([]articleResponse, 0, len(items))
 	for _, item := range items {
 		resp = append(resp, toArticleResponse(item, detail))
+	}
+	return resp
+}
+
+func enrichedToArticleResponses(items []EnrichedArticle) []articleResponse {
+	resp := make([]articleResponse, 0, len(items))
+	for _, item := range items {
+		r := articleResponse{
+			ID: item.ID, SourceID: item.SourceID, Title: item.Title,
+			TitleTranslated: item.TitleTranslated, Summary: item.Summary,
+			SourceTitle: item.SourceTitle, Link: item.Link, Language: item.Language,
+		}
+		if item.Author.Valid {
+			author := item.Author.String
+			r.Author = &author
+		}
+		if item.PublishedAt.Valid {
+			publishedAt := item.PublishedAt.Time.UTC().Format(time.RFC3339Nano)
+			r.PublishedAt = &publishedAt
+		}
+		resp = append(resp, r)
 	}
 	return resp
 }

@@ -86,7 +86,7 @@ func TestFetchJob_DedupesByNormalizedLink(t *testing.T) {
 	}
 
 	job := NewFetchJob(pool, adapter)
-	inserted, err := job.Run(ctx, src)
+	inserted, _, err := job.Run(ctx, src)
 	require.NoError(t, err)
 	require.Equal(t, 2, inserted)
 
@@ -104,7 +104,7 @@ func TestFetchJob_MarksFailureIncrementsCounter(t *testing.T) {
 
 	adapter := &mockAdapter{fetchErr: fmt.Errorf("connection refused")}
 	job := NewFetchJob(pool, adapter)
-	_, err := job.Run(ctx, src)
+	_, _, err := job.Run(ctx, src)
 	require.Error(t, err)
 
 	queries := gen.New(pool)
@@ -137,7 +137,7 @@ func TestFetchJob_SuccessResetsFailCounter(t *testing.T) {
 		},
 	}
 	job := NewFetchJob(pool, adapter)
-	inserted, err := job.Run(ctx, src)
+	inserted, _, err := job.Run(ctx, src)
 	require.NoError(t, err)
 	require.Equal(t, 1, inserted)
 

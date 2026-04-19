@@ -13,7 +13,8 @@ export interface Highlight {
 }
 
 export async function fetchHighlights(articleId: number): Promise<Highlight[]> {
-  return apiFetch<Highlight[]>(`/api/articles/${articleId}/highlights`);
+  const res = await apiFetch<{ items: Highlight[] }>(`/api/articles/${articleId}/highlights`);
+  return res?.items ?? [];
 }
 
 export async function createHighlight(params: {

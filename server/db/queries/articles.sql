@@ -68,3 +68,42 @@ JOIN article_states st ON a.id = st.article_id AND st.user_id = $1
 WHERE st.is_starred = true
 ORDER BY a.published_at DESC
 LIMIT 100;
+
+-- name: ListArticlesTodayEnriched :many
+SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
+       COALESCE(ai.title_translated, '') AS title_translated,
+       COALESCE(ai.summary, '') AS summary,
+       s.title AS source_title
+FROM articles a
+JOIN sources s ON a.source_id = s.id
+LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
+WHERE s.user_id = $1
+  AND a.published_at >= now() - interval '24 hours'
+ORDER BY a.published_at DESC
+LIMIT 100;
+
+-- name: ListArticlesStreamEnriched :many
+SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
+       COALESCE(ai.title_translated, '') AS title_translated,
+       COALESCE(ai.summary, '') AS summary,
+       s.title AS source_title
+FROM articles a
+JOIN sources s ON a.source_id = s.id
+LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $3
+WHERE s.user_id = $1
+  AND ($2::timestamptz IS NULL OR a.published_at < $2)
+ORDER BY a.published_at DESC, a.id DESC
+LIMIT $4;
+
+-- name: ListArticlesStarredEnriched :many
+SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
+       COALESCE(ai.title_translated, '') AS title_translated,
+       COALESCE(ai.summary, '') AS summary,
+       s.title AS source_title
+FROM articles a
+JOIN article_states st ON a.id = st.article_id AND st.user_id = $1
+LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
+JOIN sources s ON a.source_id = s.id
+WHERE st.is_starred = true
+ORDER BY a.published_at DESC
+LIMIT 100;

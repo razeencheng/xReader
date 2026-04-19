@@ -24,8 +24,36 @@ func NewArticleService(pool *pgxpool.Pool) *ArticleService {
 	return &ArticleService{pool: pool, queries: gen.New(pool)}
 }
 
+type EnrichedArticle struct {
+	ID              int64
+	SourceID        int64
+	Title           string
+	TitleTranslated string
+	Summary         string
+	SourceTitle     string
+	Link            string
+	Language        string
+	Author          pgtype.Text
+	PublishedAt     pgtype.Timestamptz
+	ContentText     string
+}
+
 func (s *ArticleService) ListToday(ctx context.Context, userID int64) ([]gen.Article, error) {
 	return s.queries.ListArticlesToday(ctx, userID)
+}
+
+func (s *ArticleService) ListTodayEnriched(ctx context.Context, userID int64, lang string) ([]EnrichedArticle, error) {
+	rows, err := s.queries.ListArticlesTodayEnriched(ctx, gen.ListArticlesTodayEnrichedParams{
+		UserID: userID, TargetLanguage: lang,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]EnrichedArticle, len(rows))
+	for i, r := range rows {
+		out[i] = EnrichedArticle{ID: r.ID, SourceID: r.SourceID, Title: r.Title, TitleTranslated: r.TitleTranslated, Summary: r.Summary, SourceTitle: r.SourceTitle, Link: r.Link, Language: r.Language, Author: r.Author, PublishedAt: r.PublishedAt, ContentText: r.ContentText}
+	}
+	return out, nil
 }
 
 func (s *ArticleService) ListStream(ctx context.Context, userID int64, cursor *time.Time, limit int32) ([]gen.Article, error) {
@@ -36,8 +64,36 @@ func (s *ArticleService) ListStream(ctx context.Context, userID int64, cursor *t
 	})
 }
 
+func (s *ArticleService) ListStreamEnriched(ctx context.Context, userID int64, cursor *time.Time, limit int32, lang string) ([]EnrichedArticle, error) {
+	rows, err := s.queries.ListArticlesStreamEnriched(ctx, gen.ListArticlesStreamEnrichedParams{
+		UserID: userID, Column2: timestamptzOrNull(cursor), TargetLanguage: lang, Limit: clampLimit(limit),
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]EnrichedArticle, len(rows))
+	for i, r := range rows {
+		out[i] = EnrichedArticle{ID: r.ID, SourceID: r.SourceID, Title: r.Title, TitleTranslated: r.TitleTranslated, Summary: r.Summary, SourceTitle: r.SourceTitle, Link: r.Link, Language: r.Language, Author: r.Author, PublishedAt: r.PublishedAt, ContentText: r.ContentText}
+	}
+	return out, nil
+}
+
 func (s *ArticleService) ListStarred(ctx context.Context, userID int64) ([]gen.Article, error) {
 	return s.queries.ListArticlesStarred(ctx, userID)
+}
+
+func (s *ArticleService) ListStarredEnriched(ctx context.Context, userID int64, lang string) ([]EnrichedArticle, error) {
+	rows, err := s.queries.ListArticlesStarredEnriched(ctx, gen.ListArticlesStarredEnrichedParams{
+		UserID: userID, TargetLanguage: lang,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]EnrichedArticle, len(rows))
+	for i, r := range rows {
+		out[i] = EnrichedArticle{ID: r.ID, SourceID: r.SourceID, Title: r.Title, TitleTranslated: r.TitleTranslated, Summary: r.Summary, SourceTitle: r.SourceTitle, Link: r.Link, Language: r.Language, Author: r.Author, PublishedAt: r.PublishedAt, ContentText: r.ContentText}
+	}
+	return out, nil
 }
 
 func (s *ArticleService) ListBySource(ctx context.Context, userID, sourceID int64) ([]gen.Article, error) {

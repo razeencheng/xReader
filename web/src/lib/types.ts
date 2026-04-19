@@ -17,10 +17,11 @@ export type Article = ArticleItem;
 export interface Source {
   id: number;
   title: string;
-  feed_url: string;
-  site_url: string;
+  url: string;
+  icon_url?: string | null;
   last_fetched_at: string | null;
-  fail_count: number;
+  consecutive_fails: number;
+  health: string;
 }
 
 export interface ArticleListResponse {

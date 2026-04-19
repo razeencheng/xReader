@@ -1,7 +1,7 @@
 'use client';
 
-import { use, useCallback, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { use, useCallback, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { apiFetch } from '@/lib/api-client';
@@ -14,6 +14,7 @@ import { BilingualBody } from '@/components/reader/BilingualBody';
 import { PrevNextBar } from '@/components/reader/PrevNextBar';
 import { NextUpCard } from '@/components/reader/NextUpCard';
 import { useArticleNeighbors } from '@/lib/queries/neighbors';
+import { HighlightLayer } from '@/components/reader/HighlightLayer';
 import type { ArticleItem, ArticleTab } from '@/lib/types';
 
 interface ArticleDetail extends ArticleItem {
@@ -38,9 +39,14 @@ function normalizeTab(value: string | null): ArticleTab {
 function ReaderContent({ id }: { id: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const nativeLanguage = useUIStore((s) => s.nativeLanguage);
   const tab = normalizeTab(searchParams.get('ctx') ?? searchParams.get('tab'));
   const articleId = Number(id);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [articleId]);
 
   const { data: article, isLoading } = useQuery({
     queryKey: ['article', id],
@@ -55,19 +61,32 @@ function ReaderContent({ id }: { id: string }) {
 
   const { prev, next, position, total } = useArticleNeighbors(articleId, tab);
 
+  const markRead = useCallback(async (articleToMarkReadId: number) => {
+    try {
+      await apiFetch(`/api/articles/${articleToMarkReadId}/state`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_read: true }),
+      });
+      broadcast({ type: 'state-change', articleId: articleToMarkReadId, is_read: true });
+    } catch {
+      // Ignore failed background mutations.
+    }
+  }, []);
+
   const navigateTo = useCallback(
     (a: ArticleItem | null, fallback?: () => void) => {
       if (a) {
         const params = new URLSearchParams();
-        const ctx = searchParams.get('ctx');
-        if (ctx) params.set('tab', ctx);
+        const ctx = searchParams.get('ctx') ?? searchParams.get('tab');
+        if (ctx) params.set('ctx', ctx);
+        void markRead(articleId);
         router.push(`/read/${a.id}${params.toString() ? `?${params.toString()}` : ''}`);
         return;
       }
 
       fallback?.();
     },
-    [router, searchParams],
+    [articleId, markRead, router, searchParams],
   );
 
   const readerShortcuts = useMemo(
@@ -81,39 +100,28 @@ function ReaderContent({ id }: { id: string }) {
         void (async () => {
           try {
             const nextStarred = !article.is_starred;
+            queryClient.setQueryData(['article', id], { ...article, is_starred: nextStarred });
             await apiFetch(`/api/articles/${id}/state`, {
               method: 'PATCH',
               body: JSON.stringify({ is_starred: nextStarred }),
             });
             broadcast({ type: 'state-change', articleId, is_starred: nextStarred });
           } catch {
-            // Ignore failed background mutations.
+            queryClient.setQueryData(['article', id], article);
           }
         })();
       },
       escape: () => {
-        const ctx = searchParams.get('ctx');
+        const ctx = searchParams.get('ctx') ?? searchParams.get('tab');
         const params = new URLSearchParams();
         if (ctx) params.set('tab', ctx);
         router.push(`/?${params.toString()}`);
       },
     }),
-    [article, articleId, id, navigateTo, next, prev, router, searchParams],
+    [article, articleId, id, navigateTo, next, prev, queryClient, router, searchParams],
   );
 
   useShortcuts(readerShortcuts);
-
-  const markRead = async (articleToMarkReadId: number) => {
-    try {
-      await apiFetch(`/api/articles/${articleToMarkReadId}/state`, {
-        method: 'PATCH',
-        body: JSON.stringify({ is_read: true }),
-      });
-      broadcast({ type: 'state-change', articleId: articleToMarkReadId, is_read: true });
-    } catch {
-      // Ignore failed background mutations.
-    }
-  };
 
   if (isLoading || !article) {
     return (
@@ -137,7 +145,7 @@ function ReaderContent({ id }: { id: string }) {
         position={position}
         total={total}
         onBack={() => {
-          const ctx = searchParams.get('ctx');
+          const ctx = searchParams.get('ctx') ?? searchParams.get('tab');
           const params = new URLSearchParams();
           if (ctx) params.set('tab', ctx);
           router.push(`/?${params.toString()}`);
@@ -145,44 +153,47 @@ function ReaderContent({ id }: { id: string }) {
         onToggleStar={async () => {
           try {
             const nextStarred = !article.is_starred;
+            queryClient.setQueryData(['article', id], { ...article, is_starred: nextStarred });
             await apiFetch(`/api/articles/${id}/state`, {
               method: 'PATCH',
               body: JSON.stringify({ is_starred: nextStarred }),
             });
             broadcast({ type: 'state-change', articleId, is_starred: nextStarred });
           } catch {
-            // Ignore failed background mutations.
+            queryClient.setQueryData(['article', id], article);
           }
         }}
       />
 
-      <article className="mx-auto max-w-[680px] px-5 pb-6 pt-9 font-serif text-[var(--text-body)] md:px-12">
-        <h1 className="mb-1.5 text-[32px] font-bold leading-[1.25]">{displayTitle}</h1>
-        {showOriginal ? (
-          <div className="mb-1.5 font-[system-ui] text-[13px] italic text-[var(--text-muted)]">{originalTitle}</div>
-        ) : null}
-        <div className="mb-6 font-[system-ui] text-[13px] text-[var(--text-muted)]">
-          {article.author && `${article.author} · `}
-          {article.published_at && new Date(article.published_at).toLocaleString()}
-        </div>
+      <HighlightLayer articleId={articleId}>
+        <article className="mx-auto max-w-[680px] px-5 pb-6 pt-9 font-serif text-[var(--text-body)] md:px-12">
+          <h1 className="mb-1.5 text-[32px] font-bold leading-[1.25]">{displayTitle}</h1>
+          {showOriginal ? (
+            <div className="mb-1.5 font-[system-ui] text-[13px] italic text-[var(--text-muted)]">{originalTitle}</div>
+          ) : null}
+          <div className="mb-6 font-[system-ui] text-[13px] text-[var(--text-muted)]">
+            {article.author && `${article.author} · `}
+            {article.published_at && new Date(article.published_at).toLocaleString()}
+          </div>
 
-        {summary ? <KeyPointsCallout text={summary} /> : null}
+          {summary ? <KeyPointsCallout text={summary} /> : null}
 
-        {article.content_html ? (
-          <BilingualBody
-            articleId={article.id}
-            contentHtml={article.content_html}
-            language={article.language}
-            nativeLanguage={nativeLanguage}
-          />
-        ) : (
-          <p className="text-base leading-[1.8] text-[var(--text-body)]">{article.content_text}</p>
-        )}
+          {article.content_html ? (
+            <BilingualBody
+              articleId={article.id}
+              contentHtml={article.content_html}
+              language={article.language}
+              nativeLanguage={nativeLanguage}
+            />
+          ) : (
+            <p className="text-base leading-[1.8] text-[var(--text-body)]">{article.content_text}</p>
+          )}
 
-        {next ? <NextUpCard next={next} currentId={article.id} markRead={markRead} /> : null}
+          {next ? <NextUpCard next={next} currentId={article.id} markRead={markRead} /> : null}
 
-        <div className="mt-8 text-center font-[system-ui] text-xs text-[var(--text-faint)]">— 文末 —</div>
-      </article>
+          <div className="mt-8 text-center font-[system-ui] text-xs text-[var(--text-faint)]">— 文末 —</div>
+        </article>
+      </HighlightLayer>
 
       <PrevNextBar
         current={article}

@@ -43,11 +43,11 @@ function truncateUrl(url: string, maxLength = 48) {
 }
 
 function healthState(source: Source) {
-  if (source.fail_count <= 0) {
+  if (source.consecutive_fails <= 0) {
     return { label: 'healthy', dotClass: 'bg-emerald-500' };
   }
 
-  if (source.fail_count < 4) {
+  if (source.consecutive_fails < 4) {
     return { label: 'degraded', dotClass: 'bg-amber-500' };
   }
 
@@ -317,8 +317,8 @@ export function SourcesPage() {
                       </div>
 
                       <div className="space-y-1 font-[system-ui] text-xs text-[var(--text-muted)]">
-                        <div className="truncate" title={source.feed_url}>
-                          {truncateUrl(source.feed_url)}
+                        <div className="truncate" title={source.url}>
+                          {truncateUrl(source.url)}
                         </div>
                         <div>上次抓取：{timeAgo(source.last_fetched_at)}</div>
                       </div>

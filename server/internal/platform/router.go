@@ -1,11 +1,13 @@
 package platform
 
 import (
+	"log"
 	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jin/xreader-web/internal/admin"
+	"github.com/jin/xreader-web/internal/ai"
 	"github.com/jin/xreader-web/internal/article"
 	"github.com/jin/xreader-web/internal/auth"
 	"github.com/jin/xreader-web/internal/highlight"
@@ -64,7 +66,7 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		authed.PATCH("/users/me", userH.UpdateMe)
 
 		// Sources
-		sourceSvc := source.NewSourceService(deps.Pool)
+		sourceSvc := source.NewSourceService(deps.Pool, source.NewRSSAdapter())
 		sourceH := source.NewSourceHandler(sourceSvc, nil)
 		authed.GET("/sources", sourceH.List)
 		authed.POST("/sources", sourceH.Create)
@@ -85,9 +87,22 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		authed.POST("/articles/batch-state", articleH.BatchState)
 		authed.GET("/articles/changes", articleH.Changes)
 
-		// Article SSE + body retry (needs AI client — may be nil in dev)
-		sseH := article.NewSSEHandler(deps.Pool, nil, 3)
+		// Article AI
+		aiH := article.NewAIHandler(deps.Pool)
+		authed.GET("/articles/:id/ai", aiH.GetArticleAI)
+
+		// Article SSE + body retry
+		var aiClient ai.AIClient
+		if cfgPath := os.Getenv("XREADER_AI_CONFIG"); cfgPath != "" {
+			if cfg, err := ai.LoadConfig(cfgPath); err != nil {
+				log.Printf("ai config not loaded: %v (body translation disabled)", err)
+			} else {
+				aiClient = ai.NewClient(cfg)
+			}
+		}
+		sseH := article.NewSSEHandler(deps.Pool, aiClient, 3)
 		authed.GET("/articles/:id/body-translation", sseH.BodyTranslation)
+		authed.POST("/articles/:id/body-translation", sseH.BatchTranslate)
 		bodyRetryH := article.NewBodyRetryHandler(deps.Pool)
 		authed.POST("/articles/:id/body-translation/retry", bodyRetryH.Retry)
 

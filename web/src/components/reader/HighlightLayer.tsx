@@ -1,17 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { deleteHighlight, fetchHighlights, updateHighlightNote, type Highlight } from '@/lib/queries/highlights';
 import { HighlightToolbar } from './HighlightToolbar';
 
 interface Props {
   articleId: number;
   refreshKey?: number;
+  children?: ReactNode;
 }
 
 type ParagraphHighlight = Highlight & { top?: number };
 
-export function HighlightLayer({ articleId, refreshKey }: Props) {
+export function HighlightLayer({ articleId, refreshKey, children }: Props) {
   const [highlights, setHighlights] = useState<Highlight[]>([]);
 
   useEffect(() => {
@@ -121,6 +122,7 @@ export function HighlightLayer({ articleId, refreshKey }: Props) {
   return (
     <div onContextMenu={handleMarkContextMenu} data-highlight-container="true">
       <HighlightToolbar articleId={articleId} onHighlightCreated={reload} />
+      {children}
     </div>
   );
 }

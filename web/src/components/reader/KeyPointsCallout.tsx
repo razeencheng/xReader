@@ -10,9 +10,11 @@ export function KeyPointsCallout({ text }: Props) {
       <div className="mb-1.5 text-[10px] font-bold tracking-[2px] text-[var(--text-warning)]">
         要点
       </div>
-      <div className="font-[system-ui] text-sm leading-relaxed text-[var(--text-secondary)]">
-        {text}
-      </div>
+      <ul className="list-disc space-y-1 pl-4 font-[system-ui] text-sm leading-relaxed text-[var(--text-secondary)]">
+        {text.split(/\s*[·•①②③④⑤⑥⑦⑧⑨⑩；;]\s*/).filter(Boolean).map((point, i) => (
+          <li key={i}>{point.trim()}</li>
+        ))}
+      </ul>
     </div>
   );
 }

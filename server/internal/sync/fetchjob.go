@@ -25,7 +25,7 @@ func NewFetchJob(pool *pgxpool.Pool, adapter source.SourceAdapter) *FetchJob {
 	return &FetchJob{pool: pool, queries: gen.New(pool), adapter: adapter}
 }
 
-func (j *FetchJob) Run(ctx context.Context, src gen.Source) (inserted int, err error) {
+func (j *FetchJob) Run(ctx context.Context, src gen.Source) (inserted int, articleIDs []int64, err error) {
 	adapterSrc := source.Source{
 		ID:            src.ID,
 		URL:           src.Url,
@@ -52,7 +52,7 @@ func (j *FetchJob) Run(ctx context.Context, src gen.Source) (inserted int, err e
 		}); updateErr != nil {
 			log.Printf("fetch source %d: update status after failure: %v", src.ID, updateErr)
 		}
-		return 0, fmt.Errorf("fetch source %d: %w", src.ID, fetchErr)
+		return 0, nil, fmt.Errorf("fetch source %d: %w", src.ID, fetchErr)
 	}
 
 	for _, item := range items {
@@ -68,7 +68,7 @@ func (j *FetchJob) Run(ctx context.Context, src gen.Source) (inserted int, err e
 		}
 
 		contentText := stripHTML(item.ContentHTML)
-		if _, upsertErr := j.queries.UpsertArticle(ctx, gen.UpsertArticleParams{
+		article, upsertErr := j.queries.UpsertArticle(ctx, gen.UpsertArticleParams{
 			SourceID:       src.ID,
 			ExternalID:     item.ExternalID,
 			Link:           item.Link,
@@ -79,13 +79,15 @@ func (j *FetchJob) Run(ctx context.Context, src gen.Source) (inserted int, err e
 			ContentText:    contentText,
 			PublishedAt:    pgtype.Timestamptz{Time: item.PublishedAt, Valid: true},
 			FetchedAt:      now,
-		}); upsertErr != nil {
+		})
+		if upsertErr != nil {
 			if errors.Is(upsertErr, pgx.ErrNoRows) {
 				continue
 			}
 			log.Printf("fetch source %d: upsert article %q: %v", src.ID, item.Title, upsertErr)
 			continue
 		}
+		articleIDs = append(articleIDs, article.ID)
 		inserted++
 	}
 
@@ -96,10 +98,10 @@ func (j *FetchJob) Run(ctx context.Context, src gen.Source) (inserted int, err e
 		ConsecutiveFails: 0,
 		Health:           "ok",
 	}); updateErr != nil {
-		return inserted, fmt.Errorf("update source %d fetch status: %w", src.ID, updateErr)
+		return inserted, articleIDs, fmt.Errorf("update source %d fetch status: %w", src.ID, updateErr)
 	}
 
-	return inserted, nil
+	return inserted, articleIDs, nil
 }
 
 func stripHTML(html string) string {
