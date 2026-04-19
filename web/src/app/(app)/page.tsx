@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense } from 'react';
+import Link from 'next/link';
 import { FeedTabs } from '@/components/feed/FeedTabs';
 import { DensityToggle } from '@/components/feed/DensityToggle';
 import { FeedList } from '@/components/feed/FeedList';
@@ -28,7 +29,9 @@ function FeedPageContent() {
         <div className="flex items-center gap-3 text-[13px] leading-none text-[#8a8275]">
           <span>母语：{getNativeLanguageLabel(nativeLanguage)}</span>
           <DensityToggle />
-          <span aria-hidden="true">⚙</span>
+          <Link href="/settings" className="hover:text-[#1f1f1f]" aria-label="设置">
+            ⚙
+          </Link>
         </div>
       </div>
       <FeedList />

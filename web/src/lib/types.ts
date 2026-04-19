@@ -14,6 +14,15 @@ export interface ArticleItem {
 
 export type Article = ArticleItem;
 
+export interface Source {
+  id: number;
+  title: string;
+  feed_url: string;
+  site_url: string;
+  last_fetched_at: string | null;
+  fail_count: number;
+}
+
 export interface ArticleListResponse {
   items: ArticleItem[];
   next_cursor?: string;

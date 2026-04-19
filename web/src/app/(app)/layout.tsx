@@ -2,6 +2,8 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useBroadcastSync } from '@/hooks/useBroadcastSync';
+import { useCrossDevicePoll } from '@/hooks/useCrossDevicePoll';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useUIStore } from '@/stores/useUIStore';
 
@@ -31,6 +33,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       router.replace('/login');
     }
   }, [isLoading, router, user]);
+
+  useCrossDevicePoll(!!user);
+  useBroadcastSync();
 
   if (isLoading || !user) {
     return (

@@ -15,9 +15,11 @@ ON CONFLICT (github_id) DO UPDATE SET
     avatar_url = EXCLUDED.avatar_url
 RETURNING *;
 
--- name: UpdateUserPreferences :one
+-- name: UpdateUserSettings :one
 UPDATE users
-SET native_language = $2, density_pref = $3, theme_pref = $4
+SET native_language = COALESCE(NULLIF($2, ''), native_language),
+    density_pref = COALESCE(NULLIF($3, ''), density_pref),
+    theme_pref = COALESCE(NULLIF($4, ''), theme_pref)
 WHERE id = $1
 RETURNING *;
 

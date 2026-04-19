@@ -134,26 +134,42 @@ func (q *Queries) TouchSession(ctx context.Context, id string) error {
 	return err
 }
 
-const updateUserPreferences = `-- name: UpdateUserPreferences :one
+const updateUserRole = `-- name: UpdateUserRole :exec
+UPDATE users SET role = $2 WHERE id = $1
+`
+
+type UpdateUserRoleParams struct {
+	ID   int64  `json:"id"`
+	Role string `json:"role"`
+}
+
+func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error {
+	_, err := q.db.Exec(ctx, updateUserRole, arg.ID, arg.Role)
+	return err
+}
+
+const updateUserSettings = `-- name: UpdateUserSettings :one
 UPDATE users
-SET native_language = $2, density_pref = $3, theme_pref = $4
+SET native_language = COALESCE(NULLIF($2, ''), native_language),
+    density_pref = COALESCE(NULLIF($3, ''), density_pref),
+    theme_pref = COALESCE(NULLIF($4, ''), theme_pref)
 WHERE id = $1
 RETURNING id, github_id, github_username, avatar_url, native_language, role, density_pref, theme_pref, created_at
 `
 
-type UpdateUserPreferencesParams struct {
-	ID             int64  `json:"id"`
-	NativeLanguage string `json:"native_language"`
-	DensityPref    string `json:"density_pref"`
-	ThemePref      string `json:"theme_pref"`
+type UpdateUserSettingsParams struct {
+	ID      int64       `json:"id"`
+	Column2 interface{} `json:"column_2"`
+	Column3 interface{} `json:"column_3"`
+	Column4 interface{} `json:"column_4"`
 }
 
-func (q *Queries) UpdateUserPreferences(ctx context.Context, arg UpdateUserPreferencesParams) (User, error) {
-	row := q.db.QueryRow(ctx, updateUserPreferences,
+func (q *Queries) UpdateUserSettings(ctx context.Context, arg UpdateUserSettingsParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserSettings,
 		arg.ID,
-		arg.NativeLanguage,
-		arg.DensityPref,
-		arg.ThemePref,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
 	)
 	var i User
 	err := row.Scan(
@@ -168,20 +184,6 @@ func (q *Queries) UpdateUserPreferences(ctx context.Context, arg UpdateUserPrefe
 		&i.CreatedAt,
 	)
 	return i, err
-}
-
-const updateUserRole = `-- name: UpdateUserRole :exec
-UPDATE users SET role = $2 WHERE id = $1
-`
-
-type UpdateUserRoleParams struct {
-	ID   int64  `json:"id"`
-	Role string `json:"role"`
-}
-
-func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error {
-	_, err := q.db.Exec(ctx, updateUserRole, arg.ID, arg.Role)
-	return err
 }
 
 const upsertUser = `-- name: UpsertUser :one

@@ -60,7 +60,8 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 
 		// User preferences
 		userH := user.NewHandler(deps.Pool)
-		authed.PATCH("/users/me", userH.UpdatePreferences)
+		authed.GET("/users/me", userH.GetMe)
+		authed.PATCH("/users/me", userH.UpdateMe)
 
 		// Sources
 		sourceSvc := source.NewSourceService(deps.Pool)
