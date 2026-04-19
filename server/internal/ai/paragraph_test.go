@@ -1,0 +1,23 @@
+package ai
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+func TestSplitParagraphs_BasicHTML(t *testing.T) {
+	paragraphs := SplitParagraphs("<p>First</p><p>Second</p>")
+	require.Len(t, paragraphs, 2)
+	require.Equal(t, 0, paragraphs[0].Index)
+	require.Equal(t, "First", paragraphs[0].Original)
+	require.Equal(t, 1, paragraphs[1].Index)
+	require.Equal(t, "Second", paragraphs[1].Original)
+}
+
+func TestSplitParagraphs_SkipsEmpty(t *testing.T) {
+	paragraphs := SplitParagraphs("<p></p><p>Content</p>")
+	require.Len(t, paragraphs, 1)
+	require.Equal(t, 0, paragraphs[0].Index)
+	require.Equal(t, "Content", paragraphs[0].Original)
+}
