@@ -4,17 +4,17 @@ import { useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useInView } from 'react-intersection-observer';
 import { useArticles } from '@/lib/queries/articles';
+import { useUIStore } from '@/stores/useUIStore';
+import { FeedRowComfortable } from './FeedRowComfortable';
+import { FeedRowCompact } from './FeedRowCompact';
 import type { ArticleItem, ArticleTab } from '@/lib/types';
 
 function normalizeTab(value: string | null): ArticleTab {
   return value === 'stream' || value === 'starred' ? value : 'today';
 }
 
-function FeedRowPlaceholder({ item }: { item: ArticleItem }) {
-  return <div className="px-4 py-5 text-[15px] leading-6 text-[#1f1f1f]">{item.title}</div>;
-}
-
 export function FeedList() {
+  const density = useUIStore((state) => state.density);
   const searchParams = useSearchParams();
   const tab = normalizeTab(searchParams.get('tab'));
   const isStreamTab = tab === 'stream';
@@ -35,6 +35,7 @@ export function FeedList() {
   }, [fetchNextPage, hasNextPage, inView, isFetchingNextPage, isStreamTab]);
 
   const items = data?.pages.flatMap((page) => page.items) ?? [];
+  const RowComponent = density === 'compact' ? FeedRowCompact : FeedRowComfortable;
 
   if (isLoading && items.length === 0) {
     return <div className="px-4 py-10 text-center text-sm text-[#8a8275]">Loading…</div>;
@@ -54,7 +55,7 @@ export function FeedList() {
   return (
     <div className="divide-y divide-[#ece6d8]">
       {items.map((item) => (
-        <FeedRowPlaceholder key={item.id} item={item} />
+        <RowComponent key={item.id} item={item} />
       ))}
       {isStreamTab ? <div ref={ref} className="h-10" /> : null}
       {isFetchingNextPage ? (

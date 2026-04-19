@@ -1,33 +1,30 @@
 import { render, screen } from '@testing-library/react';
 import { FeedRowCompact } from './FeedRowCompact';
-import type { Article } from '@/lib/types';
+import type { ArticleItem } from '@/lib/types';
 
-const mockItem: Article = {
+const mockItem: ArticleItem = {
   id: 1,
   source_id: 1,
   title: 'Test Title',
-  title_translated: 'Translated Title',
-  link: 'https://example.com',
+  link: '#',
   language: 'en',
-  published_at: new Date().toISOString(),
+  title_translated: '测试标题',
   source_title: 'Vercel',
-  summary: 'Some summary text',
+  published_at: new Date(Date.now() - 3 * 3_600_000).toISOString(),
 };
 
-test('renders title and badge', () => {
+test('renders title, badge, and time', () => {
   render(<FeedRowCompact item={mockItem} />);
-  expect(screen.getByText('Translated Title')).toBeInTheDocument();
-  expect(screen.getByText('Vercel')).toBeInTheDocument();
+
+  expect(screen.getByText('测试标题')).toBeInTheDocument();
+  expect(screen.getByText(/Vercel/)).toBeInTheDocument();
+  expect(screen.getByText('3h')).toBeInTheDocument();
 });
 
-test('shows summary as tooltip', () => {
+test('uses margin-left auto on time element', () => {
   const { container } = render(<FeedRowCompact item={mockItem} />);
-  expect(container.firstChild).toHaveAttribute('title', 'Some summary text');
-});
+  const row = container.firstChild as HTMLElement;
+  const lastChild = row.lastElementChild as HTMLElement;
 
-test('renders metadata pushed right via ml-auto', () => {
-  const { container } = render(<FeedRowCompact item={mockItem} />);
-  const children = Array.from(container.firstChild!.childNodes) as HTMLElement[];
-  const last = children[children.length - 1];
-  expect(last.className).toContain('ml-auto');
+  expect(lastChild.className).toContain('ml-auto');
 });

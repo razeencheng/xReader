@@ -1,82 +1,117 @@
-import type { Article } from '@/lib/types';
+'use client';
 
-function timeAgo(dateStr?: string): string {
-  if (!dateStr) return '';
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const hours = Math.floor(diff / 3600000);
-  if (hours < 1) return '< 1h';
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `${days}d`;
+import type { ArticleItem } from '@/lib/types';
+
+type FeedArticleItem = ArticleItem & {
+  content_text?: string;
+};
+
+function timeAgo(dateString: string): string {
+  const diffMs = Date.now() - new Date(dateString).getTime();
+  if (!Number.isFinite(diffMs) || diffMs <= 0) {
+    return '0h';
+  }
+
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 60) {
+    return '1h';
+  }
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${hours}h`;
+  }
+
+  return `${Math.floor(hours / 24)}d`;
 }
 
-function langTag(language: string, nativeLanguage: string): string | null {
-  const lang = language.toUpperCase().slice(0, 2);
-  const native = nativeLanguage.toUpperCase().slice(0, 2);
-  if (lang === native) return null;
-  const displayNative = native === 'ZH' ? '中' : native;
-  return `${lang} → ${displayNative}`;
+function estimateReadTime(item: FeedArticleItem): string {
+  const text = [item.title, item.title_translated, item.summary, item.content_text]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  const words = text ? text.split(/\s+/).length : 0;
+  return `${Math.max(1, Math.round(words / 200) || 1)}m`;
+}
+
+function langTag(language: string): string | null {
+  const normalized = language.trim().toLowerCase();
+  if (normalized.startsWith('zh')) {
+    return null;
+  }
+
+  const codeMap: Record<string, string> = {
+    en: 'EN',
+    ja: 'JA',
+    ko: 'KO',
+    fr: 'FR',
+    de: 'DE',
+    es: 'ES',
+    ru: 'RU',
+  };
+
+  const sourceCode = codeMap[normalized] ?? normalized.toUpperCase().slice(0, 2);
+  return `${sourceCode} → 中`;
 }
 
 interface Props {
-  item: Article;
-  nativeLanguage?: string;
+  item: ArticleItem;
+  onClick?: () => void;
 }
 
-export function FeedRowComfortable({ item, nativeLanguage = 'zh-CN' }: Props) {
-  const hasTranslation = item.title_translated && item.title_translated !== item.title;
-  const displayTitle = item.title_translated || item.title;
-  const tag = langTag(item.language, nativeLanguage);
-  const isShort = !item.summary;
+export function FeedRowComfortable({ item, onClick }: Props) {
+  const article = item as FeedArticleItem;
+  const contentText = article.content_text?.trim();
+  const summary = article.summary?.trim();
+  const translatedTitle = article.title_translated?.trim();
+  const hasTranslatedTitle = Boolean(translatedTitle && translatedTitle !== article.title);
+  const displayTitle = translatedTitle || article.title;
+  const language = langTag(article.language);
 
   return (
-    <article className="py-5 border-b border-[#ece6d8]">
-      {/* Metadata row */}
-      <div className="flex justify-between font-[system-ui] text-xs text-[#8a8275] mb-2">
-        <div className="flex gap-2 items-center">
-          <span className="px-2 py-px bg-[#eee7d8] text-[#5b5444] rounded-[10px] font-semibold">
-            {item.source_title || 'Source'}
+    <article
+      className={`border-b border-[#ece6d8] py-5 ${onClick ? 'cursor-pointer' : ''}`}
+      onClick={onClick}
+    >
+      <div className="flex items-center justify-between gap-4 text-[12px] text-[#8a8275]">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-[system-ui]">
+          <span className="shrink-0 rounded-[10px] bg-[#eee7d8] px-2 py-px font-semibold text-[#5b5444]">
+            {article.source_title || 'Source'}
           </span>
-          <span>
-            {item.author && `${item.author} · `}
-            {timeAgo(item.published_at)}
-            {tag && ` · ${tag}`}
-          </span>
+          {article.author ? <span className="truncate">{article.author}</span> : null}
+          {article.published_at ? <span className="shrink-0">{timeAgo(article.published_at)}</span> : null}
+          {language ? <span className="shrink-0">{language}</span> : null}
+        </div>
+        <div className="flex shrink-0 items-center gap-2 font-[system-ui]">
+          <span>{estimateReadTime(article)}</span>
+          <span className="opacity-50">★</span>
         </div>
       </div>
 
-      {/* Title */}
-      {isShort ? (
-        <>
-          <div className="font-[system-ui] text-[15px] leading-relaxed text-[#2a2a2a] mb-1">
-            {displayTitle}
-          </div>
-          {hasTranslation && (
-            <div className="font-[system-ui] text-xs text-[#8a8275] italic">
-              原文：{item.title}
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          <h3 className="m-0 mb-1 text-[22px] leading-[1.3] text-[#1f1f1f] font-serif">
-            {displayTitle}
-          </h3>
-          {hasTranslation && (
-            <div className="font-[system-ui] text-xs text-[#8a8275] italic mb-2">
-              原标题：{item.title}
-            </div>
-          )}
-          {item.summary && (
-            <div className="font-[system-ui] text-sm leading-relaxed text-[#4a4338]">
-              <span className="text-[#8a8275] font-semibold text-[11px] tracking-[1.5px] mr-1.5">
-                要点
-              </span>
-              {item.summary}
-            </div>
-          )}
-        </>
-      )}
+      <div className="mt-2">
+        {contentText ? (
+          <div className="font-[system-ui] text-[15px] leading-[1.6] text-[#1f1f1f]">{contentText}</div>
+        ) : (
+          <>
+            <h3 className="m-0 mb-1 font-[Iowan Old Style,Georgia,serif] text-[22px] leading-[1.3] text-[#1f1f1f]">
+              {displayTitle}
+            </h3>
+            {hasTranslatedTitle ? (
+              <div className="mb-2 font-[system-ui] text-xs italic text-[#8a8275]">
+                原标题：{article.title}
+              </div>
+            ) : null}
+            {summary ? (
+              <div className="font-[system-ui] text-[14px] leading-[1.6] text-[#4a4338]">
+                <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-[1.5px] text-[#8a8275]">
+                  要点
+                </span>
+                {summary}
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
     </article>
   );
 }
