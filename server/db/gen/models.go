@@ -24,6 +24,19 @@ type Article struct {
 	SearchVec      interface{}        `json:"search_vec"`
 }
 
+type ArticleAi struct {
+	ArticleID              int64              `json:"article_id"`
+	TargetLanguage         string             `json:"target_language"`
+	TitleTranslated        string             `json:"title_translated"`
+	Summary                string             `json:"summary"`
+	SummaryStatus          string             `json:"summary_status"`
+	SummarySkipReason      string             `json:"summary_skip_reason"`
+	BodyTranslationStatus  string             `json:"body_translation_status"`
+	BodyTranslationContent []byte             `json:"body_translation_content"`
+	CreatedAt              pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
+}
+
 type ArticleState struct {
 	UserID          int64              `json:"user_id"`
 	ArticleID       int64              `json:"article_id"`

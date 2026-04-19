@@ -1,0 +1,48 @@
+-- name: UpsertTitleTranslation :exec
+INSERT INTO article_ai (article_id, target_language, title_translated, updated_at)
+VALUES ($1, $2, $3, now())
+ON CONFLICT (article_id, target_language) DO UPDATE SET
+  title_translated = $3,
+  updated_at = now();
+
+-- name: UpsertSummary :exec
+UPDATE article_ai
+SET summary = $3,
+    summary_status = $4,
+    summary_skip_reason = $5,
+    updated_at = now()
+WHERE article_id = $1 AND target_language = $2;
+
+-- name: GetArticleAI :one
+SELECT * FROM article_ai
+WHERE article_id = $1 AND target_language = $2;
+
+-- name: SetBodyStatus :exec
+UPDATE article_ai
+SET body_translation_status = $2, updated_at = now()
+WHERE article_id = $1 AND target_language = $3;
+
+-- name: SetBodyTranslation :exec
+UPDATE article_ai
+SET body_translation_content = $3, body_translation_status = $4, updated_at = now()
+WHERE article_id = $1 AND target_language = $2;
+
+-- name: SetBodyTranslationStatus :exec
+UPDATE article_ai
+SET body_translation_status = $3, updated_at = now()
+WHERE article_id = $1 AND target_language = $2;
+
+-- name: SetBodyTranslationContent :exec
+UPDATE article_ai
+SET body_translation_content = $3, body_translation_status = 'done', updated_at = now()
+WHERE article_id = $1 AND target_language = $2;
+
+-- name: ResetBodyTranslation :exec
+UPDATE article_ai
+SET body_translation_content = NULL, body_translation_status = 'none', updated_at = now()
+WHERE article_id = $1 AND target_language = $2;
+
+-- name: EnsureArticleAI :exec
+INSERT INTO article_ai (article_id, target_language)
+VALUES ($1, $2)
+ON CONFLICT (article_id, target_language) DO NOTHING;
