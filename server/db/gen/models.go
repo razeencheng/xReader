@@ -67,6 +67,20 @@ type AuthSession struct {
 	UserAgent  pgtype.Text        `json:"user_agent"`
 }
 
+type Highlight struct {
+	ID              int64              `json:"id"`
+	UserID          int64              `json:"user_id"`
+	ArticleID       int64              `json:"article_id"`
+	Layer           string             `json:"layer"`
+	ParagraphIndex  int32              `json:"paragraph_index"`
+	TextStartOffset int32              `json:"text_start_offset"`
+	TextEndOffset   int32              `json:"text_end_offset"`
+	QuotedText      string             `json:"quoted_text"`
+	Note            pgtype.Text        `json:"note"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Source struct {
 	ID               int64              `json:"id"`
 	UserID           int64              `json:"user_id"`
