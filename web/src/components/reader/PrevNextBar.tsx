@@ -34,7 +34,7 @@ export function PrevNextBar({ current, prev, next, position, total, markRead }: 
   };
 
   return (
-    <div className="sticky bottom-0 z-20 flex items-center gap-4 border-t border-[#ece6d8] bg-white px-6 py-3 font-[system-ui] text-[13px] text-[#1f1f1f]">
+    <div className="sticky bottom-0 z-20 flex items-center gap-4 border-t border-[var(--border-default)] bg-[var(--bg-input)] px-4 py-3 font-[system-ui] text-[13px] text-[var(--text-body)] md:px-6">
       <div className="min-w-0 flex-1">
         {prev ? (
           <button
@@ -42,10 +42,10 @@ export function PrevNextBar({ current, prev, next, position, total, markRead }: 
             onClick={() => navigate(prev)}
             className="flex min-w-0 max-w-[42vw] items-center gap-2.5 text-left opacity-80 transition hover:opacity-100"
           >
-            <span className="shrink-0 text-[#8a8275]">← K</span>
+            <span className="hide-mobile shrink-0 text-[var(--text-muted)]">← K</span>
             <div className="min-w-0 overflow-hidden">
-              <div className="text-[10px] tracking-[1.5px] text-[#8a8275]">上一篇</div>
-              <div className="truncate font-medium text-[#1f1f1f]">
+              <div className="text-[10px] tracking-[1.5px] text-[var(--text-muted)]">上一篇</div>
+              <div className="truncate font-medium text-[var(--text-body)]">
                 {prev.title_translated || prev.title}
               </div>
             </div>
@@ -53,7 +53,7 @@ export function PrevNextBar({ current, prev, next, position, total, markRead }: 
         ) : null}
       </div>
 
-      <div className="shrink-0 px-4 text-[#8a8275]">
+      <div className="shrink-0 px-4 text-[var(--text-muted)]">
         {position != null && total != null ? `${position} / ${total}` : ''}
       </div>
 
@@ -65,12 +65,12 @@ export function PrevNextBar({ current, prev, next, position, total, markRead }: 
             className="ml-auto flex min-w-0 max-w-[42vw] items-center gap-2.5 text-right opacity-80 transition hover:opacity-100"
           >
             <div className="min-w-0 overflow-hidden">
-              <div className="text-[10px] tracking-[1.5px] text-[#8a8275]">下一篇</div>
-              <div className="truncate font-medium text-[#1f1f1f]">
+              <div className="text-[10px] tracking-[1.5px] text-[var(--text-muted)]">下一篇</div>
+              <div className="truncate font-medium text-[var(--text-body)]">
                 {next.title_translated || next.title}
               </div>
             </div>
-            <span className="shrink-0 text-[#8a8275]">J →</span>
+            <span className="hide-mobile shrink-0 text-[var(--text-muted)]">J →</span>
           </button>
         ) : null}
       </div>

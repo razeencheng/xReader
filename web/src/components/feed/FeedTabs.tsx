@@ -36,7 +36,7 @@ export function FeedTabs() {
             onClick={() => handleTabChange(key)}
             className={`rounded-full px-3.5 py-1.5 transition-colors ${
               active
-                ? 'bg-[#2a2a2a] font-semibold text-[#fbfaf7]'
+                ? 'bg-[var(--bg-nav)] font-semibold text-[var(--text-inverse)]'
                 : 'opacity-55 hover:opacity-80'
             }`}
           >

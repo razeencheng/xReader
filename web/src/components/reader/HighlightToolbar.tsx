@@ -71,20 +71,20 @@ export function HighlightToolbar({ articleId, onHighlightCreated }: Props) {
 
   return (
     <div
-      className="fixed z-50 flex gap-1 rounded-lg border border-[#e6dec8] bg-white px-2 py-1 shadow-md"
+      className="fixed z-50 flex gap-1 rounded-lg border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-1 shadow-md"
       style={{ top: position.top, left: position.left, transform: 'translateX(-50%)' }}
     >
       <button
         type="button"
         onClick={() => save(false)}
-        className="rounded px-2 py-1 text-xs font-medium text-[#4a4338] hover:bg-[#f5f0e8]"
+        className="rounded px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
       >
         高亮
       </button>
       <button
         type="button"
         onClick={() => save(true)}
-        className="rounded px-2 py-1 text-xs font-medium text-[#4a4338] hover:bg-[#f5f0e8]"
+        className="rounded px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
       >
         高亮 + 笔记
       </button>

@@ -22,7 +22,7 @@ export default function CallbackPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <p className="text-sm text-[#8a8275]">Signing in…</p>
+      <p className="text-sm text-[var(--text-muted)]">Signing in…</p>
     </div>
   );
 }

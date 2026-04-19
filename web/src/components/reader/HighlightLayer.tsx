@@ -72,7 +72,7 @@ export function HighlightLayer({ articleId, refreshKey }: Props) {
 
         const mark = document.createElement('mark');
         mark.dataset.highlightId = String(highlight.id);
-        mark.className = 'bg-[#fff1a8] cursor-pointer rounded-[2px] px-0.5';
+        mark.className = 'bg-[var(--bg-highlight-yellow)] cursor-pointer rounded-[2px] px-0.5';
         if (highlight.note) mark.title = highlight.note;
         try {
           range.surroundContents(mark);

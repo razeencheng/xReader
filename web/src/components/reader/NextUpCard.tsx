@@ -42,24 +42,24 @@ export function NextUpCard({ next, currentId, markRead }: Props) {
   };
 
   return (
-    <div className="mx-auto mb-10 max-w-[680px] px-12 font-[system-ui]">
+    <div className="mx-auto mb-10 max-w-[680px] px-5 font-[system-ui] md:px-12">
       <button
         type="button"
         onClick={handleClick}
-        className="flex w-full cursor-pointer items-start gap-[18px] rounded-[10px] border border-[#e6dec8] bg-[#fbf7ec] p-5 text-left transition-colors hover:border-[#d4c9a8]"
+        className="flex w-full cursor-pointer items-start gap-[18px] rounded-[10px] border border-[var(--border-strong)] bg-[var(--bg-badge-starred)] p-5 text-left transition-colors hover:border-[var(--border-strong)]"
       >
-        <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-[#2a2a2a] text-lg font-bold text-[#fdfbf6]">
+        <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-[var(--bg-nav)] text-lg font-bold text-[var(--text-inverse)]">
           →
         </div>
         <div className="min-w-0 flex-1">
-          <div className="mb-1.5 text-[10px] font-bold tracking-[2px] text-[#8a8275]">
+          <div className="mb-1.5 text-[10px] font-bold tracking-[2px] text-[var(--text-muted)]">
             下一篇 · 按 J 或点击继续
           </div>
-          <div className="mb-1 font-serif text-[19px] font-bold leading-[1.3] text-[#1f1f1f]">
+          <div className="mb-1 font-serif text-[19px] font-bold leading-[1.3] text-[var(--text-body)]">
             {displayTitle}
           </div>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#8a8275]">
-            <span className="rounded-lg bg-[#1d1d1d] px-1.5 py-px font-semibold text-[#fbfaf7]">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-muted)]">
+            <span className="rounded-lg bg-[var(--bg-nav)] px-1.5 py-px font-semibold text-[var(--text-inverse)]">
               {next.source_title || 'Source'}
             </span>
             {publishedAt ? <span>{publishedAt}</span> : null}
