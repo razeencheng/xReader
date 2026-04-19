@@ -39,7 +39,7 @@ VALUES (
     $1, $2, $3, $4, $5, $6,
     $7, $8, $9, $10, $11
 )
-RETURNING id, source_id, external_id, link, normalized_link, title, language, content_html, content_text, author, published_at, fetched_at
+RETURNING id, source_id, external_id, link, normalized_link, title, language, content_html, content_text, author, published_at, fetched_at, search_vec
 `
 
 type CreateArticleParams struct {
@@ -84,12 +84,13 @@ func (q *Queries) CreateArticle(ctx context.Context, arg CreateArticleParams) (A
 		&i.Author,
 		&i.PublishedAt,
 		&i.FetchedAt,
+		&i.SearchVec,
 	)
 	return i, err
 }
 
 const getArticleByID = `-- name: GetArticleByID :one
-SELECT id, source_id, external_id, link, normalized_link, title, language, content_html, content_text, author, published_at, fetched_at FROM articles
+SELECT id, source_id, external_id, link, normalized_link, title, language, content_html, content_text, author, published_at, fetched_at, search_vec FROM articles
 WHERE id = $1
 `
 
@@ -109,12 +110,13 @@ func (q *Queries) GetArticleByID(ctx context.Context, id int64) (Article, error)
 		&i.Author,
 		&i.PublishedAt,
 		&i.FetchedAt,
+		&i.SearchVec,
 	)
 	return i, err
 }
 
 const listArticlesBySource = `-- name: ListArticlesBySource :many
-SELECT id, source_id, external_id, link, normalized_link, title, language, content_html, content_text, author, published_at, fetched_at FROM articles
+SELECT id, source_id, external_id, link, normalized_link, title, language, content_html, content_text, author, published_at, fetched_at, search_vec FROM articles
 WHERE source_id = $1
 ORDER BY published_at DESC
 `
@@ -141,6 +143,195 @@ func (q *Queries) ListArticlesBySource(ctx context.Context, sourceID int64) ([]A
 			&i.Author,
 			&i.PublishedAt,
 			&i.FetchedAt,
+			&i.SearchVec,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listArticlesStarred = `-- name: ListArticlesStarred :many
+SELECT a.id, a.source_id, a.external_id, a.link, a.normalized_link, a.title, a.language, a.content_html, a.content_text, a.author, a.published_at, a.fetched_at, a.search_vec FROM articles a
+JOIN article_states st ON a.id = st.article_id AND st.user_id = $1
+WHERE st.is_starred = true
+ORDER BY a.published_at DESC
+LIMIT 100
+`
+
+func (q *Queries) ListArticlesStarred(ctx context.Context, userID int64) ([]Article, error) {
+	rows, err := q.db.Query(ctx, listArticlesStarred, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Article{}
+	for rows.Next() {
+		var i Article
+		if err := rows.Scan(
+			&i.ID,
+			&i.SourceID,
+			&i.ExternalID,
+			&i.Link,
+			&i.NormalizedLink,
+			&i.Title,
+			&i.Language,
+			&i.ContentHtml,
+			&i.ContentText,
+			&i.Author,
+			&i.PublishedAt,
+			&i.FetchedAt,
+			&i.SearchVec,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listArticlesStream = `-- name: ListArticlesStream :many
+SELECT a.id, a.source_id, a.external_id, a.link, a.normalized_link, a.title, a.language, a.content_html, a.content_text, a.author, a.published_at, a.fetched_at, a.search_vec FROM articles a
+JOIN sources s ON a.source_id = s.id
+WHERE s.user_id = $1
+  AND ($2::timestamptz IS NULL OR a.published_at < $2)
+ORDER BY a.published_at DESC, a.id DESC
+LIMIT $3
+`
+
+type ListArticlesStreamParams struct {
+	UserID  int64              `json:"user_id"`
+	Column2 pgtype.Timestamptz `json:"column_2"`
+	Limit   int32              `json:"limit"`
+}
+
+func (q *Queries) ListArticlesStream(ctx context.Context, arg ListArticlesStreamParams) ([]Article, error) {
+	rows, err := q.db.Query(ctx, listArticlesStream, arg.UserID, arg.Column2, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Article{}
+	for rows.Next() {
+		var i Article
+		if err := rows.Scan(
+			&i.ID,
+			&i.SourceID,
+			&i.ExternalID,
+			&i.Link,
+			&i.NormalizedLink,
+			&i.Title,
+			&i.Language,
+			&i.ContentHtml,
+			&i.ContentText,
+			&i.Author,
+			&i.PublishedAt,
+			&i.FetchedAt,
+			&i.SearchVec,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listArticlesToday = `-- name: ListArticlesToday :many
+SELECT a.id, a.source_id, a.external_id, a.link, a.normalized_link, a.title, a.language, a.content_html, a.content_text, a.author, a.published_at, a.fetched_at, a.search_vec FROM articles a
+JOIN sources s ON a.source_id = s.id
+WHERE s.user_id = $1
+  AND a.published_at >= now() - interval '24 hours'
+ORDER BY a.published_at DESC
+LIMIT 100
+`
+
+func (q *Queries) ListArticlesToday(ctx context.Context, userID int64) ([]Article, error) {
+	rows, err := q.db.Query(ctx, listArticlesToday, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Article{}
+	for rows.Next() {
+		var i Article
+		if err := rows.Scan(
+			&i.ID,
+			&i.SourceID,
+			&i.ExternalID,
+			&i.Link,
+			&i.NormalizedLink,
+			&i.Title,
+			&i.Language,
+			&i.ContentHtml,
+			&i.ContentText,
+			&i.Author,
+			&i.PublishedAt,
+			&i.FetchedAt,
+			&i.SearchVec,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchArticles = `-- name: SearchArticles :many
+SELECT a.id, a.source_id, a.title, a.link, a.language, a.published_at,
+       ts_headline('simple', a.title || ' ' || a.content_text, plainto_tsquery('simple', $2), 'MaxWords=20, MinWords=6') AS headline
+FROM articles a
+JOIN sources s ON a.source_id = s.id
+WHERE s.user_id = $1
+  AND a.search_vec @@ plainto_tsquery('simple', $2)
+ORDER BY ts_rank(a.search_vec, plainto_tsquery('simple', $2)) DESC
+LIMIT 100
+`
+
+type SearchArticlesParams struct {
+	UserID         int64  `json:"user_id"`
+	PlaintoTsquery string `json:"plainto_tsquery"`
+}
+
+type SearchArticlesRow struct {
+	ID          int64              `json:"id"`
+	SourceID    int64              `json:"source_id"`
+	Title       string             `json:"title"`
+	Link        string             `json:"link"`
+	Language    string             `json:"language"`
+	PublishedAt pgtype.Timestamptz `json:"published_at"`
+	Headline    []byte             `json:"headline"`
+}
+
+func (q *Queries) SearchArticles(ctx context.Context, arg SearchArticlesParams) ([]SearchArticlesRow, error) {
+	rows, err := q.db.Query(ctx, searchArticles, arg.UserID, arg.PlaintoTsquery)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchArticlesRow{}
+	for rows.Next() {
+		var i SearchArticlesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SourceID,
+			&i.Title,
+			&i.Link,
+			&i.Language,
+			&i.PublishedAt,
+			&i.Headline,
 		); err != nil {
 			return nil, err
 		}
@@ -162,7 +353,7 @@ VALUES (
     $7, $8, $9, $10, $11
 )
 ON CONFLICT (source_id, normalized_link) DO NOTHING
-RETURNING id, source_id, external_id, link, normalized_link, title, language, content_html, content_text, author, published_at, fetched_at
+RETURNING id, source_id, external_id, link, normalized_link, title, language, content_html, content_text, author, published_at, fetched_at, search_vec
 `
 
 type UpsertArticleParams struct {
@@ -207,6 +398,7 @@ func (q *Queries) UpsertArticle(ctx context.Context, arg UpsertArticleParams) (A
 		&i.Author,
 		&i.PublishedAt,
 		&i.FetchedAt,
+		&i.SearchVec,
 	)
 	return i, err
 }

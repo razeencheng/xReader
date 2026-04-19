@@ -1,20 +1,26 @@
 package source
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jin/xreader-web/internal/middleware"
+	"github.com/jin/xreader-web/internal/platform"
 )
 
 type SourceHandler struct {
-	Service *SourceService
+	Service  *SourceService
+	JobStore platform.JobStore
 }
 
-func NewSourceHandler(svc *SourceService) *SourceHandler {
-	return &SourceHandler{Service: svc}
+func NewSourceHandler(svc *SourceService, jobStore platform.JobStore) *SourceHandler {
+	if jobStore == nil {
+		jobStore = platform.NewMemoryJobStore()
+	}
+	return &SourceHandler{Service: svc, JobStore: jobStore}
 }
 
 func (h *SourceHandler) List(c *gin.Context) {
@@ -95,10 +101,59 @@ func (h *SourceHandler) Refresh(c *gin.Context) {
 	c.JSON(http.StatusAccepted, gin.H{"status": "refresh queued"})
 }
 
-func isUniqueViolation(err error) bool {
-	if err == nil {
-		return false
+func (h *SourceHandler) ImportOPML(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
 	}
-	msg := err.Error()
-	return strings.Contains(msg, "23505") || strings.Contains(msg, "duplicate key")
+
+	body, err := c.GetRawData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read body"})
+		return
+	}
+
+	opml, err := ParseOPML(body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid OPML"})
+		return
+	}
+	feeds := FlattenOPML(opml)
+	if len(feeds) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no feeds found in OPML"})
+		return
+	}
+
+	jobID := fmt.Sprintf("import-%d-%d", user.ID, time.Now().UnixNano())
+	h.Service.ImportOPML(c.Request.Context(), user.ID, feeds, jobID, h.JobStore)
+
+	c.JSON(http.StatusAccepted, gin.H{"job_id": jobID})
 }
+
+func (h *SourceHandler) GetJob(c *gin.Context) {
+	jobID := c.Param("id")
+	status, ok := h.JobStore.Get(jobID)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "job not found"})
+		return
+	}
+	c.JSON(http.StatusOK, status)
+}
+
+func (h *SourceHandler) ExportOPML(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+
+	data, err := h.Service.ExportOPML(c.Request.Context(), user.ID, "xReader Export")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate OPML"})
+		return
+	}
+
+	c.Data(http.StatusOK, "text/x-opml", data)
+}
+

@@ -1,0 +1,351 @@
+package article
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/jin/xreader-web/db/gen"
+	"github.com/jin/xreader-web/internal/middleware"
+)
+
+type ArticleHandler struct {
+	Service *ArticleService
+}
+
+func NewArticleHandler(svc *ArticleService) *ArticleHandler {
+	return &ArticleHandler{Service: svc}
+}
+
+type articleListResponse struct {
+	Items      []articleResponse `json:"items"`
+	NextCursor string            `json:"next_cursor,omitempty"`
+}
+
+type articleDetailResponse struct {
+	articleResponse
+	IsRead         bool            `json:"is_read"`
+	IsStarred      bool            `json:"is_starred"`
+	ReadingProgress json.RawMessage `json:"reading_progress,omitempty"`
+}
+
+type articleResponse struct {
+	ID          int64   `json:"id"`
+	SourceID    int64   `json:"source_id"`
+	Title       string  `json:"title"`
+	Link        string  `json:"link"`
+	Language    string  `json:"language"`
+	Author      *string `json:"author,omitempty"`
+	PublishedAt *string `json:"published_at,omitempty"`
+	ContentHtml string  `json:"content_html,omitempty"`
+	ContentText string  `json:"content_text,omitempty"`
+}
+
+type articleChangeResponse struct {
+	ArticleID int64  `json:"article_id"`
+	ChangedAt string `json:"changed_at"`
+}
+
+type articleStateRequest struct {
+	IsRead    *bool `json:"is_read"`
+	IsStarred *bool `json:"is_starred"`
+}
+
+type batchStateRequest struct {
+	Scope  string `json:"scope"`
+	IsRead bool   `json:"is_read"`
+}
+
+func (h *ArticleHandler) List(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+
+	ctx := c.Request.Context()
+	tab := c.DefaultQuery("tab", "today")
+	q := c.Query("q")
+	sourceIDRaw := c.Query("source_id")
+	cursorRaw := c.Query("cursor")
+	limit := parseLimit(c.DefaultQuery("limit", "50"))
+
+	items, err := h.itemsForList(ctx, user.ID, tab, q, sourceIDRaw, cursorRaw, limit)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	resp := articleListResponse{Items: items}
+	if tab == "stream" && len(items) == int(clampListLimit(limit)) {
+		if last := items[len(items)-1]; last.PublishedAt != nil {
+			resp.NextCursor = *last.PublishedAt
+		}
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *ArticleHandler) GetByID(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	ctx := c.Request.Context()
+	articleRow, err := h.Service.GetByID(ctx, user.ID, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
+		return
+	}
+
+	state, err := h.Service.GetState(ctx, user.ID, id)
+	if err != nil {
+		state = gen.ArticleState{}
+	}
+
+	resp := articleDetailResponse{articleResponse: toArticleResponse(articleRow, true), IsRead: state.IsRead, IsStarred: state.IsStarred}
+	if len(state.ReadingProgress) > 0 {
+		resp.ReadingProgress = json.RawMessage(state.ReadingProgress)
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *ArticleHandler) UpdateState(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	var req articleStateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		return
+	}
+
+	ctx := c.Request.Context()
+	if req.IsRead != nil {
+		if err := h.Service.SetRead(ctx, user.ID, id, *req.IsRead); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update state"})
+			return
+		}
+	}
+	if req.IsStarred != nil {
+		if err := h.Service.SetStarred(ctx, user.ID, id, *req.IsStarred); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update state"})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "updated"})
+}
+
+func (h *ArticleHandler) UpdateProgress(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	body, err := c.GetRawData()
+	if err != nil || !json.Valid(body) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		return
+	}
+
+	if err := h.Service.UpdateProgress(c.Request.Context(), user.ID, id, body); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update progress"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "updated"})
+}
+
+func (h *ArticleHandler) BatchState(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+
+	var req batchStateRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.Scope == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "scope required"})
+		return
+	}
+	if !req.IsRead {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "is_read must be true"})
+		return
+	}
+
+	if err := h.Service.BatchMarkRead(c.Request.Context(), user.ID, req.Scope); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "updated"})
+}
+
+func (h *ArticleHandler) Changes(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+
+	sinceRaw := c.Query("since")
+	if sinceRaw == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "since parameter required"})
+		return
+	}
+
+	since, err := parseTime(sinceRaw)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid since format"})
+		return
+	}
+
+	changes, err := h.Service.ListChanges(c.Request.Context(), user.ID, since)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list changes"})
+		return
+	}
+
+	items := make([]articleChangeResponse, 0, len(changes))
+	for _, change := range changes {
+		items = append(items, articleChangeResponse{ArticleID: change.ArticleID, ChangedAt: change.ChangedAt.Time.UTC().Format(time.RFC3339Nano)})
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+func (h *ArticleHandler) itemsForList(ctx context.Context, userID int64, tab, query, sourceIDRaw, cursorRaw string, limit int32) ([]articleResponse, error) {
+	if strings.TrimSpace(query) != "" {
+		rows, err := h.Service.Search(ctx, userID, query)
+		if err != nil {
+			return nil, err
+		}
+		return toArticleResponses(rows, false), nil
+	}
+
+	if strings.TrimSpace(sourceIDRaw) != "" {
+		sourceID, err := strconv.ParseInt(sourceIDRaw, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid source_id")
+		}
+		rows, err := h.Service.ListBySource(ctx, userID, sourceID)
+		if err != nil {
+			return nil, err
+		}
+		return toArticleResponses(rows, false), nil
+	}
+
+	switch tab {
+	case "", "today":
+		rows, err := h.Service.ListToday(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+		return toArticleResponses(rows, false), nil
+	case "starred":
+		rows, err := h.Service.ListStarred(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+		return toArticleResponses(rows, false), nil
+	case "stream":
+		cursor, err := parseTimePtr(cursorRaw)
+		if err != nil {
+			return nil, fmt.Errorf("invalid cursor")
+		}
+		rows, err := h.Service.ListStream(ctx, userID, cursor, clampListLimit(limit))
+		if err != nil {
+			return nil, err
+		}
+		return toArticleResponses(rows, false), nil
+	default:
+		return nil, fmt.Errorf("invalid tab")
+	}
+}
+
+func toArticleResponses(items []gen.Article, detail bool) []articleResponse {
+	resp := make([]articleResponse, 0, len(items))
+	for _, item := range items {
+		resp = append(resp, toArticleResponse(item, detail))
+	}
+	return resp
+}
+
+func toArticleResponse(item gen.Article, detail bool) articleResponse {
+	resp := articleResponse{ID: item.ID, SourceID: item.SourceID, Title: item.Title, Link: item.Link, Language: item.Language}
+	if item.Author.Valid {
+		author := item.Author.String
+		resp.Author = &author
+	}
+	if item.PublishedAt.Valid {
+		publishedAt := item.PublishedAt.Time.UTC().Format(time.RFC3339Nano)
+		resp.PublishedAt = &publishedAt
+	}
+	if detail {
+		resp.ContentHtml = item.ContentHtml
+		resp.ContentText = item.ContentText
+	}
+	return resp
+}
+
+func parseLimit(raw string) int32 {
+	v, err := strconv.ParseInt(raw, 10, 32)
+	if err != nil {
+		return 50
+	}
+	return clampListLimit(int32(v))
+}
+
+func clampListLimit(limit int32) int32 {
+	if limit <= 0 {
+		return 50
+	}
+	if limit > 100 {
+		return 100
+	}
+	return limit
+}
+
+func parseTime(raw string) (time.Time, error) {
+	if t, err := time.Parse(time.RFC3339Nano, raw); err == nil {
+		return t.UTC(), nil
+	}
+	return time.Parse(time.RFC3339, raw)
+}
+
+func parseTimePtr(raw string) (*time.Time, error) {
+	if raw == "" {
+		return nil, nil
+	}
+	t, err := parseTime(raw)
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
+}

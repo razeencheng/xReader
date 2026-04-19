@@ -21,6 +21,22 @@ type Article struct {
 	Author         pgtype.Text        `json:"author"`
 	PublishedAt    pgtype.Timestamptz `json:"published_at"`
 	FetchedAt      pgtype.Timestamptz `json:"fetched_at"`
+	SearchVec      interface{}        `json:"search_vec"`
+}
+
+type ArticleState struct {
+	UserID          int64              `json:"user_id"`
+	ArticleID       int64              `json:"article_id"`
+	IsRead          bool               `json:"is_read"`
+	IsStarred       bool               `json:"is_starred"`
+	ReadingProgress []byte             `json:"reading_progress"`
+	LastReadAt      pgtype.Timestamptz `json:"last_read_at"`
+}
+
+type ArticleStateChange struct {
+	UserID    int64              `json:"user_id"`
+	ArticleID int64              `json:"article_id"`
+	ChangedAt pgtype.Timestamptz `json:"changed_at"`
 }
 
 type AuthAllowlist struct {

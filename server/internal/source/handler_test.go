@@ -30,7 +30,7 @@ func setupHandlerTest(t *testing.T) (*gin.Engine, *SourceHandler, int64, func())
 		validateMeta: SourceMetadata{Title: "Test Feed", LanguageHint: "en"},
 	}
 	svc := NewSourceService(pool, adapter)
-	handler := NewSourceHandler(svc)
+	handler := NewSourceHandler(svc, nil)
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
