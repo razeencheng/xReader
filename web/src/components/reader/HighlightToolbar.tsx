@@ -76,7 +76,8 @@ export function HighlightToolbar({ articleId, onHighlightCreated }: Props) {
           <button
             onClick={() => save(false)}
             className="p-2 text-[var(--accent)] hover:bg-[var(--accent-bg)] rounded-full transition-colors"
-            title="Highlight Selection"
+            title="高亮"
+            aria-label="高亮"
           >
             <Highlighter size={16} strokeWidth={2.5} />
           </button>
@@ -84,7 +85,8 @@ export function HighlightToolbar({ articleId, onHighlightCreated }: Props) {
           <button
             onClick={() => save(true)}
             className="p-2 text-[var(--accent)] hover:bg-[var(--accent-bg)] rounded-full transition-colors"
-            title="Highlight with Note"
+            title="高亮并添加备注"
+            aria-label="高亮并添加备注"
           >
             <MessageSquare size={16} strokeWidth={2.5} />
           </button>

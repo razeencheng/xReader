@@ -68,8 +68,25 @@ export function HighlightLayer({ articleId, refreshKey, children }: Props) {
         const endNode = textNodes.find((entry) => highlight.text_end_offset >= entry.start && highlight.text_end_offset <= entry.end);
         if (!startNode || !endNode) return;
 
-        range.setStart(startNode.node, highlight.text_start_offset - startNode.start);
-        range.setEnd(endNode.node, highlight.text_end_offset - endNode.start);
+        const startOffset = highlight.text_start_offset - startNode.start;
+        const endOffset = highlight.text_end_offset - endNode.start;
+        if (
+          startOffset < 0 ||
+          endOffset < 0 ||
+          startOffset > startNode.node.length ||
+          endOffset > endNode.node.length ||
+          (startNode.node === endNode.node && endOffset <= startOffset)
+        ) {
+          return;
+        }
+
+        try {
+          range.setStart(startNode.node, startOffset);
+          range.setEnd(endNode.node, endOffset);
+        } catch {
+          // Skip highlights whose stored offsets no longer map to the rendered DOM.
+          return;
+        }
 
         const mark = document.createElement('mark');
         mark.dataset.highlightId = String(highlight.id);
@@ -82,7 +99,7 @@ export function HighlightLayer({ articleId, refreshKey, children }: Props) {
         }
       });
     }
-  }, [grouped]);
+  }, [children, grouped]);
 
   const reload = async () => {
     try {

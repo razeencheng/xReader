@@ -13,34 +13,44 @@ test.skip(!hasStorageState, `Missing storage state file: ${storageState}`);
 
 test('highlight persists after reload', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('article').first()).toBeVisible({ timeout: 120_000 });
-  await page.locator('article').first().click();
+  const articleIds = await page.evaluate(async () => {
+    const response = await fetch('/api/articles?tab=today', { credentials: 'include' });
+    const payload = (await response.json()) as { items?: Array<{ id?: number }> };
+    return (payload.items ?? [])
+      .map((item) => item.id)
+      .filter((id): id is number => typeof id === 'number');
+  });
+
+  expect(articleIds.length).toBeGreaterThanOrEqual(1);
+  await page.goto(`/read/${articleIds[0]}?ctx=today`);
+  await page.evaluate(async (articleId) => {
+    const response = await fetch(`/api/articles/${articleId}/highlights`, { credentials: 'include' });
+    const payload = (await response.json()) as { items?: Array<{ id: number }> };
+    for (const item of payload.items ?? []) {
+      await fetch(`/api/highlights/${item.id}`, { method: 'DELETE', credentials: 'include' });
+    }
+  }, articleIds[0]);
 
   const paragraph = page.locator('[data-layer="original"]').first();
   await expect(paragraph).toBeVisible();
 
-  await paragraph.evaluate((node) => {
-    const textNode = Array.from(node.childNodes).find((child) => child.nodeType === Node.TEXT_NODE) as Text | undefined;
-    const contentNode = textNode ?? (node.firstChild as Text | null);
-    if (!contentNode) {
-      throw new Error('No text node found for selection');
-    }
+  const box = await paragraph.boundingBox();
+  if (!box) {
+    throw new Error('Unable to get paragraph bounds for selection');
+  }
 
-    const text = contentNode.textContent ?? '';
-    const start = Math.max(0, Math.min(2, text.length - 1));
-    const end = Math.min(text.length, Math.max(start + 1, Math.min(8, text.length)));
-    const range = document.createRange();
-    range.setStart(contentNode, start);
-    range.setEnd(contentNode, end);
+  const startX = box.x + Math.max(16, Math.min(40, box.width * 0.15));
+  const startY = box.y + Math.max(14, Math.min(24, box.height * 0.35));
+  const endX = Math.min(box.x + box.width - 12, startX + 100);
 
-    const selection = window.getSelection();
-    selection?.removeAllRanges();
-    selection?.addRange(range);
-  });
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(endX, startY, { steps: 8 });
+  await page.mouse.up();
 
-  await page.mouse.click(100, 100);
-  await expect(page.getByRole('button', { name: '高亮' })).toBeVisible();
-  await page.getByRole('button', { name: '高亮' }).click();
+  const highlightButton = page.getByRole('button', { name: /^高亮$/ });
+  await expect(highlightButton).toBeVisible();
+  await highlightButton.click();
 
   await expect(page.locator('mark[data-highlight-id]')).toBeVisible();
   await page.reload();

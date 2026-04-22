@@ -1,7 +1,13 @@
 import type { NextConfig } from "next";
 
+const apiProxyTarget =
+  process.env.API_PROXY_TARGET?.trim() ||
+  process.env.NEXT_PUBLIC_API_BASE?.trim() ||
+  "http://localhost:8080";
+
 const nextConfig: NextConfig = {
   output: 'standalone',
+  allowedDevOrigins: ['127.0.0.1', 'localhost'],
   async rewrites() {
     return {
       beforeFiles: [],
@@ -9,7 +15,7 @@ const nextConfig: NextConfig = {
       fallback: [
         {
           source: '/api/:path*',
-          destination: 'http://localhost:8080/api/:path*',
+          destination: `${apiProxyTarget}/api/:path*`,
         },
       ],
     };

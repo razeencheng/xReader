@@ -38,8 +38,8 @@ services:
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
+      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgres://xreader:xreader@postgres:5432/xreader?sslmode=disable}
+      REDIS_URL: ${REDIS_URL_DOCKER:-redis://redis:6379}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
       XREADER_AI_CONFIG: /etc/xreader/ai.yaml
@@ -57,8 +57,8 @@ services:
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
+      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgres://xreader:xreader@postgres:5432/xreader?sslmode=disable}
+      REDIS_URL: ${REDIS_URL_DOCKER:-redis://redis:6379}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
       XREADER_AI_CONFIG: /etc/xreader/ai.yaml
@@ -68,7 +68,10 @@ services:
       - ./config/ai.yaml:/etc/xreader/ai.yaml:ro
 
   web:
-    build: ./web
+    build:
+      context: ./web
+      args:
+        API_PROXY_TARGET: "http://api:8080"
     ports:
       - "3000:3000"
     environment:

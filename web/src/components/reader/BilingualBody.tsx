@@ -140,7 +140,7 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
         }
 
         return (
-          <div key={index} ref={observeRef(index)} data-paragraph-index={index} style={{ fontFamily: originalFont }}>
+          <div key={index} ref={observeRef(index)} data-layer="original" data-paragraph-index={index} style={{ fontFamily: originalFont }}>
             <div dangerouslySetInnerHTML={{ __html: paragraph }} />
 
             {!sameLanguage ? (

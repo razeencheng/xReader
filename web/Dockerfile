@@ -4,6 +4,8 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY . .
+ARG API_PROXY_TARGET=http://localhost:8080
+ENV API_PROXY_TARGET=$API_PROXY_TARGET
 RUN pnpm build
 
 FROM node:20-alpine
