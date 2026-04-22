@@ -28,6 +28,7 @@ test('SourcesPage renders title and add button', () => {
   render(<SourcesPage />, { wrapper });
 
   expect(screen.getByText('订阅源管理')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '订阅源' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '添加' })).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: '订阅源' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: '← 返回首页' })).toBeInTheDocument();
 });

@@ -11,9 +11,9 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => useSearchParams(),
 }));
 
-const current: ArticleItem = { id: 2, source_id: 1, title: 'Current', link: '', language: 'en' };
-const prev: ArticleItem = { id: 1, source_id: 1, title: 'Previous Article', link: '', language: 'en' };
-const next: ArticleItem = { id: 3, source_id: 1, title: 'Next Article', link: '', language: 'en' };
+const current: ArticleItem = { id: 2, source_id: 1, title: 'Current', source_title: 'Current Source', link: '', language: 'en' };
+const prev: ArticleItem = { id: 1, source_id: 1, title: 'Previous Article', source_title: 'Previous Source', link: '', language: 'en' };
+const next: ArticleItem = { id: 3, source_id: 1, title: 'Next Article', source_title: 'Next Source', link: '', language: 'en' };
 
 beforeEach(() => {
   push.mockReset();
@@ -24,15 +24,22 @@ test('clicking 下一篇 calls markRead with current article id', async () => {
   const markRead = vi.fn();
   render(<PrevNextBar current={current} prev={prev} next={next} markRead={markRead} />);
 
-  await userEvent.click(screen.getByRole('button', { name: /下一篇/ }));
+  await userEvent.click(screen.getByRole('button', { name: /下一篇/i }));
 
   expect(markRead).toHaveBeenCalledWith(2);
   expect(push).toHaveBeenCalledWith('/read/3?ctx=today');
 });
 
+test('renders source labels for previous and next articles', () => {
+  render(<PrevNextBar current={current} prev={prev} next={next} markRead={vi.fn()} />);
+
+  expect(screen.getByText('Previous Source')).toBeInTheDocument();
+  expect(screen.getByText('Next Source')).toBeInTheDocument();
+});
+
 test('hides prev button when prev is null', () => {
   render(<PrevNextBar current={current} prev={null} next={next} markRead={vi.fn()} />);
 
-  expect(screen.queryByRole('button', { name: /上一篇/ })).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /下一篇/ })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /上一篇/i })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /下一篇/i })).toBeInTheDocument();
 });

@@ -6,7 +6,7 @@ import {
 import { apiFetch } from '@/lib/api-client';
 import type { ArticleListResponse, ArticleTab } from '@/lib/types';
 
-type ArticlesQueryKey = ['articles', ArticleTab];
+type ArticlesQueryKey = ['articles', ArticleTab, number | null | undefined, string | undefined];
 
 type ArticlesQueryOptions = Omit<
   UseInfiniteQueryOptions<
@@ -19,14 +19,15 @@ type ArticlesQueryOptions = Omit<
   'queryKey' | 'queryFn' | 'initialPageParam' | 'getNextPageParam'
 >;
 
-export function useArticles(tab: ArticleTab, options?: ArticlesQueryOptions) {
+export function useArticles(tab: ArticleTab, sourceId?: number | null, filter?: string, options?: ArticlesQueryOptions) {
   return useInfiniteQuery({
-    queryKey: ['articles', tab],
+    queryKey: ['articles', tab, sourceId, filter],
     queryFn: async ({ pageParam }) => {
       const params = new URLSearchParams({ tab });
-      if (pageParam) {
-        params.set('cursor', pageParam);
-      }
+      if (sourceId) params.set('source_id', sourceId.toString());
+      if (filter) params.set('filter', filter);
+      if (pageParam) params.set('cursor', pageParam);
+      
       return apiFetch<ArticleListResponse>(`/api/articles?${params.toString()}`);
     },
     initialPageParam: undefined,

@@ -73,10 +73,13 @@ LIMIT 100;
 SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
        COALESCE(ai.title_translated, '') AS title_translated,
        COALESCE(ai.summary, '') AS summary,
-       s.title AS source_title
+       s.title AS source_title,
+       COALESCE(st.is_read, false) AS is_read,
+       COALESCE(st.is_starred, false) AS is_starred
 FROM articles a
 JOIN sources s ON a.source_id = s.id
 LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
+LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
 WHERE s.user_id = $1
   AND a.published_at >= now() - interval '24 hours'
 ORDER BY a.published_at DESC
@@ -86,10 +89,13 @@ LIMIT 100;
 SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
        COALESCE(ai.title_translated, '') AS title_translated,
        COALESCE(ai.summary, '') AS summary,
-       s.title AS source_title
+       s.title AS source_title,
+       COALESCE(st.is_read, false) AS is_read,
+       COALESCE(st.is_starred, false) AS is_starred
 FROM articles a
 JOIN sources s ON a.source_id = s.id
 LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $3
+LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
 WHERE s.user_id = $1
   AND ($2::timestamptz IS NULL OR a.published_at < $2)
 ORDER BY a.published_at DESC, a.id DESC
@@ -99,7 +105,9 @@ LIMIT $4;
 SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
        COALESCE(ai.title_translated, '') AS title_translated,
        COALESCE(ai.summary, '') AS summary,
-       s.title AS source_title
+       s.title AS source_title,
+       st.is_read,
+       st.is_starred
 FROM articles a
 JOIN article_states st ON a.id = st.article_id AND st.user_id = $1
 LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
@@ -107,3 +115,33 @@ JOIN sources s ON a.source_id = s.id
 WHERE st.is_starred = true
 ORDER BY a.published_at DESC
 LIMIT 100;
+
+-- name: ListArticlesBySourceEnriched :many
+SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
+       COALESCE(ai.title_translated, '') AS title_translated,
+       COALESCE(ai.summary, '') AS summary,
+       s.title AS source_title,
+       COALESCE(st.is_read, false) AS is_read,
+       COALESCE(st.is_starred, false) AS is_starred
+FROM articles a
+JOIN sources s ON a.source_id = s.id
+LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
+LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+WHERE a.source_id = $3
+ORDER BY a.published_at DESC;
+
+-- name: ListUnreadArticlesEnriched :many
+SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
+       COALESCE(ai.title_translated, '') AS title_translated,
+       COALESCE(ai.summary, '') AS summary,
+       s.title AS source_title,
+       COALESCE(st.is_read, false) AS is_read,
+       COALESCE(st.is_starred, false) AS is_starred
+FROM articles a
+JOIN sources s ON a.source_id = s.id
+LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
+LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+WHERE s.user_id = $1
+  AND (st.is_read IS NULL OR st.is_read = false)
+ORDER BY a.published_at DESC
+LIMIT 200;

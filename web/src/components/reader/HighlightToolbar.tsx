@@ -9,6 +9,9 @@ interface Props {
   onHighlightCreated?: () => void;
 }
 
+import { Highlighter, MessageSquare } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+
 export function HighlightToolbar({ articleId, onHighlightCreated }: Props) {
   const [anchor, setAnchor] = useState<HighlightAnchor | null>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
@@ -33,25 +36,18 @@ export function HighlightToolbar({ articleId, onHighlightCreated }: Props) {
       const rect = range.getBoundingClientRect();
       setAnchor(computed);
       setPosition({
-        top: rect.top + window.scrollY - 40,
+        top: rect.top - 50, // 50px above selection
         left: rect.left + rect.width / 2,
       });
     };
 
     document.addEventListener('pointerup', handlePointerUp);
-    document.addEventListener('mouseup', handlePointerUp);
-    document.addEventListener('touchend', handlePointerUp);
-
-    return () => {
-      document.removeEventListener('pointerup', handlePointerUp);
-      document.removeEventListener('mouseup', handlePointerUp);
-      document.removeEventListener('touchend', handlePointerUp);
-    };
+    return () => document.removeEventListener('pointerup', handlePointerUp);
   }, []);
 
   const save = async (withNote: boolean) => {
     if (!anchor) return;
-    const note = withNote ? prompt('添加笔记：') ?? undefined : undefined;
+    const note = withNote ? prompt('Enter note:') ?? undefined : undefined;
     await createHighlight({
       article_id: articleId,
       layer: anchor.layer,
@@ -67,27 +63,33 @@ export function HighlightToolbar({ articleId, onHighlightCreated }: Props) {
     onHighlightCreated?.();
   };
 
-  if (!anchor || !position) return null;
-
   return (
-    <div
-      className="fixed z-50 flex gap-1 rounded-lg border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-1 shadow-md"
-      style={{ top: position.top, left: position.left, transform: 'translateX(-50%)' }}
-    >
-      <button
-        type="button"
-        onClick={() => save(false)}
-        className="rounded px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-      >
-        高亮
-      </button>
-      <button
-        type="button"
-        onClick={() => save(true)}
-        className="rounded px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-      >
-        高亮 + 笔记
-      </button>
-    </div>
+    <AnimatePresence>
+      {anchor && position && (
+        <motion.div
+          initial={{ opacity: 0, y: 10, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 10, scale: 0.9 }}
+          className="fixed z-[100] flex items-center gap-1 p-1 bg-[color-mix(in_oklch,var(--bg-panel)_85%,transparent)] backdrop-blur-xl border border-[var(--border)] rounded-full shadow-2xl"
+          style={{ top: position.top, left: position.left, transform: 'translateX(-50%)' }}
+        >
+          <button
+            onClick={() => save(false)}
+            className="p-2 text-[var(--accent)] hover:bg-[var(--accent-bg)] rounded-full transition-colors"
+            title="Highlight Selection"
+          >
+            <Highlighter size={16} strokeWidth={2.5} />
+          </button>
+          <div className="w-[1px] h-4 bg-[var(--border)]" />
+          <button
+            onClick={() => save(true)}
+            className="p-2 text-[var(--accent)] hover:bg-[var(--accent-bg)] rounded-full transition-colors"
+            title="Highlight with Note"
+          >
+            <MessageSquare size={16} strokeWidth={2.5} />
+          </button>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

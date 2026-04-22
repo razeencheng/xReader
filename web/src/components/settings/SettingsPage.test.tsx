@@ -80,6 +80,20 @@ afterEach(() => {
   };
 });
 
+beforeEach(() => {
+  apiFetch.mockImplementation(async (input: unknown, init?: RequestInit) => {
+    if (input === '/api/users/me' && (!init || !init.method || init.method === 'GET')) {
+      return {
+        native_language: 'zh-CN',
+        density_pref: 'comfortable',
+        theme_pref: 'system',
+      };
+    }
+
+    return {};
+  });
+});
+
 function renderPage() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -92,15 +106,15 @@ function renderPage() {
   );
 }
 
-test('renders settings title and language options', () => {
+test('renders settings title and language options', async () => {
   renderPage();
 
-  expect(screen.getByRole('heading', { name: '设置' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: '设置' })).toBeInTheDocument();
   const select = screen.getByLabelText('母语');
-  expect(select).toHaveDisplayValue('中文（简体）');
-  expect(screen.getByRole('option', { name: '中文（简体）' })).toBeInTheDocument();
-  expect(screen.getByRole('option', { name: '中文（繁體）' })).toBeInTheDocument();
-  expect(screen.getByRole('option', { name: 'English' })).toBeInTheDocument();
-  expect(screen.getByRole('option', { name: '日本語' })).toBeInTheDocument();
-  expect(screen.getByRole('option', { name: '한국어' })).toBeInTheDocument();
+  expect(select).toHaveDisplayValue('zh-CN');
+  expect(screen.getByRole('option', { name: 'zh-CN' })).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: 'zh-TW' })).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: 'en-US' })).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: 'ja-JP' })).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: 'ko-KR' })).toBeInTheDocument();
 });

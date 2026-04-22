@@ -10,6 +10,8 @@ export interface ArticleItem {
   summary?: string;
   source_title?: string;
   source_icon_url?: string;
+  is_read?: boolean;
+  is_starred?: boolean;
 }
 
 export type Article = ArticleItem;
@@ -22,6 +24,8 @@ export interface Source {
   last_fetched_at: string | null;
   consecutive_fails: number;
   health: string;
+  category: string;
+  unread_count?: number;
 }
 
 export interface ArticleListResponse {

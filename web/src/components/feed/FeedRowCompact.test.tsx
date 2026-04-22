@@ -13,18 +13,15 @@ const mockItem: ArticleItem = {
   published_at: new Date(Date.now() - 3 * 3_600_000).toISOString(),
 };
 
-test('renders title, badge, and time', () => {
+test('renders compact row with source label and translated title', () => {
   render(<FeedRowCompact item={mockItem} />);
 
   expect(screen.getByText('测试标题')).toBeInTheDocument();
-  expect(screen.getByText(/Vercel/)).toBeInTheDocument();
+  expect(screen.getByText('VERCEL')).toBeInTheDocument();
   expect(screen.getByText('3h')).toBeInTheDocument();
 });
 
-test('uses margin-left auto on time element', () => {
-  const { container } = render(<FeedRowCompact item={mockItem} />);
-  const row = container.firstChild as HTMLElement;
-  const lastChild = row.lastElementChild as HTMLElement;
-
-  expect(lastChild.className).toContain('ml-auto');
+test('does not render reading-time footer in compact mode', () => {
+  render(<FeedRowCompact item={mockItem} />);
+  expect(screen.queryByText(/min read/i)).not.toBeInTheDocument();
 });

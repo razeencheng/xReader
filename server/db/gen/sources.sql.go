@@ -26,13 +26,13 @@ func (q *Queries) CountSourcesByUser(ctx context.Context, userID int64) (int64, 
 const createSource = `-- name: CreateSource :one
 INSERT INTO sources (
     user_id, kind, url, normalized_url, title, icon_url, language_hint,
-    last_fetched_at, last_success_at, consecutive_fails, health, deleted_at
+    last_fetched_at, last_success_at, consecutive_fails, health, category, deleted_at
 )
 VALUES (
     $1, $2, $3, $4, $5, $6, $7,
-    $8, $9, $10, $11, $12
+    $8, $9, $10, $11, $12, $13
 )
-RETURNING id, user_id, kind, url, normalized_url, title, icon_url, language_hint, last_fetched_at, last_success_at, consecutive_fails, health, created_at, deleted_at
+RETURNING id, user_id, kind, url, normalized_url, title, icon_url, language_hint, last_fetched_at, last_success_at, consecutive_fails, health, category, created_at, deleted_at
 `
 
 type CreateSourceParams struct {
@@ -47,6 +47,7 @@ type CreateSourceParams struct {
 	LastSuccessAt    pgtype.Timestamptz `json:"last_success_at"`
 	ConsecutiveFails int32              `json:"consecutive_fails"`
 	Health           string             `json:"health"`
+	Category         string             `json:"category"`
 	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
 }
 
@@ -63,6 +64,7 @@ func (q *Queries) CreateSource(ctx context.Context, arg CreateSourceParams) (Sou
 		arg.LastSuccessAt,
 		arg.ConsecutiveFails,
 		arg.Health,
+		arg.Category,
 		arg.DeletedAt,
 	)
 	var i Source
@@ -79,6 +81,7 @@ func (q *Queries) CreateSource(ctx context.Context, arg CreateSourceParams) (Sou
 		&i.LastSuccessAt,
 		&i.ConsecutiveFails,
 		&i.Health,
+		&i.Category,
 		&i.CreatedAt,
 		&i.DeletedAt,
 	)
@@ -86,7 +89,7 @@ func (q *Queries) CreateSource(ctx context.Context, arg CreateSourceParams) (Sou
 }
 
 const getSourceByID = `-- name: GetSourceByID :one
-SELECT id, user_id, kind, url, normalized_url, title, icon_url, language_hint, last_fetched_at, last_success_at, consecutive_fails, health, created_at, deleted_at FROM sources
+SELECT id, user_id, kind, url, normalized_url, title, icon_url, language_hint, last_fetched_at, last_success_at, consecutive_fails, health, category, created_at, deleted_at FROM sources
 WHERE id = $1 AND deleted_at IS NULL
 `
 
@@ -106,6 +109,7 @@ func (q *Queries) GetSourceByID(ctx context.Context, id int64) (Source, error) {
 		&i.LastSuccessAt,
 		&i.ConsecutiveFails,
 		&i.Health,
+		&i.Category,
 		&i.CreatedAt,
 		&i.DeletedAt,
 	)
@@ -113,7 +117,7 @@ func (q *Queries) GetSourceByID(ctx context.Context, id int64) (Source, error) {
 }
 
 const listSourcesByUser = `-- name: ListSourcesByUser :many
-SELECT id, user_id, kind, url, normalized_url, title, icon_url, language_hint, last_fetched_at, last_success_at, consecutive_fails, health, created_at, deleted_at FROM sources
+SELECT id, user_id, kind, url, normalized_url, title, icon_url, language_hint, last_fetched_at, last_success_at, consecutive_fails, health, category, created_at, deleted_at FROM sources
 WHERE user_id = $1 AND deleted_at IS NULL
 ORDER BY created_at DESC
 `
@@ -140,6 +144,7 @@ func (q *Queries) ListSourcesByUser(ctx context.Context, userID int64) ([]Source
 			&i.LastSuccessAt,
 			&i.ConsecutiveFails,
 			&i.Health,
+			&i.Category,
 			&i.CreatedAt,
 			&i.DeletedAt,
 		); err != nil {
@@ -154,7 +159,7 @@ func (q *Queries) ListSourcesByUser(ctx context.Context, userID int64) ([]Source
 }
 
 const listSourcesDueForFetch = `-- name: ListSourcesDueForFetch :many
-SELECT id, user_id, kind, url, normalized_url, title, icon_url, language_hint, last_fetched_at, last_success_at, consecutive_fails, health, created_at, deleted_at FROM sources
+SELECT id, user_id, kind, url, normalized_url, title, icon_url, language_hint, last_fetched_at, last_success_at, consecutive_fails, health, category, created_at, deleted_at FROM sources
 WHERE deleted_at IS NULL
   AND (
     last_fetched_at IS NULL
@@ -187,6 +192,7 @@ func (q *Queries) ListSourcesDueForFetch(ctx context.Context) ([]Source, error) 
 			&i.LastSuccessAt,
 			&i.ConsecutiveFails,
 			&i.Health,
+			&i.Category,
 			&i.CreatedAt,
 			&i.DeletedAt,
 		); err != nil {
@@ -252,5 +258,21 @@ type UpdateSourceTitleParams struct {
 
 func (q *Queries) UpdateSourceTitle(ctx context.Context, arg UpdateSourceTitleParams) error {
 	_, err := q.db.Exec(ctx, updateSourceTitle, arg.ID, arg.Title)
+	return err
+}
+
+const updateSourceCategory = `-- name: UpdateSourceCategory :exec
+UPDATE sources
+SET category = $2
+WHERE id = $1
+`
+
+type UpdateSourceCategoryParams struct {
+	ID       int64  `json:"id"`
+	Category string `json:"category"`
+}
+
+func (q *Queries) UpdateSourceCategory(ctx context.Context, arg UpdateSourceCategoryParams) error {
+	_, err := q.db.Exec(ctx, updateSourceCategory, arg.ID, arg.Category)
 	return err
 }

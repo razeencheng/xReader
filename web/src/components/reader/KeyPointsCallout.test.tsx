@@ -1,13 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import { KeyPointsCallout } from './KeyPointsCallout';
 
-test('KeyPointsCallout renders summary text', () => {
+test('KeyPointsCallout renders split summary items', () => {
   render(<KeyPointsCallout text="① aaa ② bbb ③ ccc" />);
   expect(screen.getByText(/aaa/)).toBeInTheDocument();
-  expect(screen.getByText('要点')).toBeInTheDocument();
+  expect(screen.getByText(/bbb/)).toBeInTheDocument();
+  expect(screen.getByText(/ccc/)).toBeInTheDocument();
 });
 
-test('KeyPointsCallout renders nothing when text is empty', () => {
-  const { container } = render(<KeyPointsCallout text="" />);
-  expect(container.firstChild).toBeNull();
+test('KeyPointsCallout renders plain text when no separator exists', () => {
+  render(<KeyPointsCallout text="single summary" />);
+  expect(screen.getByText('single summary')).toBeInTheDocument();
 });

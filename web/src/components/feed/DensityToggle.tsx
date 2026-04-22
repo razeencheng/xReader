@@ -9,10 +9,10 @@ const DENSITY_OPTIONS = [
 
 export function DensityToggle() {
   const density = useUIStore((state) => state.density);
-  const toggleDensity = useUIStore((state) => state.toggleDensity);
+  const setDensity = useUIStore((state) => state.setDensity);
 
   return (
-    <div className="inline-flex rounded-[14px] bg-[var(--border-default)] p-[3px] text-[13px] leading-none">
+    <div className="inline-flex rounded-[14px] bg-[var(--border-default)]/80 p-[3px] text-[12px] leading-none">
       {DENSITY_OPTIONS.map(({ key, label }) => {
         const active = density === key;
 
@@ -20,12 +20,12 @@ export function DensityToggle() {
           <button
             key={key}
             type="button"
-            onClick={toggleDensity}
+            onClick={() => setDensity(key)}
             aria-pressed={active}
             className={`rounded-[11px] px-3 py-1.5 transition-colors ${
               active
-                ? 'bg-[var(--bg-body)] font-semibold text-[var(--text-body)]'
-                : 'text-[var(--text-muted)] opacity-70 hover:text-[var(--text-secondary)]'
+                ? 'bg-[var(--bg-body)] font-semibold text-[var(--text-body)] shadow-sm'
+                : 'text-[var(--text-muted)] opacity-75 hover:text-[var(--text-secondary)]'
             }`}
           >
             {label}

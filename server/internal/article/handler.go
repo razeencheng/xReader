@@ -29,8 +29,8 @@ type articleListResponse struct {
 
 type articleDetailResponse struct {
 	articleResponse
-	IsRead         bool            `json:"is_read"`
-	IsStarred      bool            `json:"is_starred"`
+	IsRead          bool            `json:"is_read"`
+	IsStarred       bool            `json:"is_starred"`
 	ReadingProgress json.RawMessage `json:"reading_progress,omitempty"`
 }
 
@@ -47,6 +47,8 @@ type articleResponse struct {
 	PublishedAt     *string `json:"published_at,omitempty"`
 	ContentHtml     string  `json:"content_html,omitempty"`
 	ContentText     string  `json:"content_text,omitempty"`
+	IsRead          bool    `json:"is_read"`
+	IsStarred       bool    `json:"is_starred"`
 }
 
 type articleChangeResponse struct {
@@ -73,12 +75,13 @@ func (h *ArticleHandler) List(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	tab := c.DefaultQuery("tab", "today")
+	filter := c.DefaultQuery("filter", "")
 	q := c.Query("q")
 	sourceIDRaw := c.Query("source_id")
 	cursorRaw := c.Query("cursor")
 	limit := parseLimit(c.DefaultQuery("limit", "50"))
 
-	items, err := h.itemsForList(ctx, user.ID, user.NativeLanguage, tab, q, sourceIDRaw, cursorRaw, limit)
+	items, err := h.itemsForList(ctx, user.ID, user.NativeLanguage, tab, filter, q, sourceIDRaw, cursorRaw, limit)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -243,7 +246,7 @@ func (h *ArticleHandler) Changes(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
 
-func (h *ArticleHandler) itemsForList(ctx context.Context, userID int64, lang, tab, query, sourceIDRaw, cursorRaw string, limit int32) ([]articleResponse, error) {
+func (h *ArticleHandler) itemsForList(ctx context.Context, userID int64, lang, tab, filter, query, sourceIDRaw, cursorRaw string, limit int32) ([]articleResponse, error) {
 
 	if strings.TrimSpace(query) != "" {
 		rows, err := h.Service.Search(ctx, userID, query)
@@ -253,16 +256,24 @@ func (h *ArticleHandler) itemsForList(ctx context.Context, userID int64, lang, t
 		return toArticleResponses(rows, false), nil
 	}
 
+	if filter == "unread" {
+		rows, err := h.Service.ListUnreadEnriched(ctx, userID, lang)
+		if err != nil {
+			return nil, err
+		}
+		return enrichedToArticleResponses(rows), nil
+	}
+
 	if strings.TrimSpace(sourceIDRaw) != "" {
 		sourceID, err := strconv.ParseInt(sourceIDRaw, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("invalid source_id")
 		}
-		rows, err := h.Service.ListBySource(ctx, userID, sourceID)
+		rows, err := h.Service.ListBySourceEnriched(ctx, userID, sourceID, lang)
 		if err != nil {
 			return nil, err
 		}
-		return toArticleResponses(rows, false), nil
+		return enrichedToArticleResponses(rows), nil
 	}
 
 	switch tab {
@@ -278,7 +289,7 @@ func (h *ArticleHandler) itemsForList(ctx context.Context, userID int64, lang, t
 			return nil, err
 		}
 		return enrichedToArticleResponses(rows), nil
-	case "stream":
+	case "stream", "all":
 		cursor, err := parseTimePtr(cursorRaw)
 		if err != nil {
 			return nil, fmt.Errorf("invalid cursor")
@@ -308,6 +319,7 @@ func enrichedToArticleResponses(items []EnrichedArticle) []articleResponse {
 			ID: item.ID, SourceID: item.SourceID, Title: item.Title,
 			TitleTranslated: item.TitleTranslated, Summary: item.Summary,
 			SourceTitle: item.SourceTitle, Link: item.Link, Language: item.Language,
+			IsRead: item.IsRead, IsStarred: item.IsStarred,
 		}
 		if item.Author.Valid {
 			author := item.Author.String

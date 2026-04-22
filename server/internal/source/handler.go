@@ -33,7 +33,8 @@ func (h *SourceHandler) List(c *gin.Context) {
 }
 
 type createSourceRequest struct {
-	URL string `json:"url" binding:"required"`
+	URL      string `json:"url" binding:"required"`
+	Category string `json:"category"`
 }
 
 func (h *SourceHandler) Create(c *gin.Context) {
@@ -44,7 +45,7 @@ func (h *SourceHandler) Create(c *gin.Context) {
 	}
 
 	user := middleware.GetUser(c)
-	src, err := h.Service.Create(c.Request.Context(), user.ID, req.URL)
+	src, err := h.Service.Create(c.Request.Context(), user.ID, req.URL, req.Category)
 	if err != nil {
 		if isUniqueViolation(err) {
 			c.JSON(http.StatusConflict, gin.H{"error": "source already exists"})
@@ -79,6 +80,31 @@ func (h *SourceHandler) Rename(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "renamed"})
+}
+
+type updateCategoryRequest struct {
+	Category string `json:"category" binding:"required"`
+}
+
+func (h *SourceHandler) UpdateCategory(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	var req updateCategoryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "category required"})
+		return
+	}
+
+	user := middleware.GetUser(c)
+	if err := h.Service.UpdateCategory(c.Request.Context(), user.ID, id, req.Category); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "source not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "category updated"})
 }
 
 func (h *SourceHandler) Delete(c *gin.Context) {

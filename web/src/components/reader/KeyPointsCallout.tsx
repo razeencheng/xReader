@@ -2,19 +2,31 @@ interface Props {
   text: string;
 }
 
+function splitSummary(text: string) {
+  return text
+    .split(/\s*[·•①②③④⑤⑥⑦⑧⑨⑩；;]\s*/)
+    .map((point) => point.trim())
+    .filter(Boolean);
+}
+
 export function KeyPointsCallout({ text }: Props) {
   if (!text) return null;
 
+  const points = splitSummary(text);
+
   return (
-    <div className="mb-8 border-l-[3px] border-[var(--border-accent)] bg-[var(--bg-badge-unread)] px-[18px] py-[14px]">
-      <div className="mb-1.5 text-[10px] font-bold tracking-[2px] text-[var(--text-warning)]">
-        要点
-      </div>
-      <ul className="list-disc space-y-1 pl-4 font-[system-ui] text-sm leading-relaxed text-[var(--text-secondary)]">
-        {text.split(/\s*[·•①②③④⑤⑥⑦⑧⑨⑩；;]\s*/).filter(Boolean).map((point, i) => (
-          <li key={i}>{point.trim()}</li>
-        ))}
-      </ul>
+    <div className="mb-[30px] rounded-r-[10px] border-l-[3px] border-[var(--accent)] bg-[var(--callout-bg)] px-[18px] py-3">
+      {points.length > 1 ? (
+        <ul className="pl-5 text-[0.9em] leading-[1.8] text-[var(--text-2)]">
+          {points.map((point, index) => (
+            <li key={index} className="mb-[5px]">
+              {point}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-[0.9em] leading-[1.8] text-[var(--text-2)]">{text}</p>
+      )}
     </div>
   );
 }

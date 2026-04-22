@@ -83,8 +83,16 @@ export function applyArticleStateChange(queryClient: QueryClient, change: Articl
     return mergeArticleItem(existing, change);
   });
 
-  for (const tab of ARTICLE_TABS) {
-    queryClient.setQueryData<ArticleListData | undefined>(['articles', tab], (existing) =>
+  for (const [queryKey, existing] of queryClient.getQueriesData<ArticleListData | undefined>({
+    queryKey: ['articles'],
+  })) {
+    const [, tab] = queryKey as [string, ArticleTab];
+    if (!ARTICLE_TABS.includes(tab)) {
+      continue;
+    }
+
+    queryClient.setQueryData(
+      queryKey,
       updateArticleListData(existing, change, tab, articleDetail),
     );
   }

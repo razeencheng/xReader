@@ -201,7 +201,9 @@ const listArticlesStarredEnriched = `-- name: ListArticlesStarredEnriched :many
 SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
        COALESCE(ai.title_translated, '') AS title_translated,
        COALESCE(ai.summary, '') AS summary,
-       s.title AS source_title
+       s.title AS source_title,
+       st.is_read,
+       st.is_starred
 FROM articles a
 JOIN article_states st ON a.id = st.article_id AND st.user_id = $1
 LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
@@ -228,6 +230,8 @@ type ListArticlesStarredEnrichedRow struct {
 	TitleTranslated string             `json:"title_translated"`
 	Summary         string             `json:"summary"`
 	SourceTitle     string             `json:"source_title"`
+	IsRead          bool               `json:"is_read"`
+	IsStarred       bool               `json:"is_starred"`
 }
 
 func (q *Queries) ListArticlesStarredEnriched(ctx context.Context, arg ListArticlesStarredEnrichedParams) ([]ListArticlesStarredEnrichedRow, error) {
@@ -251,6 +255,8 @@ func (q *Queries) ListArticlesStarredEnriched(ctx context.Context, arg ListArtic
 			&i.TitleTranslated,
 			&i.Summary,
 			&i.SourceTitle,
+			&i.IsRead,
+			&i.IsStarred,
 		); err != nil {
 			return nil, err
 		}
@@ -315,10 +321,13 @@ const listArticlesStreamEnriched = `-- name: ListArticlesStreamEnriched :many
 SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
        COALESCE(ai.title_translated, '') AS title_translated,
        COALESCE(ai.summary, '') AS summary,
-       s.title AS source_title
+       s.title AS source_title,
+       COALESCE(st.is_read, false) AS is_read,
+       COALESCE(st.is_starred, false) AS is_starred
 FROM articles a
 JOIN sources s ON a.source_id = s.id
 LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $3
+LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
 WHERE s.user_id = $1
   AND ($2::timestamptz IS NULL OR a.published_at < $2)
 ORDER BY a.published_at DESC, a.id DESC
@@ -344,6 +353,8 @@ type ListArticlesStreamEnrichedRow struct {
 	TitleTranslated string             `json:"title_translated"`
 	Summary         string             `json:"summary"`
 	SourceTitle     string             `json:"source_title"`
+	IsRead          bool               `json:"is_read"`
+	IsStarred       bool               `json:"is_starred"`
 }
 
 func (q *Queries) ListArticlesStreamEnriched(ctx context.Context, arg ListArticlesStreamEnrichedParams) ([]ListArticlesStreamEnrichedRow, error) {
@@ -372,6 +383,8 @@ func (q *Queries) ListArticlesStreamEnriched(ctx context.Context, arg ListArticl
 			&i.TitleTranslated,
 			&i.Summary,
 			&i.SourceTitle,
+			&i.IsRead,
+			&i.IsStarred,
 		); err != nil {
 			return nil, err
 		}
@@ -430,10 +443,13 @@ const listArticlesTodayEnriched = `-- name: ListArticlesTodayEnriched :many
 SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
        COALESCE(ai.title_translated, '') AS title_translated,
        COALESCE(ai.summary, '') AS summary,
-       s.title AS source_title
+       s.title AS source_title,
+       COALESCE(st.is_read, false) AS is_read,
+       COALESCE(st.is_starred, false) AS is_starred
 FROM articles a
 JOIN sources s ON a.source_id = s.id
 LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
+LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
 WHERE s.user_id = $1
   AND a.published_at >= now() - interval '24 hours'
 ORDER BY a.published_at DESC
@@ -457,6 +473,8 @@ type ListArticlesTodayEnrichedRow struct {
 	TitleTranslated string             `json:"title_translated"`
 	Summary         string             `json:"summary"`
 	SourceTitle     string             `json:"source_title"`
+	IsRead          bool               `json:"is_read"`
+	IsStarred       bool               `json:"is_starred"`
 }
 
 func (q *Queries) ListArticlesTodayEnriched(ctx context.Context, arg ListArticlesTodayEnrichedParams) ([]ListArticlesTodayEnrichedRow, error) {
@@ -480,6 +498,8 @@ func (q *Queries) ListArticlesTodayEnriched(ctx context.Context, arg ListArticle
 			&i.TitleTranslated,
 			&i.Summary,
 			&i.SourceTitle,
+			&i.IsRead,
+			&i.IsStarred,
 		); err != nil {
 			return nil, err
 		}
@@ -603,4 +623,147 @@ func (q *Queries) UpsertArticle(ctx context.Context, arg UpsertArticleParams) (A
 		&i.SearchVec,
 	)
 	return i, err
+}
+
+const listArticlesBySourceEnriched = `-- name: ListArticlesBySourceEnriched :many
+SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
+       COALESCE(ai.title_translated, '') AS title_translated,
+       COALESCE(ai.summary, '') AS summary,
+       s.title AS source_title,
+       COALESCE(st.is_read, false) AS is_read,
+       COALESCE(st.is_starred, false) AS is_starred
+FROM articles a
+JOIN sources s ON a.source_id = s.id
+LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
+LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+WHERE a.source_id = $3
+ORDER BY a.published_at DESC
+`
+
+type ListArticlesBySourceEnrichedParams struct {
+	UserID         int64  `json:"user_id"`
+	TargetLanguage string `json:"target_language"`
+	SourceID       int64  `json:"source_id"`
+}
+
+type ListArticlesBySourceEnrichedRow struct {
+	ID              int64              `json:"id"`
+	SourceID        int64              `json:"source_id"`
+	Title           string             `json:"title"`
+	Link            string             `json:"link"`
+	Language        string             `json:"language"`
+	Author          pgtype.Text        `json:"author"`
+	PublishedAt     pgtype.Timestamptz `json:"published_at"`
+	ContentText     string             `json:"content_text"`
+	TitleTranslated string             `json:"title_translated"`
+	Summary         string             `json:"summary"`
+	SourceTitle     string             `json:"source_title"`
+	IsRead          bool               `json:"is_read"`
+	IsStarred       bool               `json:"is_starred"`
+}
+
+func (q *Queries) ListArticlesBySourceEnriched(ctx context.Context, arg ListArticlesBySourceEnrichedParams) ([]ListArticlesBySourceEnrichedRow, error) {
+	rows, err := q.db.Query(ctx, listArticlesBySourceEnriched, arg.UserID, arg.TargetLanguage, arg.SourceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListArticlesBySourceEnrichedRow{}
+	for rows.Next() {
+		var i ListArticlesBySourceEnrichedRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SourceID,
+			&i.Title,
+			&i.Link,
+			&i.Language,
+			&i.Author,
+			&i.PublishedAt,
+			&i.ContentText,
+			&i.TitleTranslated,
+			&i.Summary,
+			&i.SourceTitle,
+			&i.IsRead,
+			&i.IsStarred,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUnreadArticlesEnriched = `-- name: ListUnreadArticlesEnriched :many
+SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
+       COALESCE(ai.title_translated, '') AS title_translated,
+       COALESCE(ai.summary, '') AS summary,
+       s.title AS source_title,
+       COALESCE(st.is_read, false) AS is_read,
+       COALESCE(st.is_starred, false) AS is_starred
+FROM articles a
+JOIN sources s ON a.source_id = s.id
+LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
+LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+WHERE s.user_id = $1
+  AND (st.is_read IS NULL OR st.is_read = false)
+ORDER BY a.published_at DESC
+LIMIT 200
+`
+
+type ListUnreadArticlesEnrichedParams struct {
+	UserID         int64  `json:"user_id"`
+	TargetLanguage string `json:"target_language"`
+}
+
+type ListUnreadArticlesEnrichedRow struct {
+	ID              int64              `json:"id"`
+	SourceID        int64              `json:"source_id"`
+	Title           string             `json:"title"`
+	Link            string             `json:"link"`
+	Language        string             `json:"language"`
+	Author          pgtype.Text        `json:"author"`
+	PublishedAt     pgtype.Timestamptz `json:"published_at"`
+	ContentText     string             `json:"content_text"`
+	TitleTranslated string             `json:"title_translated"`
+	Summary         string             `json:"summary"`
+	SourceTitle     string             `json:"source_title"`
+	IsRead          bool               `json:"is_read"`
+	IsStarred       bool               `json:"is_starred"`
+}
+
+func (q *Queries) ListUnreadArticlesEnriched(ctx context.Context, arg ListUnreadArticlesEnrichedParams) ([]ListUnreadArticlesEnrichedRow, error) {
+	rows, err := q.db.Query(ctx, listUnreadArticlesEnriched, arg.UserID, arg.TargetLanguage)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUnreadArticlesEnrichedRow{}
+	for rows.Next() {
+		var i ListUnreadArticlesEnrichedRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SourceID,
+			&i.Title,
+			&i.Link,
+			&i.Language,
+			&i.Author,
+			&i.PublishedAt,
+			&i.ContentText,
+			&i.TitleTranslated,
+			&i.Summary,
+			&i.SourceTitle,
+			&i.IsRead,
+			&i.IsStarred,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

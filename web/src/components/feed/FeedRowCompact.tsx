@@ -1,47 +1,56 @@
 'use client';
 
+import { motion } from 'framer-motion';
+import { formatRelativeTime, getDisplayTitle, getOriginalTitle } from '@/lib/article-meta';
+import { getSourceColor } from '@/lib/source-meta';
 import type { ArticleItem } from '@/lib/types';
 
-function timeAgo(dateStr?: string): string {
-  if (!dateStr) return '';
-
-  const timestamp = new Date(dateStr).getTime();
-  if (Number.isNaN(timestamp)) return '';
-
-  const diffHours = Math.floor((Date.now() - timestamp) / 3_600_000);
-  if (diffHours < 1) return '< 1h';
-  if (diffHours < 24) return `${diffHours}h`;
-
-  return `${Math.floor(diffHours / 24)}d`;
-}
-
-interface FeedRowCompactProps {
-  item: ArticleItem;
-  onClick?: () => void;
+interface Props {
+  item: ArticleItem & { is_read?: boolean; is_starred?: boolean };
   selected?: boolean;
+  onClick?: () => void;
 }
 
-export function FeedRowCompact({ item, onClick, selected = false }: FeedRowCompactProps) {
-  const displayTitle = item.title_translated ?? item.title;
-  const starred = (item as ArticleItem & { starred?: boolean }).starred;
+export function FeedRowCompact({ item, selected = false, onClick }: Props) {
+  const sourceName = (item.source_title?.trim() || 'Untitled Source').toUpperCase();
+  const relativeTime = formatRelativeTime(item.published_at);
+  const displayTitle = getDisplayTitle(item);
+  const originalTitle = getOriginalTitle(item);
+  const sourceColor = getSourceColor(item.source_title);
 
   return (
-    <div
+    <article
+      role="button"
+      aria-current={selected ? 'true' : undefined}
+      tabIndex={0}
       onClick={onClick}
-      className={`flex items-center gap-2 border-b border-[var(--border-default)] px-4 py-2.5 md:px-0 md:py-[10px] ${selected ? 'bg-[var(--bg-badge-starred)]' : ''}`}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick?.();
+        }
+      }}
+      className={`relative cursor-pointer border-b border-[var(--border-light)] px-[14px] py-[9px] transition-[background,opacity] duration-150 ${
+        selected ? 'bg-[var(--bg-selected)]' : 'hover:bg-[var(--bg-hover)]'
+      } ${item.is_read && !selected ? 'opacity-[0.48]' : 'opacity-100'}`}
     >
-      <span className="shrink-0 rounded-[8px] bg-[var(--bg-surface)] px-1.5 py-px text-[10px] font-semibold text-[var(--text-link)]">
-        {item.source_title || 'Source'}
-      </span>
+      {selected ? (
+        <motion.div
+          layoutId="active-article-indicator"
+          className="absolute inset-y-[22%] left-0 w-[2.5px] rounded-r bg-[var(--accent)]"
+        />
+      ) : null}
 
-      <span className="min-w-0 flex-1 truncate text-[13px] font-medium leading-[1.35] text-[var(--text-body)] md:text-[14px]">
-        {displayTitle}
-      </span>
+      <div className="mb-1 flex items-center gap-[5px]">
+        <span className="inline-block h-[10px] w-[10px] shrink-0 rounded-[2px]" style={{ backgroundColor: sourceColor }} />
+        <span className="flex-1 truncate text-[10.5px] font-medium uppercase tracking-[0.03em] text-[var(--text-3)]">
+          {sourceName}
+        </span>
+        {relativeTime ? <span className="text-[11px] text-[var(--text-3)]">{relativeTime}</span> : null}
+      </div>
 
-      <span className="ml-auto shrink-0 whitespace-nowrap text-[11px] text-[var(--text-muted)]">
-        {timeAgo(item.published_at)}
-        {starred ? ' ★' : ''}
-      </span>
-    </div>
+      <div className="text-[13px] font-semibold leading-[1.38] text-[var(--text)]">{displayTitle}</div>
+      {originalTitle ? <div className="mt-[3px] text-[11px] italic leading-[1.35] text-[var(--text-3)]">{originalTitle}</div> : null}
+    </article>
   );
 }

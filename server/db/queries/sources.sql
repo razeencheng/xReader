@@ -1,11 +1,11 @@
 -- name: CreateSource :one
 INSERT INTO sources (
     user_id, kind, url, normalized_url, title, icon_url, language_hint,
-    last_fetched_at, last_success_at, consecutive_fails, health, deleted_at
+    last_fetched_at, last_success_at, consecutive_fails, health, category, deleted_at
 )
 VALUES (
     $1, $2, $3, $4, $5, $6, $7,
-    $8, $9, $10, $11, $12
+    $8, $9, $10, $11, $12, $13
 )
 RETURNING *;
 
@@ -50,3 +50,8 @@ WHERE deleted_at IS NULL
     OR (consecutive_fails >= 6 AND last_fetched_at < now() - interval '6 hours')
   )
 ORDER BY last_fetched_at ASC NULLS FIRST;
+
+-- name: UpdateSourceCategory :exec
+UPDATE sources
+SET category = $2
+WHERE id = $1;

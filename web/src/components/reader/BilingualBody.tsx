@@ -1,8 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { Languages } from 'lucide-react';
 import { useLazyTranslation } from '@/hooks/useLazyTranslation';
 import { fontForLang } from '@/lib/langFonts';
+import { isSameLanguage } from '@/lib/article-meta';
 
 interface Props {
   articleId: number;
@@ -37,14 +39,6 @@ const BLOCK_TAGS = new Set([
 
 const WRAPPER_TAGS = new Set(['article', 'aside', 'div', 'footer', 'header', 'main', 'ol', 'section', 'ul']);
 
-function normalizeLanguage(language: string) {
-  return language.toLowerCase().split('-')[0];
-}
-
-function isSameLanguage(articleLanguage: string, nativeLanguage: string) {
-  return normalizeLanguage(articleLanguage) === normalizeLanguage(nativeLanguage);
-}
-
 function escapeHtml(text: string) {
   return text
     .replaceAll('&', '&amp;')
@@ -56,7 +50,7 @@ function escapeHtml(text: string) {
 
 function splitContentHtml(contentHtml: string) {
   const parser = new DOMParser();
-  const document = parser.parseFromString(`<body>${contentHtml}</body>`, 'text/html');
+  const doc = parser.parseFromString(`<body>${contentHtml}</body>`, 'text/html');
   const paragraphs: string[] = [];
 
   const pushText = (text: string) => {
@@ -66,7 +60,7 @@ function splitContentHtml(contentHtml: string) {
     }
   };
 
-  const pushNode = (node: ChildNode) => {
+  const traverseNodes = (node: ChildNode) => {
     if (node.nodeType === Node.TEXT_NODE) {
       pushText(node.textContent ?? '');
       return;
@@ -80,7 +74,7 @@ function splitContentHtml(contentHtml: string) {
     const tag = element.tagName.toLowerCase();
 
     if (WRAPPER_TAGS.has(tag)) {
-      Array.from(element.childNodes).forEach(pushNode);
+      Array.from(element.childNodes).forEach(traverseNodes);
       return;
     }
 
@@ -92,31 +86,21 @@ function splitContentHtml(contentHtml: string) {
     paragraphs.push(`<p>${element.outerHTML}</p>`);
   };
 
-  Array.from(document.body.childNodes).forEach(pushNode);
+  Array.from(doc.body.childNodes).forEach(traverseNodes);
   return paragraphs;
-}
-
-function LoadingPulse() {
-  return (
-    <div className="mt-2 flex gap-1.5 pb-4">
-      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--border-default)]" />
-      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--border-default)] [animation-delay:150ms]" />
-      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--border-default)] [animation-delay:300ms]" />
-    </div>
-  );
-}
-
-const CODE_TAG_RE = /^<(pre|code)[\s>]/i;
-
-function isCodeBlock(html: string): boolean {
-  return CODE_TAG_RE.test(html.trim());
 }
 
 export function BilingualBody({ articleId, contentHtml, language, nativeLanguage }: Props) {
   const paragraphs = useMemo(() => splitContentHtml(contentHtml), [contentHtml]);
   const sameLanguage = isSameLanguage(language, nativeLanguage);
   const originalFont = fontForLang(language);
-  const translationFont = fontForLang(nativeLanguage);
+  const resetKey = `${articleId}:${language}:${nativeLanguage}:${contentHtml}`;
+  const [translationState, setTranslationState] = useState<{ key: string; open: Set<number> }>({
+    key: resetKey,
+    open: new Set(),
+  });
+
+  const openTranslations = translationState.key === resetKey ? translationState.open : new Set<number>();
 
   const { translations, observeRef } = useLazyTranslation({
     articleId,
@@ -124,49 +108,67 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
     enabled: !sameLanguage,
   });
 
+  const toggleTranslation = (index: number) => {
+    setTranslationState((previous) => {
+      const next = previous.key === resetKey ? new Set(previous.open) : new Set<number>();
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+
+      return { key: resetKey, open: next };
+    });
+  };
+
   return (
-    <div className="text-[17px] leading-[1.8] md:text-[18px] md:leading-[1.75]">
+    <div className="space-y-[1.6em]">
       {paragraphs.map((paragraph, index) => {
+        const isCode = /<pre|<code/i.test(paragraph);
         const translation = translations.get(index);
-        const isCode = isCodeBlock(paragraph);
-        const paragraphProps = {
-          'data-paragraph-index': index,
-          'data-highlight-source': encodeURIComponent(paragraph),
-        };
+        const isOpen = openTranslations.has(index);
+        const isLoading = isOpen && !translation;
 
         if (isCode) {
           return (
             <div
               key={index}
-              className="mb-[1.2em] overflow-x-auto rounded-md bg-[var(--bg-card)] p-4 font-mono text-[13px] leading-[1.6] text-[var(--text-body)]"
-              {...paragraphProps}
+              className="overflow-x-auto rounded-lg border border-[var(--border-light)] bg-[var(--bg-surface)] p-4 font-mono text-[13.5px] leading-[1.6] text-[var(--text-primary)]"
               dangerouslySetInnerHTML={{ __html: paragraph }}
             />
           );
         }
 
         return (
-          <div key={index} ref={observeRef(index)} className="mb-[1.2em]" {...paragraphProps}>
-            <div
-              data-layer="original"
-              className="text-[var(--text-body)]"
-              style={{ fontFamily: originalFont }}
-              dangerouslySetInnerHTML={{ __html: paragraph }}
-            />
+          <div key={index} ref={observeRef(index)} data-paragraph-index={index} style={{ fontFamily: originalFont }}>
+            <div dangerouslySetInnerHTML={{ __html: paragraph }} />
+
             {!sameLanguage ? (
-              translations.has(index) ? (
-                translation ? (
-                  <div
-                    data-layer="translation"
-                    className="mt-2 text-[var(--text-muted)]"
-                    style={{ fontFamily: translationFont }}
-                  >
-                    {translation}
+              <div className="mt-2">
+                {isOpen ? (
+                  <div className="mb-2 border-l-2 border-[var(--accent)] pl-4 text-[0.92em] italic leading-[1.8] text-[var(--text-2)]">
+                    {translation ? (
+                      translation
+                    ) : (
+                      <span className="inline-flex items-center gap-2 text-[11.5px] not-italic text-[var(--text-3)]">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--accent)]" />
+                        Translating…
+                      </span>
+                    )}
                   </div>
-                ) : null
-              ) : (
-                <LoadingPulse />
-              )
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => toggleTranslation(index)}
+                  className={`inline-flex items-center gap-1.5 border-none bg-transparent p-0 text-[11.5px] transition-colors ${
+                    isOpen ? 'text-[var(--accent)]' : 'text-[var(--text-3)] hover:text-[var(--text-2)]'
+                  }`}
+                >
+                  <Languages size={12} />
+                  {isLoading ? 'Translating…' : isOpen ? 'Hide translation' : 'Translate paragraph'}
+                </button>
+              </div>
             ) : null}
           </div>
         );

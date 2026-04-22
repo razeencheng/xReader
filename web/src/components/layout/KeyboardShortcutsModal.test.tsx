@@ -1,0 +1,22 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
+
+test('renders handoff shortcut groups and closes from the close button', async () => {
+  const user = userEvent.setup();
+  const onClose = vi.fn();
+
+  render(<KeyboardShortcutsModal open onClose={onClose} />);
+
+  expect(screen.getByRole('dialog', { name: /keyboard shortcuts/i })).toBeInTheDocument();
+  expect(screen.getByText('Navigation')).toBeInTheDocument();
+  expect(screen.getByText('Article')).toBeInTheDocument();
+  expect(screen.getByText('View')).toBeInTheDocument();
+  expect(screen.getByText('Next article')).toBeInTheDocument();
+  expect(screen.getByText('Star / unstar current article')).toBeInTheDocument();
+  expect(screen.getByText('Toggle focus mode')).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: /close keyboard shortcuts/i }));
+
+  expect(onClose).toHaveBeenCalledTimes(1);
+});

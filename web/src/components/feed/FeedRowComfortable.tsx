@@ -1,97 +1,85 @@
 'use client';
 
+import { Star } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { estimateReadMinutes, formatRelativeTime, getDisplayTitle, getOriginalTitle } from '@/lib/article-meta';
+import { getSourceColor } from '@/lib/source-meta';
 import type { ArticleItem } from '@/lib/types';
 
-type FeedArticleItem = ArticleItem & {
-  content_text?: string;
-};
-
-function timeAgo(dateString: string): string {
-  const diffMs = Date.now() - new Date(dateString).getTime();
-  if (!Number.isFinite(diffMs) || diffMs <= 0) {
-    return '0h';
-  }
-
-  const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 60) {
-    return `${minutes}m`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `${hours}h`;
-  }
-
-  return `${Math.floor(hours / 24)}d`;
-}
-
-function estimateReadTime(item: FeedArticleItem): string {
-  const text = [item.title, item.title_translated, item.summary, item.content_text]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-  const words = text ? text.split(/\s+/).length : 0;
-  return `${Math.max(1, Math.round(words / 200) || 1)}m`;
-}
-
 interface Props {
-  item: ArticleItem;
-  onClick?: () => void;
+  item: ArticleItem & { is_starred?: boolean; is_read?: boolean };
   selected?: boolean;
+  onClick?: () => void;
+  onStar?: (id: number) => void;
 }
 
-export function FeedRowComfortable({ item, onClick, selected = false }: Props) {
-  const article = item as FeedArticleItem;
-  const contentText = article.content_text?.trim();
-  const summary = article.summary?.trim();
-  const translatedTitle = article.title_translated?.trim();
-  const hasTranslatedTitle = Boolean(translatedTitle && translatedTitle !== article.title);
-  const displayTitle = translatedTitle || article.title;
+export function FeedRowComfortable({ item, selected = false, onClick, onStar }: Props) {
+  const displayTitle = getDisplayTitle(item);
+  const originalTitle = getOriginalTitle(item);
+  const relativeTime = formatRelativeTime(item.published_at);
+  const readMinutes = estimateReadMinutes(item);
+  const sourceName = (item.source_title?.trim() || 'Untitled Source').toUpperCase();
+  const sourceColor = getSourceColor(item.source_title);
 
   return (
     <article
-      className={`border-b border-[var(--border-default)] px-4 py-3 md:px-0 md:py-5 ${onClick ? 'cursor-pointer' : ''} ${selected ? 'bg-[var(--bg-badge-starred)]' : ''}`}
+      role="button"
+      aria-current={selected ? 'true' : undefined}
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick?.();
+        }
+      }}
+      className={`group relative cursor-pointer border-b border-[var(--border-light)] px-4 py-3 transition-[background,opacity] duration-150 ${
+        selected ? 'bg-[var(--bg-selected)]' : 'hover:bg-[var(--bg-hover)]'
+      } ${item.is_read && !selected ? 'opacity-[0.48]' : 'opacity-100'}`}
     >
-      <div className="flex flex-col gap-2 text-[12px] text-[var(--text-muted)] md:flex-row md:items-start md:justify-between md:gap-4">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-[system-ui] md:max-w-[72%]">
-          <span className="shrink-0 rounded-[10px] bg-[var(--bg-surface)] px-2 py-px font-semibold text-[var(--text-link)]">
-            {article.source_title || 'Source'}
-          </span>
-          {article.author ? <span className="truncate">{article.author}</span> : null}
-          {article.published_at ? <span className="shrink-0">{timeAgo(article.published_at)}</span> : null}
-        </div>
-        <div className="flex shrink-0 items-center gap-2 font-[system-ui]">
-          <span>{estimateReadTime(article)}</span>
-          <span className="opacity-50">★</span>
-        </div>
+      {selected ? (
+        <motion.div
+          layoutId="active-article-indicator"
+          className="absolute inset-y-[22%] left-0 w-[2.5px] rounded-r bg-[var(--accent)]"
+        />
+      ) : null}
+
+      <div className="mb-[5px] flex items-center gap-[5px]">
+        <span className="inline-block h-[10px] w-[10px] shrink-0 rounded-[2px]" style={{ backgroundColor: sourceColor }} />
+        <span className="flex-1 truncate text-[10.5px] font-medium uppercase tracking-[0.03em] text-[var(--text-3)]">
+          {sourceName}
+        </span>
+        {relativeTime ? <span className="text-[11px] text-[var(--text-3)]">{relativeTime}</span> : null}
       </div>
 
-      <div className="mt-2.5">
-        {contentText && contentText.length < 280 ? (
-          <div className="font-[system-ui] text-[15px] leading-[1.6] text-[var(--text-body)] md:text-[16px]">
-            {contentText}
-          </div>
-        ) : (
-          <>
-            <h3 className="m-0 mb-1 font-[Iowan Old Style,Georgia,serif] text-[18px] leading-[1.3] text-[var(--text-body)] md:text-[22px]">
-              {displayTitle}
-            </h3>
-            {hasTranslatedTitle ? (
-              <div className="mb-2 font-[system-ui] text-xs italic text-[var(--text-muted)]">
-                {article.title}
-              </div>
-            ) : null}
-            {summary ? (
-              <div className="truncate font-[system-ui] text-[14px] leading-[1.6] text-[var(--text-secondary)]">
-                <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-[1.5px] text-[var(--text-muted)]">
-                  要点
-                </span>
-                {summary}
-              </div>
-            ) : null}
-          </>
-        )}
+      <h3 className="text-[14px] font-semibold leading-[1.38] text-[var(--text)]">{displayTitle}</h3>
+
+      {originalTitle ? (
+        <p className="mt-[3px] text-[11.5px] italic leading-[1.35] text-[var(--text-3)]">{originalTitle}</p>
+      ) : null}
+
+      <div className="mt-1 flex items-center">
+        {readMinutes ? <span className="text-[11px] text-[var(--text-3)]">{readMinutes} min read</span> : <span />}
+        <div className="flex-1" />
+        {onStar ? (
+          <button
+            type="button"
+            aria-label={item.is_starred ? 'Unstar article' : 'Star article'}
+            onClick={(event) => {
+              event.stopPropagation();
+              onStar(item.id);
+            }}
+            className={`rounded p-[3px] transition-[opacity,color] duration-150 ${
+              item.is_starred
+                ? 'text-[var(--star)] opacity-100'
+                : 'text-[var(--text-3)] opacity-0 hover:text-[var(--star)] group-hover:opacity-100'
+            }`}
+          >
+            <Star size={13} fill={item.is_starred ? 'currentColor' : 'none'} strokeWidth={item.is_starred ? 0 : 1.8} />
+          </button>
+        ) : item.is_starred ? (
+          <Star size={13} className="text-[var(--star)]" fill="currentColor" strokeWidth={0} />
+        ) : null}
       </div>
     </article>
   );

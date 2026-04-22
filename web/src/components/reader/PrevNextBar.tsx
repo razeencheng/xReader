@@ -1,6 +1,8 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
+import { getDisplayTitle } from '@/lib/article-meta';
+import { getSourceColor } from '@/lib/source-meta';
 import type { ArticleItem } from '@/lib/types';
 
 interface Props {
@@ -19,6 +21,52 @@ function buildHref(articleId: number, searchParams: SearchParamsLike) {
   return query ? `/read/${articleId}?${query}` : `/read/${articleId}`;
 }
 
+function NavCard({
+  article,
+  direction,
+  hotkey,
+  align = 'left',
+  onClick,
+}: {
+  article: ArticleItem;
+  direction: '上一篇' | '下一篇';
+  hotkey: string;
+  align?: 'left' | 'right';
+  onClick: () => void;
+}) {
+  const sourceColor = getSourceColor(article.source_title);
+  const alignment = align === 'right' ? 'items-end text-right' : 'items-start text-left';
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group flex min-w-0 flex-1 items-center gap-3 rounded-[16px] border border-[var(--border-light)] bg-[rgba(255,255,255,0.86)] px-3 py-3 transition-all hover:-translate-y-[1px] hover:border-[var(--accent)] hover:bg-[var(--bg)] ${align === 'right' ? 'justify-end' : ''}`}
+    >
+      {align === 'left' ? (
+        <span className="hide-mobile inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[var(--bg-hover)] text-[12px] font-semibold text-[var(--text-3)] transition-colors group-hover:bg-[var(--accent-bg)] group-hover:text-[var(--accent)]">
+          {hotkey}
+        </span>
+      ) : null}
+
+      <div className={`min-w-0 flex flex-1 flex-col ${alignment}`}>
+        <div className="mb-1 text-[10px] font-semibold tracking-[0.16em] text-[var(--text-3)]">{direction}</div>
+        <div className="mb-1 flex max-w-full items-center gap-2 text-[11px] text-[var(--text-3)]">
+          <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: sourceColor }} />
+          <span className="truncate">{article.source_title || 'Source'}</span>
+        </div>
+        <div className="w-full truncate font-medium text-[var(--text-body)]">{getDisplayTitle(article)}</div>
+      </div>
+
+      {align === 'right' ? (
+        <span className="hide-mobile inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[var(--bg-hover)] text-[12px] font-semibold text-[var(--text-3)] transition-colors group-hover:bg-[var(--accent-bg)] group-hover:text-[var(--accent)]">
+          {hotkey}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
 export function PrevNextBar({ current, prev, next, position, total, markRead }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -34,44 +82,19 @@ export function PrevNextBar({ current, prev, next, position, total, markRead }: 
   };
 
   return (
-    <div className="sticky bottom-0 z-20 flex items-center gap-4 border-t border-[var(--border-default)] bg-[var(--bg-input)] px-4 py-3 font-[system-ui] text-[13px] text-[var(--text-body)] md:px-6">
-      <div className="min-w-0 flex-1">
+    <div className="sticky bottom-0 z-20 border-t border-[var(--border-light)] bg-[rgba(248,244,238,0.92)] px-4 pb-4 pt-3 font-sans text-[13px] text-[var(--text-body)] backdrop-blur md:px-6">
+      <div className="flex items-center gap-3">
         {prev ? (
-          <button
-            type="button"
-            onClick={() => navigate(prev)}
-            className="flex min-w-0 max-w-[42vw] items-center gap-2.5 text-left opacity-80 transition hover:opacity-100"
-          >
-            <span className="hide-mobile shrink-0 text-[var(--text-muted)]">← K</span>
-            <div className="min-w-0 overflow-hidden">
-              <div className="text-[10px] tracking-[1.5px] text-[var(--text-muted)]">上一篇</div>
-              <div className="truncate font-medium text-[var(--text-body)]">
-                {prev.title_translated || prev.title}
-              </div>
-            </div>
-          </button>
+          <NavCard article={prev} direction="上一篇" hotkey="← K" onClick={() => navigate(prev)} />
         ) : null}
-      </div>
 
-      <div className="shrink-0 px-4 text-[var(--text-muted)]">
-        {position != null && total != null ? `${position} / ${total}` : ''}
-      </div>
+        <div className="shrink-0 px-2 text-center">
+          <div className="text-[10px] font-semibold tracking-[0.16em] text-[var(--text-3)]">位置</div>
+          <div className="mt-1 text-[12px] text-[var(--text-2)]">{position != null && total != null ? `${position} / ${total}` : ''}</div>
+        </div>
 
-      <div className="min-w-0 flex-1">
         {next ? (
-          <button
-            type="button"
-            onClick={() => navigate(next)}
-            className="ml-auto flex min-w-0 max-w-[42vw] items-center gap-2.5 text-right opacity-80 transition hover:opacity-100"
-          >
-            <div className="min-w-0 overflow-hidden">
-              <div className="text-[10px] tracking-[1.5px] text-[var(--text-muted)]">下一篇</div>
-              <div className="truncate font-medium text-[var(--text-body)]">
-                {next.title_translated || next.title}
-              </div>
-            </div>
-            <span className="hide-mobile shrink-0 text-[var(--text-muted)]">J →</span>
-          </button>
+          <NavCard article={next} direction="下一篇" hotkey="J →" align="right" onClick={() => navigate(next)} />
         ) : null}
       </div>
     </div>

@@ -36,6 +36,8 @@ type EnrichedArticle struct {
 	Author          pgtype.Text
 	PublishedAt     pgtype.Timestamptz
 	ContentText     string
+	IsRead          bool
+	IsStarred       bool
 }
 
 func (s *ArticleService) ListToday(ctx context.Context, userID int64) ([]gen.Article, error) {
@@ -51,7 +53,13 @@ func (s *ArticleService) ListTodayEnriched(ctx context.Context, userID int64, la
 	}
 	out := make([]EnrichedArticle, len(rows))
 	for i, r := range rows {
-		out[i] = EnrichedArticle{ID: r.ID, SourceID: r.SourceID, Title: r.Title, TitleTranslated: r.TitleTranslated, Summary: r.Summary, SourceTitle: r.SourceTitle, Link: r.Link, Language: r.Language, Author: r.Author, PublishedAt: r.PublishedAt, ContentText: r.ContentText}
+		out[i] = EnrichedArticle{
+			ID: r.ID, SourceID: r.SourceID, Title: r.Title,
+			TitleTranslated: r.TitleTranslated, Summary: r.Summary,
+			SourceTitle: r.SourceTitle, Link: r.Link, Language: r.Language,
+			Author: r.Author, PublishedAt: r.PublishedAt, ContentText: r.ContentText,
+			IsRead: r.IsRead, IsStarred: r.IsStarred,
+		}
 	}
 	return out, nil
 }
@@ -73,7 +81,13 @@ func (s *ArticleService) ListStreamEnriched(ctx context.Context, userID int64, c
 	}
 	out := make([]EnrichedArticle, len(rows))
 	for i, r := range rows {
-		out[i] = EnrichedArticle{ID: r.ID, SourceID: r.SourceID, Title: r.Title, TitleTranslated: r.TitleTranslated, Summary: r.Summary, SourceTitle: r.SourceTitle, Link: r.Link, Language: r.Language, Author: r.Author, PublishedAt: r.PublishedAt, ContentText: r.ContentText}
+		out[i] = EnrichedArticle{
+			ID: r.ID, SourceID: r.SourceID, Title: r.Title,
+			TitleTranslated: r.TitleTranslated, Summary: r.Summary,
+			SourceTitle: r.SourceTitle, Link: r.Link, Language: r.Language,
+			Author: r.Author, PublishedAt: r.PublishedAt, ContentText: r.ContentText,
+			IsRead: r.IsRead, IsStarred: r.IsStarred,
+		}
 	}
 	return out, nil
 }
@@ -91,7 +105,53 @@ func (s *ArticleService) ListStarredEnriched(ctx context.Context, userID int64, 
 	}
 	out := make([]EnrichedArticle, len(rows))
 	for i, r := range rows {
-		out[i] = EnrichedArticle{ID: r.ID, SourceID: r.SourceID, Title: r.Title, TitleTranslated: r.TitleTranslated, Summary: r.Summary, SourceTitle: r.SourceTitle, Link: r.Link, Language: r.Language, Author: r.Author, PublishedAt: r.PublishedAt, ContentText: r.ContentText}
+		out[i] = EnrichedArticle{
+			ID: r.ID, SourceID: r.SourceID, Title: r.Title,
+			TitleTranslated: r.TitleTranslated, Summary: r.Summary,
+			SourceTitle: r.SourceTitle, Link: r.Link, Language: r.Language,
+			Author: r.Author, PublishedAt: r.PublishedAt, ContentText: r.ContentText,
+			IsRead: r.IsRead, IsStarred: r.IsStarred,
+		}
+	}
+	return out, nil
+}
+
+func (s *ArticleService) ListBySourceEnriched(ctx context.Context, userID, sourceID int64, lang string) ([]EnrichedArticle, error) {
+	rows, err := s.queries.ListArticlesBySourceEnriched(ctx, gen.ListArticlesBySourceEnrichedParams{
+		UserID: userID, SourceID: sourceID, TargetLanguage: lang,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]EnrichedArticle, len(rows))
+	for i, r := range rows {
+		out[i] = EnrichedArticle{
+			ID: r.ID, SourceID: r.SourceID, Title: r.Title,
+			TitleTranslated: r.TitleTranslated, Summary: r.Summary,
+			SourceTitle: r.SourceTitle, Link: r.Link, Language: r.Language,
+			Author: r.Author, PublishedAt: r.PublishedAt, ContentText: r.ContentText,
+			IsRead: r.IsRead, IsStarred: r.IsStarred,
+		}
+	}
+	return out, nil
+}
+
+func (s *ArticleService) ListUnreadEnriched(ctx context.Context, userID int64, lang string) ([]EnrichedArticle, error) {
+	rows, err := s.queries.ListUnreadArticlesEnriched(ctx, gen.ListUnreadArticlesEnrichedParams{
+		UserID: userID, TargetLanguage: lang,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]EnrichedArticle, len(rows))
+	for i, r := range rows {
+		out[i] = EnrichedArticle{
+			ID: r.ID, SourceID: r.SourceID, Title: r.Title,
+			TitleTranslated: r.TitleTranslated, Summary: r.Summary,
+			SourceTitle: r.SourceTitle, Link: r.Link, Language: r.Language,
+			Author: r.Author, PublishedAt: r.PublishedAt, ContentText: r.ContentText,
+			IsRead: r.IsRead, IsStarred: r.IsStarred,
+		}
 	}
 	return out, nil
 }

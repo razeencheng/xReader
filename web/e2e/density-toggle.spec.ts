@@ -1,8 +1,15 @@
 import { expect, test } from 'playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
 
-test.use({
-  storageState: process.env.PLAYWRIGHT_STORAGE_STATE ?? 'playwright/.auth/user.json',
-});
+const storageState = process.env.PLAYWRIGHT_STORAGE_STATE ?? 'playwright/.auth/user.json';
+const hasStorageState = fs.existsSync(path.resolve(storageState));
+
+if (hasStorageState) {
+  test.use({ storageState });
+}
+
+test.skip(!hasStorageState, `Missing storage state file: ${storageState}`);
 
 test('density preference persists after reload', async ({ page }) => {
   await page.goto('/');

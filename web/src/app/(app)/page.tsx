@@ -1,41 +1,196 @@
 'use client';
 
-import { Suspense } from 'react';
-import Link from 'next/link';
-import { FeedTabs } from '@/components/feed/FeedTabs';
-import { DensityToggle } from '@/components/feed/DensityToggle';
+import { useCallback, useMemo, useState, Suspense } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
 import { FeedList } from '@/components/feed/FeedList';
+import { ArticleView } from '@/components/reader/ArticleView';
+import { SourceBrowser } from '@/components/layout/SourceBrowser';
+import { KeyboardShortcutsButton, KeyboardShortcutsModal } from '@/components/layout/KeyboardShortcutsModal';
+import { apiFetch } from '@/lib/api-client';
+import { applyArticleStateChange } from '@/lib/article-state-cache';
+import { broadcast } from '@/lib/broadcast';
+import { useReaderShortcuts } from '@/hooks/useReaderShortcuts';
+import { useArticles } from '@/lib/queries/articles';
+import { toggleReaderFocusMode } from '@/lib/reader-layout';
 import { useUIStore } from '@/stores/useUIStore';
-
-function getNativeLanguageLabel(value: string) {
-  if (value === 'zh-CN') {
-    return '中文（简体）';
-  }
-
-  if (value === 'en') {
-    return 'English';
-  }
-
-  return value;
-}
+import type { ArticleItem, ArticleTab } from '@/lib/types';
 
 function FeedPageContent() {
-  const nativeLanguage = useUIStore((state) => state.nativeLanguage);
+  const queryClient = useQueryClient();
+  const currentView = useUIStore((state) => state.currentView);
+  const selectedSourceId = useUIStore((state) => state.selectedSourceId);
+  const readFilter = useUIStore((state) => state.readFilter);
+  const layout = useUIStore((state) => state.layout);
+  const focusMode = useUIStore((state) => state.focusMode);
+  const setLayout = useUIStore((state) => state.setLayout);
+  const setFocusMode = useUIStore((state) => state.setFocusMode);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const handleOpenArticle = useCallback((article: ArticleItem) => {
+    setSelectedId(article.id.toString());
+  }, []);
+
+  const tab: ArticleTab = currentView === 'starred' ? 'starred' : currentView === 'today' ? 'today' : 'stream';
+  const showSourceBrowser = currentView === 'sources' && selectedSourceId === null;
+  const { data } = useArticles(tab, currentView === 'sources' ? selectedSourceId : null, undefined, {
+    enabled: !showSourceBrowser,
+  });
+  const items = useMemo(() => data?.pages.flatMap((page) => page.items) ?? [], [data]);
+  const filteredItems = useMemo(() => {
+    if (currentView === 'starred') return items;
+    if (readFilter === 'unread') return items.filter((item) => !item.is_read);
+    if (readFilter === 'read') return items.filter((item) => item.is_read);
+    return items;
+  }, [currentView, items, readFilter]);
+  const selectedArticleId = selectedId ? Number(selectedId) : null;
+  const currentIndex = filteredItems.findIndex((item) => item.id === selectedArticleId);
+  const currentArticle = currentIndex >= 0 ? filteredItems[currentIndex] : null;
+
+  const updateArticleState = useCallback(
+    async (
+      articleId: number,
+      nextState: { is_read?: boolean; is_starred?: boolean },
+      previousState: { is_read?: boolean; is_starred?: boolean },
+    ) => {
+      applyArticleStateChange(queryClient, { articleId, ...nextState });
+
+      try {
+        await apiFetch(`/api/articles/${articleId}/state`, {
+          method: 'PATCH',
+          body: JSON.stringify(nextState),
+        });
+        broadcast({ type: 'state-change', articleId, ...nextState });
+      } catch {
+        applyArticleStateChange(queryClient, { articleId, ...previousState });
+      }
+    },
+    [queryClient],
+  );
+
+  const handleMarkRead = useCallback(
+    (article: ArticleItem | null) => {
+      if (!article || article.is_read) return;
+      void updateArticleState(article.id, { is_read: true }, { is_read: article.is_read });
+    },
+    [updateArticleState],
+  );
+
+  const handleToggleStar = useCallback(
+    (article: ArticleItem | null) => {
+      if (!article) return;
+
+      void updateArticleState(
+        article.id,
+        { is_starred: !article.is_starred },
+        { is_starred: article.is_starred },
+      );
+    },
+    [updateArticleState],
+  );
+
+  const handleToggleFocus = useCallback(() => {
+    toggleReaderFocusMode(focusMode, layout, setLayout, setFocusMode);
+  }, [focusMode, layout, setFocusMode, setLayout]);
+
+  const selectArticleAtIndex = useCallback(
+    (index: number) => {
+      const article = filteredItems[index];
+      if (!article) return;
+      setSelectedId(article.id.toString());
+    },
+    [filteredItems],
+  );
+
+  const { isShortcutsOpen, openShortcuts, closeShortcuts } = useReaderShortcuts({
+    onNext: () => {
+      if (currentIndex < filteredItems.length - 1) {
+        selectArticleAtIndex(currentIndex + 1);
+      }
+    },
+    onPrev: () => {
+      if (currentIndex > 0) {
+        selectArticleAtIndex(currentIndex - 1);
+      }
+    },
+    onToggleStar: () => handleToggleStar(currentArticle),
+    onMarkRead: () => handleMarkRead(currentArticle),
+    onToggleFocus: handleToggleFocus,
+    onEscape: () => {
+      if (focusMode) {
+        setFocusMode(false);
+      }
+    },
+  });
 
   return (
-    <main className="min-h-screen bg-[var(--bg-body)] text-[var(--text-body)]">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 border-b border-[var(--border-default)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <FeedTabs />
-        <div className="flex flex-wrap items-center gap-3 text-[13px] leading-none text-[var(--text-muted)]">
-          <span>母语：{getNativeLanguageLabel(nativeLanguage)}</span>
-          <DensityToggle />
-          <Link href="/settings" className="hover:text-[var(--text-body)]" aria-label="设置">
-            ⚙
-          </Link>
-        </div>
-      </div>
-      <FeedList />
-    </main>
+    <div className="flex h-full overflow-hidden bg-[var(--bg)]">
+      <motion.div
+        animate={{
+          width: focusMode ? 0 : 'var(--list-width)',
+          opacity: focusMode ? 0 : 1,
+          pointerEvents: focusMode ? 'none' : 'auto',
+        }}
+        transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
+        className="relative z-20 flex h-full shrink-0 overflow-hidden border-r border-[var(--border)] bg-[var(--bg)]"
+      >
+        <AnimatePresence mode="popLayout" initial={false}>
+          {showSourceBrowser ? (
+            <motion.div
+              key="source-browser"
+              initial={{ x: -8, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -8, opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="h-full"
+            >
+              <SourceBrowser />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="article-list"
+              initial={{ x: 8, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 8, opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="flex h-full flex-col"
+            >
+              <FeedList onOpenArticle={handleOpenArticle} selectedArticleId={selectedArticleId} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+
+      <main className="relative h-full min-w-0 flex-1 overflow-hidden bg-[var(--bg)]">
+        <AnimatePresence mode="wait">
+          {selectedId ? (
+            <motion.div
+              key={selectedId}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="h-full"
+            >
+              <ArticleView id={selectedId} onClose={() => setSelectedId(null)} className="h-full" />
+            </motion.div>
+          ) : (
+            <div className="flex h-full items-center justify-center px-12 text-center select-none">
+              <div className="max-w-sm space-y-6 text-[var(--text-3)]">
+                <div className="font-serif text-[22px] italic text-[var(--text-2)]">Select an article</div>
+                <p className="text-sm leading-6">
+                  Pick something from the left to start reading.<br />
+                  Focus mode and reading tweaks stay with you automatically.
+                </p>
+              </div>
+            </div>
+          )}
+        </AnimatePresence>
+      </main>
+
+      <KeyboardShortcutsButton onClick={openShortcuts} />
+      <KeyboardShortcutsModal open={isShortcutsOpen} onClose={closeShortcuts} />
+    </div>
   );
 }
 

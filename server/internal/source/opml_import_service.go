@@ -27,7 +27,7 @@ func (s *SourceService) ImportOPML(ctx context.Context, userID int64, feeds []Fl
 				continue
 			}
 
-			_, err := s.Create(context.Background(), userID, feed.XMLURL)
+			_, err := s.Create(context.Background(), userID, feed.XMLURL, feed.Folder)
 			if err != nil {
 				if isUniqueViolation(err) {
 					status.Skipped++
@@ -60,7 +60,7 @@ func (s *SourceService) ImportOPMLSync(ctx context.Context, userID int64, feeds 
 			status.Failed++
 			continue
 		}
-		_, err := s.Create(ctx, userID, feed.XMLURL)
+		_, err := s.Create(ctx, userID, feed.XMLURL, feed.Folder)
 		if err != nil {
 			if isUniqueViolation(err) {
 				status.Skipped++

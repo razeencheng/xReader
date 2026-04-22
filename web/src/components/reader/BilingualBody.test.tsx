@@ -1,43 +1,53 @@
 import { render, screen } from '@testing-library/react';
-import { BilingualBody } from './BilingualBody';
+import userEvent from '@testing-library/user-event';
 
-const createSSEClient = vi.fn();
+const useLazyTranslation = vi.fn();
 
-vi.mock('@/lib/sse-client', () => ({
-  createSSEClient: (...args: unknown[]) => createSSEClient(...args),
+vi.mock('@/hooks/useLazyTranslation', () => ({
+  useLazyTranslation: (...args: unknown[]) => useLazyTranslation(...args),
 }));
+
+import { BilingualBody } from './BilingualBody';
 
 const contentHtml = '<p>First paragraph</p><p>Second paragraph</p>';
 
-afterEach(() => {
-  createSSEClient.mockReset();
+beforeEach(() => {
+  useLazyTranslation.mockReset();
 });
 
-test('renders original content when same language without SSE connection', () => {
+test('renders original paragraphs without translation controls in same-language mode', () => {
+  useLazyTranslation.mockReturnValue({
+    translations: new Map(),
+    observeRef: () => () => undefined,
+  });
+
   render(
     <BilingualBody articleId={1} contentHtml={contentHtml} language="zh-CN" nativeLanguage="zh" />,
   );
 
   expect(screen.getByText('First paragraph')).toBeInTheDocument();
   expect(screen.getByText('Second paragraph')).toBeInTheDocument();
-  expect(createSSEClient).not.toHaveBeenCalled();
+  expect(screen.queryByRole('button', { name: /Translate paragraph/i })).not.toBeInTheDocument();
 });
 
-test('renders paragraphs with data-paragraph-index attributes', () => {
-  createSSEClient.mockReturnValue({
-    onParagraph: vi.fn(),
-    onDone: vi.fn(),
-    onError: vi.fn(),
-    close: vi.fn(),
+test('toggles paragraph translation from a dedicated button', async () => {
+  useLazyTranslation.mockReturnValue({
+    translations: new Map([[0, '第一段翻译']]),
+    observeRef: () => () => undefined,
   });
 
-  const { container } = render(
-    <BilingualBody articleId={1} contentHtml={contentHtml} language="ja" nativeLanguage="zh-CN" />,
+  const user = userEvent.setup();
+  render(
+    <BilingualBody articleId={1} contentHtml={contentHtml} language="en" nativeLanguage="zh-CN" />,
   );
 
-  const paragraphs = container.querySelectorAll('[data-paragraph-index]');
+  const buttons = screen.getAllByRole('button', { name: /Translate paragraph/i });
+  expect(buttons).toHaveLength(2);
 
-  expect(paragraphs).toHaveLength(2);
-  expect(screen.getByText('First paragraph')).toBeInTheDocument();
-  expect(screen.getByText('Second paragraph')).toBeInTheDocument();
+  await user.click(buttons[0]);
+  expect(screen.getByText('第一段翻译')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Hide translation/i })).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: /Hide translation/i }));
+  expect(screen.queryByText('第一段翻译')).not.toBeInTheDocument();
 });

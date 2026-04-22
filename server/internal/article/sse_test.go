@@ -39,12 +39,14 @@ func TestSSE_ServesCachedTranslation(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Contains(t, w.Header().Get("Content-Type"), "text/event-stream")
-	require.Contains(t, w.Body.String(), `data: {"index":0,"original":"First","translation":"第一段","type":"paragraph"}`)
-	require.Contains(t, w.Body.String(), `data: {"index":1,"original":"Second","translation":"第二段","type":"paragraph"}`)
-	require.Contains(t, w.Body.String(), `data: {"type":"done"}`)
+	require.Contains(t, w.Body.String(), `event: paragraph`)
+	require.Contains(t, w.Body.String(), `data: {"index":0,"original":"First","translation":"第一段"}`)
+	require.Contains(t, w.Body.String(), `data: {"index":1,"original":"Second","translation":"第二段"}`)
+	require.Contains(t, w.Body.String(), `event: done`)
+	require.Contains(t, w.Body.String(), `data: {}`)
 }
 
-func TestSSE_StartsJobForNewRequest(t *testing.T) {
+func TestSSE_StreamsTranslationForNewRequest(t *testing.T) {
 	r, _, queries, pool, userID, sourceID, cleanup := setupArticleHandlerTest(t)
 	t.Cleanup(cleanup)
 
@@ -60,11 +62,14 @@ func TestSSE_StartsJobForNewRequest(t *testing.T) {
 	require.NoError(t, err)
 	r.ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusAccepted, w.Code)
-	require.JSONEq(t, `{"status":"started"}`, w.Body.String())
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Header().Get("Content-Type"), "text/event-stream")
+	require.Contains(t, w.Body.String(), `event: paragraph`)
+	require.Contains(t, w.Body.String(), `data: {"index":0,"original":"new","translation":""}`)
+	require.Contains(t, w.Body.String(), `event: done`)
 }
 
-func TestSSE_ProcessingReturns202(t *testing.T) {
+func TestSSE_ProcessingStreamsTranslation(t *testing.T) {
 	r, _, queries, pool, userID, sourceID, cleanup := setupArticleHandlerTest(t)
 	t.Cleanup(cleanup)
 
@@ -82,6 +87,9 @@ func TestSSE_ProcessingReturns202(t *testing.T) {
 	require.NoError(t, err)
 	r.ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusAccepted, w.Code)
-	require.JSONEq(t, `{"status":"processing"}`, w.Body.String())
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Header().Get("Content-Type"), "text/event-stream")
+	require.Contains(t, w.Body.String(), `event: paragraph`)
+	require.Contains(t, w.Body.String(), `data: {"index":0,"original":"processing","translation":""}`)
+	require.Contains(t, w.Body.String(), `event: done`)
 }
