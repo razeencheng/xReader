@@ -1,9 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { CalendarDays, Globe, List, RadioTower, Settings, Star } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { CalendarDays, Globe, Keyboard, List, RadioTower, Settings, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUIStore, type ViewTab } from '@/stores/useUIStore';
+import { KeyboardShortcutsModal } from '@/components/layout/KeyboardShortcutsModal';
 
 const LANGUAGE_OPTIONS = [
   { code: 'zh-CN', label: '中文', name: 'Chinese', short: 'ZH' },
@@ -73,6 +75,8 @@ function LanguageModal({
 
 export function Sidebar({ className = '' }: { className?: string }) {
   const [isLanguageOpen, setIsLanguageOpen] = useState(false);
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  const router = useRouter();
   const currentView = useUIStore((state) => state.currentView);
   const setCurrentView = useUIStore((state) => state.setCurrentView);
   const nativeLanguage = useUIStore((state) => state.nativeLanguage);
@@ -122,6 +126,15 @@ export function Sidebar({ className = '' }: { className?: string }) {
 
         <button
           type="button"
+          title="快捷键"
+          onClick={() => setIsShortcutsOpen(true)}
+          className="mb-1 flex h-9 w-9 items-center justify-center rounded-[9px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
+        >
+          <Keyboard size={16} strokeWidth={1.75} />
+        </button>
+
+        <button
+          type="button"
           title={`Native language: ${currentLanguage.name}`}
           onClick={() => setIsLanguageOpen(true)}
           className="flex h-9 w-9 flex-col items-center justify-center gap-[1px] rounded-[9px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
@@ -135,6 +148,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
         <button
           type="button"
           title="Settings"
+          onClick={() => router.push('/settings')}
           className="flex h-9 w-9 items-center justify-center rounded-[9px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
         >
           <Settings size={17} strokeWidth={1.75} />
@@ -148,6 +162,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
           onClose={() => setIsLanguageOpen(false)}
         />
       ) : null}
+      <KeyboardShortcutsModal open={isShortcutsOpen} onClose={() => setIsShortcutsOpen(false)} />
     </>
   );
 }

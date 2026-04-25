@@ -331,7 +331,7 @@ function ReaderContent({ id }: { id: string }) {
         total={total}
         markRead={markRead}
       />
-      <KeyboardShortcutsButton onClick={openShortcuts} />
+      <KeyboardShortcutsButton onClick={openShortcuts} className="md:hidden" />
       <KeyboardShortcutsModal open={isShortcutsOpen} onClose={closeShortcuts} />
       <TweaksPanel />
     </div>

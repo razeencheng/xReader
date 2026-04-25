@@ -188,7 +188,7 @@ function FeedPageContent() {
         </AnimatePresence>
       </main>
 
-      <KeyboardShortcutsButton onClick={openShortcuts} />
+      <KeyboardShortcutsButton onClick={openShortcuts} className="md:hidden" />
       <KeyboardShortcutsModal open={isShortcutsOpen} onClose={closeShortcuts} />
     </div>
   );

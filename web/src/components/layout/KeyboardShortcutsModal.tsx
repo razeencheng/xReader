@@ -48,7 +48,7 @@ export function KeyboardShortcutsButton({
       onClick={onClick}
       title="Keyboard shortcuts (?)"
       aria-label="Open keyboard shortcuts"
-      className={`fixed bottom-4 left-4 z-[90] inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[rgba(248,244,238,0.92)] px-3 py-2 text-[11px] text-[var(--text-3)] shadow-[0_16px_40px_rgba(65,52,35,0.12)] backdrop-blur transition-colors hover:bg-[var(--bg)] hover:text-[var(--text-2)] ${className}`}
+      className={`fixed bottom-4 left-4 md:left-[68px] z-[90] inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[rgba(248,244,238,0.92)] px-3 py-2 text-[11px] text-[var(--text-3)] shadow-[0_16px_40px_rgba(65,52,35,0.12)] backdrop-blur transition-colors hover:bg-[var(--bg)] hover:text-[var(--text-2)] ${className}`}
     >
       <Keyboard size={13} />
       <span className="font-medium">快捷键</span>

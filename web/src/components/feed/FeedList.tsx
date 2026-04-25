@@ -10,7 +10,6 @@ import { useUIStore, type ReadFilter } from '@/stores/useUIStore';
 import { FeedRowComfortable } from './FeedRowComfortable';
 import { FeedRowCompact } from './FeedRowCompact';
 import { FeedSkeleton, CompactSkeleton } from './FeedSkeleton';
-import { DensityToggle } from './DensityToggle';
 import { getSourceColor } from '@/lib/source-meta';
 import type { ArticleItem, ArticleTab, Source } from '@/lib/types';
 
@@ -116,36 +115,30 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
           <span className="text-[14px] font-semibold text-[var(--text)]">{headerLabel}</span>
         </div>
 
-        <div className="flex items-center justify-between gap-2">
-          {showReadFilters ? (
-            <div className="flex gap-0.5">
-              {READ_FILTERS.map(({ id, label }) => {
-                const active = readFilter === id;
-                const count = counts[id];
+        {showReadFilters ? (
+          <div className="flex gap-0.5">
+            {READ_FILTERS.map(({ id, label }) => {
+              const active = readFilter === id;
+              const count = counts[id];
 
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setReadFilter(id)}
-                    className={`inline-flex items-center gap-1 rounded-md px-2 py-[3px] text-[11.5px] transition-colors ${
-                      active
-                        ? 'bg-[var(--accent-bg)] font-semibold text-[var(--accent)]'
-                        : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)]'
-                    }`}
-                  >
-                    {label}
-                    <span className="text-[10px] opacity-75">{count}</span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div />
-          )}
-
-          <DensityToggle />
-        </div>
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setReadFilter(id)}
+                  className={`inline-flex items-center gap-1 rounded-md px-2 py-[3px] text-[11.5px] transition-colors ${
+                    active
+                      ? 'bg-[var(--accent-bg)] font-semibold text-[var(--accent)]'
+                      : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)]'
+                  }`}
+                >
+                  {label}
+                  <span className="text-[10px] opacity-75">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
       </header>
 
       <div className="flex-1 overflow-y-auto">
