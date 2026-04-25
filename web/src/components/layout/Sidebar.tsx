@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Globe, Keyboard, Settings } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { LanguageModal } from '@/components/layout/LanguageModal';
@@ -19,6 +19,7 @@ const NAV_LABEL_KEYS = {
 export function Sidebar({ className = '' }: { className?: string }) {
   const [isLanguageOpen, setIsLanguageOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
   const currentView = useUIStore((state) => state.currentView);
   const setCurrentView = useUIStore((state) => state.setCurrentView);
   const nativeLanguage = useUIStore((state) => state.nativeLanguage);
@@ -30,6 +31,13 @@ export function Sidebar({ className = '' }: { className?: string }) {
     () => getLanguageOption(nativeLanguage),
     [nativeLanguage],
   );
+
+  const handleSelectView = (view: typeof PRIMARY_NAV_ITEMS[number]['id']) => {
+    setCurrentView(view, view === 'sources' ? null : undefined);
+    if (pathname !== '/') {
+      router.push('/');
+    }
+  };
 
   return (
     <>
@@ -47,7 +55,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
                 key={item.id}
                 type="button"
                 title={t(NAV_LABEL_KEYS[item.id])}
-                onClick={() => setCurrentView(item.id)}
+                onClick={() => handleSelectView(item.id)}
                 className={`relative flex h-9 w-9 items-center justify-center rounded-[9px] transition-colors ${
                   active
                     ? 'text-[var(--accent)]'
