@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { isLanguageOptionActive, LANGUAGE_OPTIONS } from '@/components/layout/navigationConfig';
 import { useI18n } from '@/lib/i18n';
 
@@ -14,12 +15,28 @@ export function LanguageModal({
 }) {
   const { t } = useI18n();
 
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape' || event.key === 'Esc') {
+        onClose();
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [onClose]);
+
   return (
     <div
       className="fixed inset-0 z-[120] flex items-center justify-center bg-black/30 px-4 backdrop-blur-[3px]"
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('language.title')}
         className="w-full max-w-[320px] rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.18)]"
         onClick={(event) => event.stopPropagation()}
       >
