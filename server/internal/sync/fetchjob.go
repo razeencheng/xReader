@@ -26,6 +26,7 @@ func NewFetchJob(pool *pgxpool.Pool, adapter source.SourceAdapter) *FetchJob {
 }
 
 func (j *FetchJob) Run(ctx context.Context, src gen.Source) (inserted int, articleIDs []int64, err error) {
+	isInitialFetch := !src.LastSuccessAt.Valid
 	adapterSrc := source.Source{
 		ID:            src.ID,
 		URL:           src.Url,
@@ -89,6 +90,12 @@ func (j *FetchJob) Run(ctx context.Context, src gen.Source) (inserted int, artic
 		}
 		articleIDs = append(articleIDs, article.ID)
 		inserted++
+	}
+
+	if isInitialFetch {
+		if _, markErr := j.queries.MarkInitialSourceBacklogRead(ctx, src.ID); markErr != nil {
+			return inserted, articleIDs, fmt.Errorf("mark initial backlog read for source %d: %w", src.ID, markErr)
+		}
 	}
 
 	if updateErr := j.queries.UpdateSourceFetchStatus(ctx, gen.UpdateSourceFetchStatusParams{

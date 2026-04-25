@@ -13,6 +13,13 @@ RETURNING *;
 SELECT * FROM articles
 WHERE id = $1;
 
+-- name: UpdateArticleContent :one
+UPDATE articles
+SET content_html = $2,
+    content_text = $3
+WHERE id = $1
+RETURNING *;
+
 -- name: ListArticlesBySource :many
 SELECT * FROM articles
 WHERE source_id = $1

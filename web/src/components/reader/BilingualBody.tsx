@@ -18,6 +18,7 @@ const BLOCK_TAGS = new Set([
   'aside',
   'blockquote',
   'div',
+  'details',
   'figure',
   'footer',
   'h1',
@@ -37,7 +38,8 @@ const BLOCK_TAGS = new Set([
   'ul',
 ]);
 
-const WRAPPER_TAGS = new Set(['article', 'aside', 'div', 'footer', 'header', 'main', 'ol', 'section', 'ul']);
+const WRAPPER_TAGS = new Set(['article', 'aside', 'div', 'footer', 'header', 'main', 'section']);
+const SKIP_EMPTY_TAGS = new Set(['br', 'ins']);
 
 function escapeHtml(text: string) {
   return text
@@ -46,6 +48,13 @@ function escapeHtml(text: string) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+}
+
+function primaryTagFromHtml(html: string) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<body>${html}</body>`, 'text/html');
+  const firstElement = doc.body.firstElementChild;
+  return firstElement?.tagName.toLowerCase() ?? 'p';
 }
 
 function splitContentHtml(contentHtml: string) {
@@ -72,6 +81,10 @@ function splitContentHtml(contentHtml: string) {
 
     const element = node as HTMLElement;
     const tag = element.tagName.toLowerCase();
+
+    if (SKIP_EMPTY_TAGS.has(tag) && !element.textContent?.trim()) {
+      return;
+    }
 
     if (WRAPPER_TAGS.has(tag)) {
       Array.from(element.childNodes).forEach(traverseNodes);
@@ -122,9 +135,10 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
   };
 
   return (
-    <div className="space-y-[1.6em]">
+    <div className="reader-content">
       {paragraphs.map((paragraph, index) => {
         const isCode = /<pre|<code/i.test(paragraph);
+        const blockTag = primaryTagFromHtml(paragraph);
         const translation = translations.get(index);
         const isOpen = openTranslations.has(index);
         const isLoading = isOpen && !translation;
@@ -133,6 +147,7 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
           return (
             <div
               key={index}
+              data-block-tag={blockTag}
               className="overflow-x-auto rounded-lg border border-[var(--border-light)] bg-[var(--bg-surface)] p-4 font-mono text-[13.5px] leading-[1.6] text-[var(--text-primary)]"
               dangerouslySetInnerHTML={{ __html: paragraph }}
             />
@@ -140,7 +155,14 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
         }
 
         return (
-          <div key={index} ref={observeRef(index)} data-layer="original" data-paragraph-index={index} style={{ fontFamily: originalFont }}>
+          <div
+            key={index}
+            ref={observeRef(index)}
+            data-block-tag={blockTag}
+            data-layer="original"
+            data-paragraph-index={index}
+            style={{ fontFamily: originalFont }}
+          >
             <div dangerouslySetInnerHTML={{ __html: paragraph }} />
 
             {!sameLanguage ? (

@@ -16,12 +16,13 @@ import (
 var errNotFound = errors.New("not found")
 
 type ArticleService struct {
-	pool    *pgxpool.Pool
-	queries *gen.Queries
+	pool           *pgxpool.Pool
+	queries        *gen.Queries
+	originalLoader func(context.Context, string) (OriginalContent, error)
 }
 
 func NewArticleService(pool *pgxpool.Pool) *ArticleService {
-	return &ArticleService{pool: pool, queries: gen.New(pool)}
+	return &ArticleService{pool: pool, queries: gen.New(pool), originalLoader: fetchOriginalContent}
 }
 
 type EnrichedArticle struct {
@@ -224,19 +225,22 @@ func (s *ArticleService) UpdateProgress(ctx context.Context, userID, articleID i
 	})
 }
 
-func (s *ArticleService) BatchMarkRead(ctx context.Context, userID int64, scope string) error {
+func (s *ArticleService) BatchSetRead(ctx context.Context, userID int64, scope string, isRead bool) ([]int64, error) {
 	scope = strings.TrimSpace(scope)
 	if scope == "tab:today" {
-		return s.queries.BatchMarkReadToday(ctx, userID)
+		return s.queries.BatchSetReadToday(ctx, gen.BatchSetReadTodayParams{UserID: userID, IsRead: isRead})
+	}
+	if scope == "tab:stream" || scope == "tab:all" {
+		return s.queries.BatchSetReadStream(ctx, gen.BatchSetReadStreamParams{UserID: userID, IsRead: isRead})
 	}
 	if after, ok := strings.CutPrefix(scope, "source:"); ok {
 		sourceID, err := strconv.ParseInt(after, 10, 64)
 		if err != nil {
-			return fmt.Errorf("invalid scope: %s", scope)
+			return nil, fmt.Errorf("invalid scope: %s", scope)
 		}
-		return s.queries.BatchMarkReadBySource(ctx, gen.BatchMarkReadBySourceParams{UserID: userID, ID: sourceID})
+		return s.queries.BatchSetReadBySource(ctx, gen.BatchSetReadBySourceParams{UserID: userID, ID: sourceID, IsRead: isRead})
 	}
-	return fmt.Errorf("unknown scope: %s", scope)
+	return nil, fmt.Errorf("unknown scope: %s", scope)
 }
 
 func (s *ArticleService) ListChanges(ctx context.Context, userID int64, since time.Time) ([]gen.ListStateChangesSinceRow, error) {
@@ -248,6 +252,25 @@ func (s *ArticleService) ListChanges(ctx context.Context, userID int64, since ti
 
 func (s *ArticleService) GetState(ctx context.Context, userID, articleID int64) (gen.ArticleState, error) {
 	return s.queries.GetArticleState(ctx, gen.GetArticleStateParams{UserID: userID, ArticleID: articleID})
+}
+
+func (s *ArticleService) LoadOriginal(ctx context.Context, userID, articleID int64) (OriginalContent, error) {
+	article, err := s.GetByID(ctx, userID, articleID)
+	if err != nil {
+		return OriginalContent{}, err
+	}
+	content, err := s.originalLoader(ctx, article.Link)
+	if err != nil {
+		return OriginalContent{}, err
+	}
+	if _, err := s.queries.UpdateArticleContent(ctx, gen.UpdateArticleContentParams{
+		ID:          article.ID,
+		ContentHtml: content.ContentHTML,
+		ContentText: content.ContentText,
+	}); err != nil {
+		return OriginalContent{}, err
+	}
+	return content, nil
 }
 
 func (s *ArticleService) withTx(ctx context.Context, fn func(*gen.Queries) error) error {

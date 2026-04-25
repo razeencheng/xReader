@@ -150,7 +150,9 @@ func TestBatchMarkRead_Today(t *testing.T) {
 	ctx := context.Background()
 
 	article := insertArticleForTest(t, queries, ctx, sourceID, "today", time.Now().Add(-time.Hour))
-	require.NoError(t, svc.BatchMarkRead(ctx, userID, "tab:today"))
+	updated, err := svc.BatchSetRead(ctx, userID, "tab:today", true)
+	require.NoError(t, err)
+	require.Contains(t, updated, article.ID)
 
 	state, err := gen.New(pool).GetArticleState(ctx, gen.GetArticleStateParams{UserID: userID, ArticleID: article.ID})
 	require.NoError(t, err)

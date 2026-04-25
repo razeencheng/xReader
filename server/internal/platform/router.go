@@ -83,9 +83,11 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		articleH := article.NewArticleHandler(articleSvc)
 		authed.GET("/articles", articleH.List)
 		authed.GET("/articles/:id", articleH.GetByID)
+		authed.POST("/articles/:id/original", articleH.LoadOriginal)
 		authed.PATCH("/articles/:id/state", articleH.UpdateState)
 		authed.PUT("/articles/:id/progress", articleH.UpdateProgress)
 		authed.POST("/articles/batch-state", articleH.BatchState)
+		authed.POST("/articles/batch/state", articleH.BatchState)
 		authed.GET("/articles/changes", articleH.Changes)
 
 		// Article AI

@@ -1,6 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
+import Link from 'next/link';
+import { Plus } from 'lucide-react';
 import { useUIStore } from '@/stores/useUIStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useQuery } from '@tanstack/react-query';
@@ -75,7 +77,7 @@ export function SourceBrowser() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full w-[300px] flex-col gap-3 border-r border-[var(--border)] bg-[var(--bg)] px-4 py-4">
+      <div className="flex h-full w-full flex-col gap-3 border-r border-[var(--border)] bg-[var(--bg)] px-4 py-4 md:w-[300px]">
         <div className="h-10 animate-pulse rounded-xl bg-[var(--bg-hover)]" />
         <div className="h-9 animate-pulse rounded-xl bg-[var(--bg-hover)]" />
         <div className="space-y-2 pt-2">
@@ -92,13 +94,24 @@ export function SourceBrowser() {
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.18, ease: 'easeOut' }}
-      className="flex h-full w-[300px] flex-col overflow-hidden border-r border-[var(--border)] bg-[var(--bg)]"
+      className="flex h-full w-full flex-col overflow-hidden border-r border-[var(--border)] bg-[var(--bg)] md:w-[300px]"
     >
       <header className="shrink-0 border-b border-[var(--border-light)] px-4 pb-[10px] pt-[11px]">
-        <h1 className="text-[14px] font-semibold text-[var(--text)]">Sources</h1>
-        <p className="mt-[2px] text-[11.5px] text-[var(--text-3)]">
-          {totalUnread} unread · {sources.length} feeds
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-[14px] font-semibold text-[var(--text)]">Sources</h1>
+            <p className="mt-[2px] text-[11.5px] text-[var(--text-3)]">
+              {totalUnread} unread · {sources.length} feeds
+            </p>
+          </div>
+          <Link
+            href="/sources"
+            className="inline-flex shrink-0 items-center gap-1 rounded-[9px] border border-[var(--border)] bg-[var(--bg-panel)] px-2.5 py-1.5 text-[11.5px] font-medium text-[var(--text-2)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--accent)]"
+          >
+            <Plus size={13} strokeWidth={1.9} />
+            添加
+          </Link>
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto pb-2">

@@ -108,6 +108,62 @@ func TestArticleHandler_ListAndDetail(t *testing.T) {
 	require.Equal(t, "<p>hello world</p>", detailResp["content_html"])
 }
 
+func TestArticleHandler_LoadOriginalUsesArticleLink(t *testing.T) {
+	r, handler, queries, _, userID, sourceID, cleanup := setupArticleHandlerTest(t)
+	t.Cleanup(cleanup)
+	ctx := context.Background()
+
+	article := insertHandlerArticle(t, queries, ctx, sourceID, "summary-only", time.Now())
+	handler.Service.originalLoader = func(_ context.Context, rawURL string) (OriginalContent, error) {
+		require.Equal(t, article.Link, rawURL)
+		return OriginalContent{
+			URL:         rawURL,
+			Title:       "Original title",
+			ContentHTML: "<p>Full original paragraph with enough readable text.</p>",
+			ContentText: "Full original paragraph with enough readable text.",
+		}, nil
+	}
+
+	r.Use(withArticleUser(userID))
+	r.POST("/api/articles/:id/original", handler.LoadOriginal)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", fmt.Sprintf("/api/articles/%d/original", article.ID), nil)
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	require.Equal(t, article.Link, resp["url"])
+	require.Equal(t, "Original title", resp["title"])
+	require.Equal(t, "<p>Full original paragraph with enough readable text.</p>", resp["content_html"])
+}
+
+func TestArticleService_LoadOriginalPersistsContent(t *testing.T) {
+	_, handler, queries, _, userID, sourceID, cleanup := setupArticleHandlerTest(t)
+	t.Cleanup(cleanup)
+	ctx := context.Background()
+
+	article := insertHandlerArticle(t, queries, ctx, sourceID, "summary-persist", time.Now())
+	handler.Service.originalLoader = func(_ context.Context, rawURL string) (OriginalContent, error) {
+		require.Equal(t, article.Link, rawURL)
+		return OriginalContent{
+			URL:         rawURL,
+			Title:       "Original title",
+			ContentHTML: "<p>Persisted full original content with enough readable text.</p><p>Another paragraph.</p>",
+			ContentText: "Persisted full original content with enough readable text. Another paragraph.",
+		}, nil
+	}
+
+	_, err := handler.Service.LoadOriginal(ctx, userID, article.ID)
+	require.NoError(t, err)
+
+	updated, err := queries.GetArticleByID(ctx, article.ID)
+	require.NoError(t, err)
+	require.Equal(t, "<p>Persisted full original content with enough readable text.</p><p>Another paragraph.</p>", updated.ContentHtml)
+	require.Equal(t, "Persisted full original content with enough readable text. Another paragraph.", updated.ContentText)
+}
+
 func TestArticleHandler_UpdateStateAndProgress(t *testing.T) {
 	r, handler, queries, pool, userID, sourceID, cleanup := setupArticleHandlerTest(t)
 	t.Cleanup(cleanup)
@@ -180,4 +236,33 @@ func TestArticleHandler_BatchAndChanges(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &changesResp))
 	items := changesResp["items"].([]any)
 	require.NotEmpty(t, items)
+}
+
+func TestArticleHandler_BatchCanUndoSourceReadState(t *testing.T) {
+	r, handler, queries, pool, userID, sourceID, cleanup := setupArticleHandlerTest(t)
+	t.Cleanup(cleanup)
+	ctx := context.Background()
+
+	article := insertHandlerArticle(t, queries, ctx, sourceID, "batch-undo", time.Now())
+
+	r.Use(withArticleUser(userID))
+	r.POST("/api/articles/batch/state", handler.BatchState)
+
+	body, _ := json.Marshal(map[string]any{"scope": fmt.Sprintf("source:%d", sourceID), "is_read": true})
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/articles/batch/state", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	body, _ = json.Marshal(map[string]any{"scope": fmt.Sprintf("source:%d", sourceID), "is_read": false})
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/articles/batch/state", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	state, err := gen.New(pool).GetArticleState(ctx, gen.GetArticleStateParams{UserID: userID, ArticleID: article.ID})
+	require.NoError(t, err)
+	require.False(t, state.IsRead)
 }

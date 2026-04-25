@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FeedList } from '@/components/feed/FeedList';
 import { ArticleView } from '@/components/reader/ArticleView';
 import { SourceBrowser } from '@/components/layout/SourceBrowser';
-import { KeyboardShortcutsButton, KeyboardShortcutsModal } from '@/components/layout/KeyboardShortcutsModal';
+import { KeyboardShortcutsModal } from '@/components/layout/KeyboardShortcutsModal';
 import { apiFetch } from '@/lib/api-client';
 import { applyArticleStateChange } from '@/lib/article-state-cache';
 import { broadcast } from '@/lib/broadcast';
@@ -37,13 +37,13 @@ function FeedPageContent() {
     enabled: !showSourceBrowser,
   });
   const items = useMemo(() => data?.pages.flatMap((page) => page.items) ?? [], [data]);
+  const selectedArticleId = selectedId ? Number(selectedId) : null;
   const filteredItems = useMemo(() => {
     if (currentView === 'starred') return items;
-    if (readFilter === 'unread') return items.filter((item) => !item.is_read);
+    if (readFilter === 'unread') return items.filter((item) => !item.is_read || item.id === selectedArticleId);
     if (readFilter === 'read') return items.filter((item) => item.is_read);
     return items;
-  }, [currentView, items, readFilter]);
-  const selectedArticleId = selectedId ? Number(selectedId) : null;
+  }, [currentView, items, readFilter, selectedArticleId]);
   const currentIndex = filteredItems.findIndex((item) => item.id === selectedArticleId);
   const currentArticle = currentIndex >= 0 ? filteredItems[currentIndex] : null;
 
@@ -102,7 +102,7 @@ function FeedPageContent() {
     [filteredItems],
   );
 
-  const { isShortcutsOpen, openShortcuts, closeShortcuts } = useReaderShortcuts({
+  const { isShortcutsOpen, closeShortcuts } = useReaderShortcuts({
     onNext: () => {
       if (currentIndex < filteredItems.length - 1) {
         selectArticleAtIndex(currentIndex + 1);
@@ -132,7 +132,9 @@ function FeedPageContent() {
           pointerEvents: focusMode ? 'none' : 'auto',
         }}
         transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-        className="relative z-20 flex h-full shrink-0 overflow-hidden border-r border-[var(--border)] bg-[var(--bg)]"
+        className={`relative z-20 h-full shrink-0 overflow-hidden border-r border-[var(--border)] bg-[var(--bg)] ${
+          selectedId ? 'hidden md:flex' : 'flex w-full md:w-auto'
+        }`}
       >
         <AnimatePresence mode="popLayout" initial={false}>
           {showSourceBrowser ? (
@@ -161,7 +163,7 @@ function FeedPageContent() {
         </AnimatePresence>
       </motion.div>
 
-      <main className="relative h-full min-w-0 flex-1 overflow-hidden bg-[var(--bg)]">
+      <main className={`relative h-full min-w-0 flex-1 overflow-hidden bg-[var(--bg)] ${selectedId ? 'block' : 'hidden md:block'}`}>
         <AnimatePresence mode="wait">
           {selectedId ? (
             <motion.div
@@ -188,7 +190,6 @@ function FeedPageContent() {
         </AnimatePresence>
       </main>
 
-      <KeyboardShortcutsButton onClick={openShortcuts} className="md:hidden" />
       <KeyboardShortcutsModal open={isShortcutsOpen} onClose={closeShortcuts} />
     </div>
   );

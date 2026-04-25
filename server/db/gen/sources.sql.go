@@ -32,7 +32,7 @@ VALUES (
     $1, $2, $3, $4, $5, $6, $7,
     $8, $9, $10, $11, $12, $13
 )
-RETURNING id, user_id, kind, url, normalized_url, title, icon_url, language_hint, last_fetched_at, last_success_at, consecutive_fails, health, category, created_at, deleted_at
+RETURNING id, user_id, kind, url, normalized_url, title, icon_url, language_hint, last_fetched_at, last_success_at, consecutive_fails, health, created_at, deleted_at, category
 `
 
 type CreateSourceParams struct {
@@ -81,15 +81,15 @@ func (q *Queries) CreateSource(ctx context.Context, arg CreateSourceParams) (Sou
 		&i.LastSuccessAt,
 		&i.ConsecutiveFails,
 		&i.Health,
-		&i.Category,
 		&i.CreatedAt,
 		&i.DeletedAt,
+		&i.Category,
 	)
 	return i, err
 }
 
 const getSourceByID = `-- name: GetSourceByID :one
-SELECT id, user_id, kind, url, normalized_url, title, icon_url, language_hint, last_fetched_at, last_success_at, consecutive_fails, health, category, created_at, deleted_at FROM sources
+SELECT id, user_id, kind, url, normalized_url, title, icon_url, language_hint, last_fetched_at, last_success_at, consecutive_fails, health, created_at, deleted_at, category FROM sources
 WHERE id = $1 AND deleted_at IS NULL
 `
 
@@ -109,15 +109,15 @@ func (q *Queries) GetSourceByID(ctx context.Context, id int64) (Source, error) {
 		&i.LastSuccessAt,
 		&i.ConsecutiveFails,
 		&i.Health,
-		&i.Category,
 		&i.CreatedAt,
 		&i.DeletedAt,
+		&i.Category,
 	)
 	return i, err
 }
 
 const listSourcesByUser = `-- name: ListSourcesByUser :many
-SELECT id, user_id, kind, url, normalized_url, title, icon_url, language_hint, last_fetched_at, last_success_at, consecutive_fails, health, category, created_at, deleted_at FROM sources
+SELECT id, user_id, kind, url, normalized_url, title, icon_url, language_hint, last_fetched_at, last_success_at, consecutive_fails, health, created_at, deleted_at, category FROM sources
 WHERE user_id = $1 AND deleted_at IS NULL
 ORDER BY created_at DESC
 `
@@ -144,9 +144,9 @@ func (q *Queries) ListSourcesByUser(ctx context.Context, userID int64) ([]Source
 			&i.LastSuccessAt,
 			&i.ConsecutiveFails,
 			&i.Health,
-			&i.Category,
 			&i.CreatedAt,
 			&i.DeletedAt,
+			&i.Category,
 		); err != nil {
 			return nil, err
 		}
@@ -159,7 +159,7 @@ func (q *Queries) ListSourcesByUser(ctx context.Context, userID int64) ([]Source
 }
 
 const listSourcesDueForFetch = `-- name: ListSourcesDueForFetch :many
-SELECT id, user_id, kind, url, normalized_url, title, icon_url, language_hint, last_fetched_at, last_success_at, consecutive_fails, health, category, created_at, deleted_at FROM sources
+SELECT id, user_id, kind, url, normalized_url, title, icon_url, language_hint, last_fetched_at, last_success_at, consecutive_fails, health, created_at, deleted_at, category FROM sources
 WHERE deleted_at IS NULL
   AND (
     last_fetched_at IS NULL
@@ -192,9 +192,9 @@ func (q *Queries) ListSourcesDueForFetch(ctx context.Context) ([]Source, error) 
 			&i.LastSuccessAt,
 			&i.ConsecutiveFails,
 			&i.Health,
-			&i.Category,
 			&i.CreatedAt,
 			&i.DeletedAt,
+			&i.Category,
 		); err != nil {
 			return nil, err
 		}
@@ -214,6 +214,22 @@ WHERE id = $1
 
 func (q *Queries) SoftDeleteSource(ctx context.Context, id int64) error {
 	_, err := q.db.Exec(ctx, softDeleteSource, id)
+	return err
+}
+
+const updateSourceCategory = `-- name: UpdateSourceCategory :exec
+UPDATE sources
+SET category = $2
+WHERE id = $1
+`
+
+type UpdateSourceCategoryParams struct {
+	ID       int64  `json:"id"`
+	Category string `json:"category"`
+}
+
+func (q *Queries) UpdateSourceCategory(ctx context.Context, arg UpdateSourceCategoryParams) error {
+	_, err := q.db.Exec(ctx, updateSourceCategory, arg.ID, arg.Category)
 	return err
 }
 
@@ -258,21 +274,5 @@ type UpdateSourceTitleParams struct {
 
 func (q *Queries) UpdateSourceTitle(ctx context.Context, arg UpdateSourceTitleParams) error {
 	_, err := q.db.Exec(ctx, updateSourceTitle, arg.ID, arg.Title)
-	return err
-}
-
-const updateSourceCategory = `-- name: UpdateSourceCategory :exec
-UPDATE sources
-SET category = $2
-WHERE id = $1
-`
-
-type UpdateSourceCategoryParams struct {
-	ID       int64  `json:"id"`
-	Category string `json:"category"`
-}
-
-func (q *Queries) UpdateSourceCategory(ctx context.Context, arg UpdateSourceCategoryParams) error {
-	_, err := q.db.Exec(ctx, updateSourceCategory, arg.ID, arg.Category)
 	return err
 }

@@ -24,7 +24,7 @@ v1 ships **this experience** powered by RSS sources and an AI pipeline. Non-RSS 
 v1 is considered done when the owner and their small group of invited users can, from a Mac laptop or mobile browser, do the following end-to-end without friction:
 
 1. Log in via GitHub (must be on the allowlist).
-2. Paste an RSS/Atom URL or import an OPML file → new source appears within seconds.
+2. Paste a domain, website URL, RSS/Atom URL, or import an OPML file → the app discovers the subscribable feed when possible and the new source appears within seconds.
 3. Open the home page → see today's items in a flat feed with titles translated into the user's native language and AI-summarized key points (要点) shown inline.
 4. Switch between **舒适** (Comfortable) and **紧凑** (Compact) feed density with a toggle or `C` keyboard shortcut.
 5. Click an item → reader view renders with clean typography, 要点 at the top, alternating-paragraph translation for non-native content.
@@ -129,6 +129,31 @@ Short items (tweets, HN comments — via RSS bridges):
 - Skip 要点 entirely; show the full text inline with translation if needed.
 - Classifier: items with `content_text` length < 280 chars are "short" → no summary.
 
+Source add UX:
+
+- The add-source input accepts a bare domain (`example.com`), a website homepage, or a direct RSS/Atom URL.
+- The server normalizes bare domains to HTTPS first, fetches the page, and discovers feeds from `<link rel="alternate" type="application/rss+xml|application/atom+xml">`.
+- If no linked feed is found, try common paths such as `/feed`, `/rss`, `/atom.xml`, `/feed.xml`, and `/index.xml`.
+- The UI must show progress below the input (for example: normalizing URL → checking homepage → testing discovered feeds → adding source). Failure must be explicit and actionable, not a silent disabled button.
+- First successful fetch for a newly added source must avoid creating historical unread debt. Keep articles unread if they are within the last 7 days or among the latest 20 items; mark older backlog items read automatically. The articles remain searchable and readable, but they do not pollute the user's unread queue.
+- After adding a source, the UI should explain this rule in plain language: "首次抓取会默认只保留最近 7 天或最新 20 篇为未读，其余历史文章会自动归档为已读。"
+
+Read / unread semantics:
+
+- **Unread** means the article is still in the user's triage queue. **Read** means the user has intentionally processed it enough that it can leave the queue.
+- Opening an article does **not** immediately mark it read. This avoids punishing accidental opens and lets users peek without losing queue state.
+- Auto-mark as read when there is meaningful engagement: current v1 threshold is scroll progress `>= 75%`. Future tuning may add time-on-page plus partial scroll, but plain open is not enough.
+- Quick mark-read is required on feed rows and via keyboard shortcut `E`. The action updates optimistically and syncs through the normal article state API.
+- Bulk mark-read is required for high-volume triage, but it should only appear when the user is actively triaging `Unread`. Place a compact `全部已读` button on the filter row where the bulk action affordance lives; hide it in `All`, `Read`, and `Starred`.
+- Clicking `全部已读` opens a small confirmation popover with the primary message `标记当前列表中的所有为已读`. The user must click `确认` before the batch API runs; `取消` closes the popover without side effects.
+- The batch scope follows the current logical list context and may include unread items that have not been paginated into the browser yet: Today uses `tab:today`, All/Stream uses `tab:stream` when viewed through Unread, and a selected source uses `source:<id>`.
+- Bulk mark-read only affects items that are currently unread, and the API must return the affected article IDs. Undo must restore exactly those IDs, not every article in the broad scope, so previously read items never become unread by accident.
+- Bulk actions should complete without a confirmation dialog, then show a toast/inline notice such as `已将当前视图 36 篇标为已读 · 撤销`. The undo window should last long enough to feel safe (5-8 seconds recommended for toast UIs; inline notices can remain until the next action).
+- In `Unread`, a just-read item must not disappear instantly. It first becomes visually muted, shows `已读 · 撤销`, and leaves the list after a short grace period (v1: 3 seconds).
+- `撤销` restores the item to unread, cancels the pending dismissal, and syncs the state back to the server.
+- In `All` and source views, read items stay visible with weaker opacity. In `Starred`, read state never removes an item from the view.
+- Counts reflect durable server/cache state, not the temporary grace-period visibility. Example: `Unread 9` can show a just-read row for a few seconds while the count already reflects 9.
+
 Keyboard shortcuts:
 
 - `J` / `↓` — next item
@@ -181,11 +206,21 @@ Layout:
 Interaction rules:
 
 - Navigating to next via J/→/next-up-card/bottom-bar **auto-marks the current item as read** (background call; UI advances immediately).
+- Scrolling past the read threshold in the reader marks the current item read, but the feed keeps the item visible briefly in `Unread` using the same `已读 · 撤销` grace-period pattern.
 - Prev / next traverse the **filter context the user entered from**. If user clicked into article from Today tab with "AI track" filter, prev/next stays within that filtered sequence. Store this in the URL query (e.g. `?ctx=today&filter=ai`).
 - Highlights: select text → floating toolbar (「高亮」「高亮 + 笔记」) → background-colored mark renders inline and persists. On reopen, highlights re-render at same offsets.
 - Highlights anchor to **paragraph index + character offsets** in the post-sanitization plain text; they render on whichever layer(s) the user highlighted (typically both, mirrored).
 - End-of-article "next up" card is shown unconditionally — even for short articles where it would appear above the fold.
 - Reader opens at a new route `/read/:article_id` so back button returns to the feed with scroll position preserved.
+
+Original-article loading rules:
+
+- Some RSS sources only expose an excerpt or one paragraph. When the article appears likely summary-only, show an inline `加载原文` action in the reader instead of forcing users to open a new tab.
+- `加载原文` fetches the article's canonical link through the backend, extracts the main content, sanitizes it, and returns reader-safe HTML.
+- A successful original load is persisted to `articles.content_html` and `articles.content_text`; reopening the article must not require another manual load.
+- The fetched page's site presentation is discarded. Strip source `class`, `style`, `id`, script, tracking, and unsafe embeds so the article inherits xReader typography and spacing.
+- Semantic structure is preserved: headings, paragraphs, ordered/unordered lists, blockquotes, code/pre blocks, figures/images, tables, and `details/summary` (commonly used for TOC) remain visible with xReader's reader stylesheet.
+- The reader should keep hierarchy without becoming a generic webview: source fonts and colors are not retained; xReader re-renders the document with consistent title, heading, paragraph, list, TOC, and code styles.
 
 ### 5.3 Settings page (minimal v1)
 
@@ -395,6 +430,7 @@ One implementation: `openai.Client` wrapping `net/http`. If the user swaps relay
 - OAuth state param for CSRF on the login callback.
 - Non-OAuth write endpoints: SameSite=Strict session cookie + custom `X-Requested-With: xhr` header (React sets it by default in fetch wrapper).
 - HTML sanitization of fetched RSS content using a whitelist library (e.g., `bluemonday` for Go). Strip `<script>`, on-event attrs, unsafe iframes.
+- Original-page fetching is server-side only and must protect against SSRF: allow only `http` / `https`, reject localhost, loopback, private, multicast, and link-local targets, enforce timeout and response-size limits, and accept HTML content only.
 - CSP: no inline scripts (Next.js can be configured with nonces), restrict connect-src to same origin + configured AI base URL if any direct calls needed (v1: no direct AI calls from the browser).
 - Image proxy: `GET /api/image-proxy?url=<enc>` — only proxies `image/*` MIME, max 5 MB, 7-day CDN cache.
 - `rel="noopener noreferrer"` on all outbound links.
@@ -568,7 +604,7 @@ Base: `/api/`. All write endpoints require session cookie; admin endpoints also 
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/sources` | List my sources |
-| POST | `/api/sources` | Add (`{url: "https://..."}`) — server fetches once, validates, persists |
+| POST | `/api/sources` | Add (`{url: "https://..."}`) — accepts domain, homepage, or feed URL; server discovers/validates feed, fetches once, persists |
 | PATCH | `/api/sources/:id` | Rename / recategorize |
 | DELETE | `/api/sources/:id` | Soft-delete |
 | POST | `/api/sources/import-opml` | Upload OPML; returns `job_id`; poll `/api/jobs/:job_id` for progress |
@@ -581,11 +617,12 @@ Base: `/api/`. All write endpoints require session cookie; admin endpoints also 
 |---|---|---|
 | GET | `/api/articles` | Paginated list. Query: `tab=today\|stream\|starred`, `source_id=`, `q=` (search), `cursor=` |
 | GET | `/api/articles/:id` | Single article, includes `article_ai.summary` and `title_translated` for current user's `native_language`. |
+| POST | `/api/articles/:id/original` | Fetch and persist original page content for summary-only RSS items; returns sanitized reader-safe content. |
 | GET | `/api/articles/:id/body-translation` | **SSE**. If cached, single event with full translation then close. If pending, stream paragraphs as translated. |
 | POST | `/api/articles/:id/body-translation/retry` | Re-run translation (e.g. after a failure) |
 | PATCH | `/api/articles/:id/state` | Update `is_read` / `is_starred` |
 | PUT | `/api/articles/:id/progress` | Save `reading_progress` |
-| POST | `/api/articles/batch/state` | Batch mark-read. Body: `{scope: "source:42" \| "tab:today", is_read: true}` |
+| POST | `/api/articles/batch/state` | Batch set read state. Body: `{scope: "source:42" \| "tab:today" \| "tab:stream", is_read: true\|false}`. Response includes affected `article_ids` for exact undo. |
 | GET | `/api/articles/changes?since=<iso>` | Polling endpoint for multi-device sync |
 
 ### 8.5 Highlights
@@ -856,6 +893,13 @@ Short references to what was accepted/rejected during the design conversation, s
 | No mobile swipe navigation | Owner explicit (Q7) — protects text selection for highlights |
 | "Next up" card always visible | Owner explicit (Q7) |
 | Prev/next follows entry context | Owner explicit (Q7) |
+| Opening article does not immediately mark read | Owner wanted accidental opens / peeks to be safe; read state means processed, not merely opened |
+| Just-read unread rows fade first, then disappear | Owner requested delayed disappearance so state changes are understandable and reversible |
+| New-source backlog defaults to read | Owner noted adding many sources creates too many unread items; unread should mean actionable new queue, not historical archive debt |
+| Bulk mark-read with exact undo | Owner needed a way to clear many low-interest items without one-by-one work; exact affected IDs prevent undo from flipping older read state |
+| Summary-only RSS supports `加载原文` in-reader | Owner observed sources like razeen.me expose only one RSS paragraph; preserving the reader context is preferred over opening the raw site |
+| Original content uses xReader typography, not source site styling | Owner wanted loaded originals to feel like the same reader while preserving semantic hierarchy such as headings, lists, and TOC |
+| Source add accepts domain/homepage/feed URL | Owner requested a novice-friendly flow that discovers feeds automatically from simple input |
 | RSS-only v1 | Scoping reframe — owner approved; X/V2EX = Phase 2 |
 | OpenAI-compatible AI client, config-driven | Owner has a relay station / wants flexibility |
 | No Obsidian sync v1 | Owner confirmed predecessor's feature was aspirational and unused |

@@ -95,9 +95,9 @@ type Source struct {
 	LastSuccessAt    pgtype.Timestamptz `json:"last_success_at"`
 	ConsecutiveFails int32              `json:"consecutive_fails"`
 	Health           string             `json:"health"`
-	Category         string             `json:"category"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
+	Category         string             `json:"category"`
 }
 
 type User struct {

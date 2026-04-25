@@ -146,3 +146,89 @@ func TestFetchJob_SuccessResetsFailCounter(t *testing.T) {
 	require.Equal(t, int32(0), updated.ConsecutiveFails)
 	require.Equal(t, "ok", updated.Health)
 }
+
+func TestFetchJob_FirstFetchMarksHistoricalBacklogRead(t *testing.T) {
+	ctx := context.Background()
+	pool, cleanup := testutil.SetupTestDB(t, ctx)
+	t.Cleanup(cleanup)
+
+	src := setupTestSource(t, pool, ctx)
+	now := time.Now()
+	items := make([]source.RawItem, 0, 25)
+	for i := 0; i < 25; i++ {
+		publishedAt := now.Add(-time.Duration(i+20) * 24 * time.Hour)
+		items = append(items, source.RawItem{
+			ExternalID:  fmt.Sprintf("old-%02d", i),
+			Link:        fmt.Sprintf("https://example.com/old-%02d", i),
+			Title:       fmt.Sprintf("Old Post %02d", i),
+			ContentHTML: "<p>old</p>",
+			PublishedAt: publishedAt,
+		})
+	}
+
+	job := NewFetchJob(pool, &mockAdapter{items: items})
+	inserted, _, err := job.Run(ctx, src)
+	require.NoError(t, err)
+	require.Equal(t, 25, inserted)
+
+	var unreadCount int
+	err = pool.QueryRow(ctx, `
+		SELECT count(*)
+		FROM articles a
+		LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $2
+		WHERE a.source_id = $1 AND (st.is_read IS NULL OR st.is_read = false)
+	`, src.ID, src.UserID).Scan(&unreadCount)
+	require.NoError(t, err)
+	require.Equal(t, 20, unreadCount)
+
+	var readCount int
+	err = pool.QueryRow(ctx, `
+		SELECT count(*)
+		FROM articles a
+		JOIN article_states st ON st.article_id = a.id AND st.user_id = $2
+		WHERE a.source_id = $1 AND st.is_read = true
+	`, src.ID, src.UserID).Scan(&readCount)
+	require.NoError(t, err)
+	require.Equal(t, 5, readCount)
+}
+
+func TestFetchJob_DoesNotApplyInitialBacklogRuleAfterFirstSuccess(t *testing.T) {
+	ctx := context.Background()
+	pool, cleanup := testutil.SetupTestDB(t, ctx)
+	t.Cleanup(cleanup)
+
+	src := setupTestSource(t, pool, ctx)
+	queries := gen.New(pool)
+	err := queries.UpdateSourceFetchStatus(ctx, gen.UpdateSourceFetchStatusParams{
+		ID:               src.ID,
+		LastFetchedAt:    pgtype.Timestamptz{Time: time.Now().Add(-time.Hour), Valid: true},
+		LastSuccessAt:    pgtype.Timestamptz{Time: time.Now().Add(-time.Hour), Valid: true},
+		ConsecutiveFails: 0,
+		Health:           "ok",
+	})
+	require.NoError(t, err)
+	src, err = queries.GetSourceByID(ctx, src.ID)
+	require.NoError(t, err)
+
+	oldItem := source.RawItem{
+		ExternalID:  "later-old",
+		Link:        "https://example.com/later-old",
+		Title:       "Later Old Post",
+		ContentHTML: "<p>old</p>",
+		PublishedAt: time.Now().Add(-90 * 24 * time.Hour),
+	}
+	job := NewFetchJob(pool, &mockAdapter{items: []source.RawItem{oldItem}})
+	inserted, _, err := job.Run(ctx, src)
+	require.NoError(t, err)
+	require.Equal(t, 1, inserted)
+
+	var unreadCount int
+	err = pool.QueryRow(ctx, `
+		SELECT count(*)
+		FROM articles a
+		LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $2
+		WHERE a.source_id = $1 AND (st.is_read IS NULL OR st.is_read = false)
+	`, src.ID, src.UserID).Scan(&unreadCount)
+	require.NoError(t, err)
+	require.Equal(t, 1, unreadCount)
+}

@@ -51,3 +51,24 @@ test('toggles paragraph translation from a dedicated button', async () => {
   await user.click(screen.getByRole('button', { name: /Hide translation/i }));
   expect(screen.queryByText('第一段翻译')).not.toBeInTheDocument();
 });
+
+test('marks semantic article blocks so the reader stylesheet can preserve hierarchy', () => {
+  useLazyTranslation.mockReturnValue({
+    translations: new Map(),
+    observeRef: () => () => undefined,
+  });
+
+  const { container } = render(
+    <BilingualBody
+      articleId={1}
+      contentHtml="<details><summary>目录</summary><ul><li>第一节</li></ul></details><h3>章节标题</h3><p>正文段落</p>"
+      language="zh-CN"
+      nativeLanguage="zh"
+    />,
+  );
+
+  expect(container.querySelector('.reader-content')).toBeInTheDocument();
+  expect(container.querySelector('[data-block-tag="details"] details')).toBeInTheDocument();
+  expect(container.querySelector('[data-block-tag="h3"] h3')).toHaveTextContent('章节标题');
+  expect(container.querySelector('[data-block-tag="p"] p')).toHaveTextContent('正文段落');
+});

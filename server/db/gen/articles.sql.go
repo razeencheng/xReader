@@ -155,6 +155,77 @@ func (q *Queries) ListArticlesBySource(ctx context.Context, sourceID int64) ([]A
 	return items, nil
 }
 
+const listArticlesBySourceEnriched = `-- name: ListArticlesBySourceEnriched :many
+SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
+       COALESCE(ai.title_translated, '') AS title_translated,
+       COALESCE(ai.summary, '') AS summary,
+       s.title AS source_title,
+       COALESCE(st.is_read, false) AS is_read,
+       COALESCE(st.is_starred, false) AS is_starred
+FROM articles a
+JOIN sources s ON a.source_id = s.id
+LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
+LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+WHERE a.source_id = $3
+ORDER BY a.published_at DESC
+`
+
+type ListArticlesBySourceEnrichedParams struct {
+	UserID         int64  `json:"user_id"`
+	TargetLanguage string `json:"target_language"`
+	SourceID       int64  `json:"source_id"`
+}
+
+type ListArticlesBySourceEnrichedRow struct {
+	ID              int64              `json:"id"`
+	SourceID        int64              `json:"source_id"`
+	Title           string             `json:"title"`
+	Link            string             `json:"link"`
+	Language        string             `json:"language"`
+	Author          pgtype.Text        `json:"author"`
+	PublishedAt     pgtype.Timestamptz `json:"published_at"`
+	ContentText     string             `json:"content_text"`
+	TitleTranslated string             `json:"title_translated"`
+	Summary         string             `json:"summary"`
+	SourceTitle     string             `json:"source_title"`
+	IsRead          bool               `json:"is_read"`
+	IsStarred       bool               `json:"is_starred"`
+}
+
+func (q *Queries) ListArticlesBySourceEnriched(ctx context.Context, arg ListArticlesBySourceEnrichedParams) ([]ListArticlesBySourceEnrichedRow, error) {
+	rows, err := q.db.Query(ctx, listArticlesBySourceEnriched, arg.UserID, arg.TargetLanguage, arg.SourceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListArticlesBySourceEnrichedRow{}
+	for rows.Next() {
+		var i ListArticlesBySourceEnrichedRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SourceID,
+			&i.Title,
+			&i.Link,
+			&i.Language,
+			&i.Author,
+			&i.PublishedAt,
+			&i.ContentText,
+			&i.TitleTranslated,
+			&i.Summary,
+			&i.SourceTitle,
+			&i.IsRead,
+			&i.IsStarred,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listArticlesStarred = `-- name: ListArticlesStarred :many
 SELECT a.id, a.source_id, a.external_id, a.link, a.normalized_link, a.title, a.language, a.content_html, a.content_text, a.author, a.published_at, a.fetched_at, a.search_vec FROM articles a
 JOIN article_states st ON a.id = st.article_id AND st.user_id = $1
@@ -511,191 +582,6 @@ func (q *Queries) ListArticlesTodayEnriched(ctx context.Context, arg ListArticle
 	return items, nil
 }
 
-const searchArticles = `-- name: SearchArticles :many
-SELECT a.id, a.source_id, a.title, a.link, a.language, a.published_at,
-       ts_headline('simple', a.title || ' ' || a.content_text, plainto_tsquery('simple', $2), 'MaxWords=20, MinWords=6') AS headline
-FROM articles a
-JOIN sources s ON a.source_id = s.id
-WHERE s.user_id = $1
-  AND a.search_vec @@ plainto_tsquery('simple', $2)
-ORDER BY ts_rank(a.search_vec, plainto_tsquery('simple', $2)) DESC
-LIMIT 100
-`
-
-type SearchArticlesParams struct {
-	UserID         int64  `json:"user_id"`
-	PlaintoTsquery string `json:"plainto_tsquery"`
-}
-
-type SearchArticlesRow struct {
-	ID          int64              `json:"id"`
-	SourceID    int64              `json:"source_id"`
-	Title       string             `json:"title"`
-	Link        string             `json:"link"`
-	Language    string             `json:"language"`
-	PublishedAt pgtype.Timestamptz `json:"published_at"`
-	Headline    []byte             `json:"headline"`
-}
-
-func (q *Queries) SearchArticles(ctx context.Context, arg SearchArticlesParams) ([]SearchArticlesRow, error) {
-	rows, err := q.db.Query(ctx, searchArticles, arg.UserID, arg.PlaintoTsquery)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []SearchArticlesRow{}
-	for rows.Next() {
-		var i SearchArticlesRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.SourceID,
-			&i.Title,
-			&i.Link,
-			&i.Language,
-			&i.PublishedAt,
-			&i.Headline,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const upsertArticle = `-- name: UpsertArticle :one
-INSERT INTO articles (
-    source_id, external_id, link, normalized_link, title, language,
-    content_html, content_text, author, published_at, fetched_at
-)
-VALUES (
-    $1, $2, $3, $4, $5, $6,
-    $7, $8, $9, $10, $11
-)
-ON CONFLICT (source_id, normalized_link) DO NOTHING
-RETURNING id, source_id, external_id, link, normalized_link, title, language, content_html, content_text, author, published_at, fetched_at, search_vec
-`
-
-type UpsertArticleParams struct {
-	SourceID       int64              `json:"source_id"`
-	ExternalID     string             `json:"external_id"`
-	Link           string             `json:"link"`
-	NormalizedLink string             `json:"normalized_link"`
-	Title          string             `json:"title"`
-	Language       string             `json:"language"`
-	ContentHtml    string             `json:"content_html"`
-	ContentText    string             `json:"content_text"`
-	Author         pgtype.Text        `json:"author"`
-	PublishedAt    pgtype.Timestamptz `json:"published_at"`
-	FetchedAt      pgtype.Timestamptz `json:"fetched_at"`
-}
-
-func (q *Queries) UpsertArticle(ctx context.Context, arg UpsertArticleParams) (Article, error) {
-	row := q.db.QueryRow(ctx, upsertArticle,
-		arg.SourceID,
-		arg.ExternalID,
-		arg.Link,
-		arg.NormalizedLink,
-		arg.Title,
-		arg.Language,
-		arg.ContentHtml,
-		arg.ContentText,
-		arg.Author,
-		arg.PublishedAt,
-		arg.FetchedAt,
-	)
-	var i Article
-	err := row.Scan(
-		&i.ID,
-		&i.SourceID,
-		&i.ExternalID,
-		&i.Link,
-		&i.NormalizedLink,
-		&i.Title,
-		&i.Language,
-		&i.ContentHtml,
-		&i.ContentText,
-		&i.Author,
-		&i.PublishedAt,
-		&i.FetchedAt,
-		&i.SearchVec,
-	)
-	return i, err
-}
-
-const listArticlesBySourceEnriched = `-- name: ListArticlesBySourceEnriched :many
-SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
-       COALESCE(ai.title_translated, '') AS title_translated,
-       COALESCE(ai.summary, '') AS summary,
-       s.title AS source_title,
-       COALESCE(st.is_read, false) AS is_read,
-       COALESCE(st.is_starred, false) AS is_starred
-FROM articles a
-JOIN sources s ON a.source_id = s.id
-LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
-LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
-WHERE a.source_id = $3
-ORDER BY a.published_at DESC
-`
-
-type ListArticlesBySourceEnrichedParams struct {
-	UserID         int64  `json:"user_id"`
-	TargetLanguage string `json:"target_language"`
-	SourceID       int64  `json:"source_id"`
-}
-
-type ListArticlesBySourceEnrichedRow struct {
-	ID              int64              `json:"id"`
-	SourceID        int64              `json:"source_id"`
-	Title           string             `json:"title"`
-	Link            string             `json:"link"`
-	Language        string             `json:"language"`
-	Author          pgtype.Text        `json:"author"`
-	PublishedAt     pgtype.Timestamptz `json:"published_at"`
-	ContentText     string             `json:"content_text"`
-	TitleTranslated string             `json:"title_translated"`
-	Summary         string             `json:"summary"`
-	SourceTitle     string             `json:"source_title"`
-	IsRead          bool               `json:"is_read"`
-	IsStarred       bool               `json:"is_starred"`
-}
-
-func (q *Queries) ListArticlesBySourceEnriched(ctx context.Context, arg ListArticlesBySourceEnrichedParams) ([]ListArticlesBySourceEnrichedRow, error) {
-	rows, err := q.db.Query(ctx, listArticlesBySourceEnriched, arg.UserID, arg.TargetLanguage, arg.SourceID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListArticlesBySourceEnrichedRow{}
-	for rows.Next() {
-		var i ListArticlesBySourceEnrichedRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.SourceID,
-			&i.Title,
-			&i.Link,
-			&i.Language,
-			&i.Author,
-			&i.PublishedAt,
-			&i.ContentText,
-			&i.TitleTranslated,
-			&i.Summary,
-			&i.SourceTitle,
-			&i.IsRead,
-			&i.IsStarred,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listUnreadArticlesEnriched = `-- name: ListUnreadArticlesEnriched :many
 SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
        COALESCE(ai.title_translated, '') AS title_translated,
@@ -766,4 +652,153 @@ func (q *Queries) ListUnreadArticlesEnriched(ctx context.Context, arg ListUnread
 		return nil, err
 	}
 	return items, nil
+}
+
+const searchArticles = `-- name: SearchArticles :many
+SELECT a.id, a.source_id, a.title, a.link, a.language, a.published_at,
+       ts_headline('simple', a.title || ' ' || a.content_text, plainto_tsquery('simple', $2), 'MaxWords=20, MinWords=6') AS headline
+FROM articles a
+JOIN sources s ON a.source_id = s.id
+WHERE s.user_id = $1
+  AND a.search_vec @@ plainto_tsquery('simple', $2)
+ORDER BY ts_rank(a.search_vec, plainto_tsquery('simple', $2)) DESC
+LIMIT 100
+`
+
+type SearchArticlesParams struct {
+	UserID         int64  `json:"user_id"`
+	PlaintoTsquery string `json:"plainto_tsquery"`
+}
+
+type SearchArticlesRow struct {
+	ID          int64              `json:"id"`
+	SourceID    int64              `json:"source_id"`
+	Title       string             `json:"title"`
+	Link        string             `json:"link"`
+	Language    string             `json:"language"`
+	PublishedAt pgtype.Timestamptz `json:"published_at"`
+	Headline    []byte             `json:"headline"`
+}
+
+func (q *Queries) SearchArticles(ctx context.Context, arg SearchArticlesParams) ([]SearchArticlesRow, error) {
+	rows, err := q.db.Query(ctx, searchArticles, arg.UserID, arg.PlaintoTsquery)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchArticlesRow{}
+	for rows.Next() {
+		var i SearchArticlesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SourceID,
+			&i.Title,
+			&i.Link,
+			&i.Language,
+			&i.PublishedAt,
+			&i.Headline,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateArticleContent = `-- name: UpdateArticleContent :one
+UPDATE articles
+SET content_html = $2,
+    content_text = $3
+WHERE id = $1
+RETURNING id, source_id, external_id, link, normalized_link, title, language, content_html, content_text, author, published_at, fetched_at, search_vec
+`
+
+type UpdateArticleContentParams struct {
+	ID          int64  `json:"id"`
+	ContentHtml string `json:"content_html"`
+	ContentText string `json:"content_text"`
+}
+
+func (q *Queries) UpdateArticleContent(ctx context.Context, arg UpdateArticleContentParams) (Article, error) {
+	row := q.db.QueryRow(ctx, updateArticleContent, arg.ID, arg.ContentHtml, arg.ContentText)
+	var i Article
+	err := row.Scan(
+		&i.ID,
+		&i.SourceID,
+		&i.ExternalID,
+		&i.Link,
+		&i.NormalizedLink,
+		&i.Title,
+		&i.Language,
+		&i.ContentHtml,
+		&i.ContentText,
+		&i.Author,
+		&i.PublishedAt,
+		&i.FetchedAt,
+		&i.SearchVec,
+	)
+	return i, err
+}
+
+const upsertArticle = `-- name: UpsertArticle :one
+INSERT INTO articles (
+    source_id, external_id, link, normalized_link, title, language,
+    content_html, content_text, author, published_at, fetched_at
+)
+VALUES (
+    $1, $2, $3, $4, $5, $6,
+    $7, $8, $9, $10, $11
+)
+ON CONFLICT (source_id, normalized_link) DO NOTHING
+RETURNING id, source_id, external_id, link, normalized_link, title, language, content_html, content_text, author, published_at, fetched_at, search_vec
+`
+
+type UpsertArticleParams struct {
+	SourceID       int64              `json:"source_id"`
+	ExternalID     string             `json:"external_id"`
+	Link           string             `json:"link"`
+	NormalizedLink string             `json:"normalized_link"`
+	Title          string             `json:"title"`
+	Language       string             `json:"language"`
+	ContentHtml    string             `json:"content_html"`
+	ContentText    string             `json:"content_text"`
+	Author         pgtype.Text        `json:"author"`
+	PublishedAt    pgtype.Timestamptz `json:"published_at"`
+	FetchedAt      pgtype.Timestamptz `json:"fetched_at"`
+}
+
+func (q *Queries) UpsertArticle(ctx context.Context, arg UpsertArticleParams) (Article, error) {
+	row := q.db.QueryRow(ctx, upsertArticle,
+		arg.SourceID,
+		arg.ExternalID,
+		arg.Link,
+		arg.NormalizedLink,
+		arg.Title,
+		arg.Language,
+		arg.ContentHtml,
+		arg.ContentText,
+		arg.Author,
+		arg.PublishedAt,
+		arg.FetchedAt,
+	)
+	var i Article
+	err := row.Scan(
+		&i.ID,
+		&i.SourceID,
+		&i.ExternalID,
+		&i.Link,
+		&i.NormalizedLink,
+		&i.Title,
+		&i.Language,
+		&i.ContentHtml,
+		&i.ContentText,
+		&i.Author,
+		&i.PublishedAt,
+		&i.FetchedAt,
+		&i.SearchVec,
+	)
+	return i, err
 }

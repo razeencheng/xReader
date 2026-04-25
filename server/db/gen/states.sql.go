@@ -11,41 +11,140 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const batchMarkReadBySource = `-- name: BatchMarkReadBySource :exec
-INSERT INTO article_states (user_id, article_id, is_read, last_read_at)
-SELECT $1, a.id, true, now()
-FROM articles a
-JOIN sources s ON a.source_id = s.id
-WHERE s.id = $2 AND s.user_id = $1
-ON CONFLICT (user_id, article_id) DO UPDATE SET
-  is_read = true,
-  last_read_at = now()
+const batchSetReadBySource = `-- name: BatchSetReadBySource :many
+WITH upserted AS (
+  INSERT INTO article_states (user_id, article_id, is_read, last_read_at)
+  SELECT $1, a.id, $3, CASE WHEN $3 THEN now() ELSE NULL END
+  FROM articles a
+  JOIN sources s ON a.source_id = s.id
+  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+  WHERE s.id = $2 AND s.user_id = $1
+    AND COALESCE(st.is_read, false) <> $3
+  ON CONFLICT (user_id, article_id) DO UPDATE SET
+    is_read = $3,
+    last_read_at = CASE WHEN $3 THEN now() ELSE NULL END
+  RETURNING article_id
+), changes AS (
+  INSERT INTO article_state_changes (user_id, article_id)
+  SELECT $1, article_id FROM upserted
+)
+SELECT article_id FROM upserted
 `
 
-type BatchMarkReadBySourceParams struct {
+type BatchSetReadBySourceParams struct {
 	UserID int64 `json:"user_id"`
 	ID     int64 `json:"id"`
+	IsRead bool  `json:"is_read"`
 }
 
-func (q *Queries) BatchMarkReadBySource(ctx context.Context, arg BatchMarkReadBySourceParams) error {
-	_, err := q.db.Exec(ctx, batchMarkReadBySource, arg.UserID, arg.ID)
-	return err
+func (q *Queries) BatchSetReadBySource(ctx context.Context, arg BatchSetReadBySourceParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, batchSetReadBySource, arg.UserID, arg.ID, arg.IsRead)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var article_id int64
+		if err := rows.Scan(&article_id); err != nil {
+			return nil, err
+		}
+		items = append(items, article_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
-const batchMarkReadToday = `-- name: BatchMarkReadToday :exec
-INSERT INTO article_states (user_id, article_id, is_read, last_read_at)
-SELECT $1, a.id, true, now()
-FROM articles a
-JOIN sources s ON a.source_id = s.id
-WHERE s.user_id = $1 AND a.published_at >= now() - interval '24 hours'
-ON CONFLICT (user_id, article_id) DO UPDATE SET
-  is_read = true,
-  last_read_at = now()
+const batchSetReadStream = `-- name: BatchSetReadStream :many
+WITH upserted AS (
+  INSERT INTO article_states (user_id, article_id, is_read, last_read_at)
+  SELECT $1, a.id, $2, CASE WHEN $2 THEN now() ELSE NULL END
+  FROM articles a
+  JOIN sources s ON a.source_id = s.id
+  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+  WHERE s.user_id = $1
+    AND COALESCE(st.is_read, false) <> $2
+  ON CONFLICT (user_id, article_id) DO UPDATE SET
+    is_read = $2,
+    last_read_at = CASE WHEN $2 THEN now() ELSE NULL END
+  RETURNING article_id
+), changes AS (
+  INSERT INTO article_state_changes (user_id, article_id)
+  SELECT $1, article_id FROM upserted
+)
+SELECT article_id FROM upserted
 `
 
-func (q *Queries) BatchMarkReadToday(ctx context.Context, userID int64) error {
-	_, err := q.db.Exec(ctx, batchMarkReadToday, userID)
-	return err
+type BatchSetReadStreamParams struct {
+	UserID int64 `json:"user_id"`
+	IsRead bool  `json:"is_read"`
+}
+
+func (q *Queries) BatchSetReadStream(ctx context.Context, arg BatchSetReadStreamParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, batchSetReadStream, arg.UserID, arg.IsRead)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var article_id int64
+		if err := rows.Scan(&article_id); err != nil {
+			return nil, err
+		}
+		items = append(items, article_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const batchSetReadToday = `-- name: BatchSetReadToday :many
+WITH upserted AS (
+  INSERT INTO article_states (user_id, article_id, is_read, last_read_at)
+  SELECT $1, a.id, $2, CASE WHEN $2 THEN now() ELSE NULL END
+  FROM articles a
+  JOIN sources s ON a.source_id = s.id
+  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+  WHERE s.user_id = $1 AND a.published_at >= now() - interval '24 hours'
+    AND COALESCE(st.is_read, false) <> $2
+  ON CONFLICT (user_id, article_id) DO UPDATE SET
+    is_read = $2,
+    last_read_at = CASE WHEN $2 THEN now() ELSE NULL END
+  RETURNING article_id
+), changes AS (
+  INSERT INTO article_state_changes (user_id, article_id)
+  SELECT $1, article_id FROM upserted
+)
+SELECT article_id FROM upserted
+`
+
+type BatchSetReadTodayParams struct {
+	UserID int64 `json:"user_id"`
+	IsRead bool  `json:"is_read"`
+}
+
+func (q *Queries) BatchSetReadToday(ctx context.Context, arg BatchSetReadTodayParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, batchSetReadToday, arg.UserID, arg.IsRead)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var article_id int64
+		if err := rows.Scan(&article_id); err != nil {
+			return nil, err
+		}
+		items = append(items, article_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getArticleState = `-- name: GetArticleState :one
@@ -101,6 +200,54 @@ func (q *Queries) ListStateChangesSince(ctx context.Context, arg ListStateChange
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markInitialSourceBacklogRead = `-- name: MarkInitialSourceBacklogRead :many
+WITH ranked AS (
+  SELECT a.id,
+         a.published_at,
+         row_number() OVER (ORDER BY a.published_at DESC NULLS LAST, a.id DESC) AS rn
+  FROM articles a
+  WHERE a.source_id = $1
+), upserted AS (
+  INSERT INTO article_states (user_id, article_id, is_read, last_read_at)
+  SELECT s.user_id, ranked.id, true, now()
+  FROM ranked
+  JOIN sources s ON s.id = $1
+  WHERE NOT (
+    ranked.published_at >= now() - interval '7 days'
+    OR ranked.rn <= 20
+  )
+  ON CONFLICT (user_id, article_id) DO UPDATE SET
+    is_read = true,
+    last_read_at = now()
+  RETURNING article_id
+), changes AS (
+  INSERT INTO article_state_changes (user_id, article_id)
+  SELECT s.user_id, article_id FROM upserted
+  JOIN sources s ON s.id = $1
+)
+SELECT article_id FROM upserted
+`
+
+func (q *Queries) MarkInitialSourceBacklogRead(ctx context.Context, sourceID int64) ([]int64, error) {
+	rows, err := q.db.Query(ctx, markInitialSourceBacklogRead, sourceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var article_id int64
+		if err := rows.Scan(&article_id); err != nil {
+			return nil, err
+		}
+		items = append(items, article_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

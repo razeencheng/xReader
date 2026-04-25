@@ -12,6 +12,7 @@
   --bg-surface: oklch(93.2% 0.012 82);
   --bg-selected: oklch(91.5% 0.013 80);
   --bg-input: oklch(99.4% 0.004 80);
+  --bg-elevated: var(--bg-input);
   --bg-nav: oklch(22% 0.01 260);
   --bg-callout: oklch(97.5% 0.014 88);
   --bg-badge-unread: oklch(98.2% 0.017 88);
@@ -76,6 +77,7 @@ html.theme-dark {
   --bg-surface: oklch(25% 0.014 260);
   --bg-selected: oklch(28% 0.016 260);
   --bg-input: oklch(14% 0.01 260);
+  --bg-elevated: var(--bg-panel);
   --bg-nav: oklch(90% 0.006 80);
   --bg-callout: oklch(22% 0.025 85);
   --bg-badge-unread: oklch(24% 0.03 88);
@@ -168,6 +170,164 @@ a {
   letter-spacing: -0.01em;
 }
 
+.reader-content {
+  color: var(--text-2);
+}
+
+.reader-content > [data-layer='original'],
+.reader-content > [data-block-tag='pre'] {
+  margin-top: 1.45em;
+}
+
+.reader-content > [data-layer='original']:first-child,
+.reader-content > [data-block-tag='pre']:first-child {
+  margin-top: 0;
+}
+
+.reader-content :is(p, ul, ol, blockquote, figure, pre, table, details) {
+  margin: 0;
+}
+
+.reader-content :is(h2, h3, h4, h5, h6) {
+  margin: 0;
+  color: var(--text-body);
+  font-family: var(--font-article);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.28;
+}
+
+.reader-content > [data-block-tag='h2'] {
+  margin-top: 2.6em;
+}
+
+.reader-content > [data-block-tag='h3'] {
+  margin-top: 2.25em;
+}
+
+.reader-content > [data-block-tag='h4'],
+.reader-content > [data-block-tag='h5'],
+.reader-content > [data-block-tag='h6'] {
+  margin-top: 1.9em;
+}
+
+.reader-content > [data-block-tag='h2']:first-child,
+.reader-content > [data-block-tag='h3']:first-child,
+.reader-content > [data-block-tag='h4']:first-child,
+.reader-content > [data-block-tag='h5']:first-child,
+.reader-content > [data-block-tag='h6']:first-child {
+  margin-top: 0;
+}
+
+.reader-content h2 {
+  border-top: 1px solid var(--border-light);
+  padding-top: 1.1em;
+  font-size: 1.42em;
+}
+
+.reader-content h3 {
+  border-left: 3px solid var(--accent);
+  padding-left: 0.72em;
+  font-size: 1.24em;
+}
+
+.reader-content h4 {
+  font-size: 1.08em;
+}
+
+.reader-content :is(ul, ol) {
+  display: grid;
+  gap: 0.55em;
+  padding-left: 1.35em;
+}
+
+.reader-content li {
+  padding-left: 0.15em;
+}
+
+.reader-content li::marker {
+  color: var(--text-3);
+  font-family: var(--font-ui);
+  font-size: 0.84em;
+}
+
+.reader-content strong {
+  color: var(--text-body);
+  font-weight: 700;
+}
+
+.reader-content code {
+  border: 1px solid var(--border-light);
+  border-radius: 0.4em;
+  background: var(--bg-surface);
+  padding: 0.08em 0.38em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.86em;
+}
+
+.reader-content pre code {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.reader-content blockquote {
+  border-left: 3px solid var(--border-accent);
+  border-radius: 0 1rem 1rem 0;
+  background: var(--bg-callout);
+  padding: 0.9em 1.1em;
+  color: var(--text-secondary);
+}
+
+.reader-content details {
+  border: 1px solid var(--border-light);
+  border-radius: 1.1rem;
+  background: color-mix(in srgb, var(--bg-callout) 72%, var(--bg-body));
+  padding: 0.95em 1em;
+  font-family: var(--font-ui);
+  font-size: 0.88em;
+  line-height: 1.65;
+}
+
+.reader-content summary {
+  cursor: default;
+  color: var(--text-body);
+  font-weight: 700;
+  list-style-position: outside;
+}
+
+.reader-content details ul {
+  margin-top: 0.75em;
+  padding-left: 1.1em;
+}
+
+.reader-content figure {
+  overflow: hidden;
+  border-radius: 1rem;
+  background: var(--bg-panel);
+}
+
+.reader-content img {
+  display: block;
+  height: auto;
+  max-width: 100%;
+  margin-inline: auto;
+}
+
+.reader-content table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-family: var(--font-ui);
+  font-size: 0.9em;
+}
+
+.reader-content :is(th, td) {
+  border-bottom: 1px solid var(--border-light);
+  padding: 0.55em 0.75em;
+  text-align: left;
+}
+
 .glass-effect {
   background: color-mix(in srgb, var(--bg-body) 92%, transparent);
   backdrop-filter: blur(10px);
@@ -211,7 +371,7 @@ mark {
   padding: 0 2px;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 767px) {
   :root {
     --list-width: 100%;
   }

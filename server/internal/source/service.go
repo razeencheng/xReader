@@ -63,34 +63,34 @@ func (s *SourceService) Create(ctx context.Context, userID int64, rawURL string,
 	if category == "" {
 		category = "General"
 	}
-	normalized, err := Normalize(rawURL)
-	if err != nil {
-		return gen.Source{}, fmt.Errorf("invalid URL: %w", err)
-	}
-
 	adapter, ok := s.adapters["rss"]
 	if !ok {
 		return gen.Source{}, fmt.Errorf("no adapter for kind rss")
 	}
 
-	meta, err := adapter.Validate(ctx, rawURL)
+	discovered, err := discoverFeed(ctx, rawURL, adapter)
 	if err != nil {
-		return gen.Source{}, fmt.Errorf("validate feed: %w", err)
+		return gen.Source{}, fmt.Errorf("discover feed: %w", err)
 	}
 
-	title := meta.Title
+	normalized, err := Normalize(discovered.URL)
+	if err != nil {
+		return gen.Source{}, fmt.Errorf("invalid URL: %w", err)
+	}
+
+	title := discovered.Metadata.Title
 	if title == "" {
-		title = rawURL
+		title = discovered.URL
 	}
 
 	return s.queries.CreateSource(ctx, gen.CreateSourceParams{
 		UserID:        userID,
 		Kind:          "rss",
-		Url:           rawURL,
+		Url:           discovered.URL,
 		NormalizedUrl: normalized,
 		Title:         title,
-		IconUrl:       textOrNull(meta.IconURL),
-		LanguageHint:  textOrNull(meta.LanguageHint),
+		IconUrl:       textOrNull(discovered.Metadata.IconURL),
+		LanguageHint:  textOrNull(discovered.Metadata.LanguageHint),
 		Health:        "unknown",
 		Category:      category,
 	})

@@ -3,6 +3,7 @@ package article
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -56,6 +57,13 @@ type articleChangeResponse struct {
 	ChangedAt string `json:"changed_at"`
 }
 
+type originalContentResponse struct {
+	URL         string `json:"url"`
+	Title       string `json:"title,omitempty"`
+	ContentHtml string `json:"content_html"`
+	ContentText string `json:"content_text"`
+}
+
 type articleStateRequest struct {
 	IsRead    *bool `json:"is_read"`
 	IsStarred *bool `json:"is_starred"`
@@ -64,6 +72,12 @@ type articleStateRequest struct {
 type batchStateRequest struct {
 	Scope  string `json:"scope"`
 	IsRead bool   `json:"is_read"`
+}
+
+type batchStateResponse struct {
+	Status     string  `json:"status"`
+	Updated    int     `json:"updated"`
+	ArticleIDs []int64 `json:"article_ids"`
 }
 
 func (h *ArticleHandler) List(c *gin.Context) {
@@ -202,16 +216,12 @@ func (h *ArticleHandler) BatchState(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "scope required"})
 		return
 	}
-	if !req.IsRead {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "is_read must be true"})
-		return
-	}
-
-	if err := h.Service.BatchMarkRead(c.Request.Context(), user.ID, req.Scope); err != nil {
+	articleIDs, err := h.Service.BatchSetRead(c.Request.Context(), user.ID, req.Scope, req.IsRead)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "updated"})
+	c.JSON(http.StatusOK, batchStateResponse{Status: "updated", Updated: len(articleIDs), ArticleIDs: articleIDs})
 }
 
 func (h *ArticleHandler) Changes(c *gin.Context) {
@@ -244,6 +254,46 @@ func (h *ArticleHandler) Changes(c *gin.Context) {
 		items = append(items, articleChangeResponse{ArticleID: change.ArticleID, ChangedAt: change.ChangedAt.Time.UTC().Format(time.RFC3339Nano)})
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+func (h *ArticleHandler) LoadOriginal(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	content, err := h.Service.LoadOriginal(c.Request.Context(), user.ID, id)
+	if err != nil {
+		switch {
+		case errors.Is(err, errNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
+		case errors.Is(err, errOriginalUnsupportedURL), errors.Is(err, errOriginalUnsafeURL):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "original URL is not supported"})
+		case errors.Is(err, errOriginalNotHTML):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "original page is not readable HTML"})
+		case errors.Is(err, errOriginalTooLarge):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "original page is too large"})
+		case errors.Is(err, errOriginalNoContent):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "could not find readable original content"})
+		default:
+			c.JSON(http.StatusBadGateway, gin.H{"error": "failed to load original content"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, originalContentResponse{
+		URL:         content.URL,
+		Title:       content.Title,
+		ContentHtml: content.ContentHTML,
+		ContentText: content.ContentText,
+	})
 }
 
 func (h *ArticleHandler) itemsForList(ctx context.Context, userID int64, lang, tab, filter, query, sourceIDRaw, cursorRaw string, limit int32) ([]articleResponse, error) {

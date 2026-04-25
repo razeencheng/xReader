@@ -7,13 +7,14 @@ import { Languages } from 'lucide-react';
 import { apiFetch } from '@/lib/api-client';
 import { applyArticleStateChange } from '@/lib/article-state-cache';
 import { broadcast } from '@/lib/broadcast';
-import { estimateReadMinutes, formatRelativeTime, getDisplayTitle, isSameLanguage } from '@/lib/article-meta';
+import { estimateReadMinutes, formatRelativeTime, getDisplayTitle, isLikelySummaryOnly, isSameLanguage } from '@/lib/article-meta';
 import { getActiveReaderLayout, toggleReaderFocusMode } from '@/lib/reader-layout';
 import { useUIStore } from '@/stores/useUIStore';
 import { KeyPointsCallout } from '@/components/reader/KeyPointsCallout';
 import { BilingualBody } from '@/components/reader/BilingualBody';
 import { HighlightLayer } from '@/components/reader/HighlightLayer';
 import { ReaderHeader } from '@/components/reader/ReaderHeader';
+import { SourceExcerptNotice } from '@/components/reader/SourceExcerptNotice';
 import { TweaksPanel } from '@/components/reader/TweaksPanel';
 import type { ArticleItem } from '@/lib/types';
 
@@ -29,6 +30,13 @@ interface ArticleAI {
   summary?: string;
 }
 
+interface OriginalContent {
+  url: string;
+  title?: string;
+  content_html: string;
+  content_text: string;
+}
+
 interface ArticleViewProps {
   id: string;
   onClose?: () => void;
@@ -38,8 +46,11 @@ interface ArticleViewProps {
 export function ArticleView({ id, onClose, className = '' }: ArticleViewProps) {
   const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const hasAutoMarkedRead = useRef(false);
-  const [progress, setProgress] = useState(0);
+  const autoMarkedArticleIds = useRef(new Set<number>());
+  const [progressState, setProgressState] = useState({ articleId: id, value: 0 });
+  const [originalContentState, setOriginalContentState] = useState<{ articleId: string; content: OriginalContent } | null>(null);
+  const [loadingOriginalId, setLoadingOriginalId] = useState<string | null>(null);
+  const [originalErrorState, setOriginalErrorState] = useState<{ articleId: string; message: string } | null>(null);
 
   const nativeLanguage = useUIStore((state) => state.nativeLanguage);
   const fontSize = useUIStore((state) => state.fontSize);
@@ -62,25 +73,30 @@ export function ArticleView({ id, onClose, className = '' }: ArticleViewProps) {
     enabled: !!article && titleNeedsTranslation,
   });
 
+  const progress = progressState.articleId === id ? progressState.value : 0;
+  const originalContent = originalContentState?.articleId === id ? originalContentState.content : null;
+  const isLoadingOriginal = loadingOriginalId === id;
+  const originalError = originalErrorState?.articleId === id ? originalErrorState.message : null;
+
   const handleScroll = useCallback(() => {
     const element = scrollRef.current;
     if (!element) return;
 
     const scrollHeight = element.scrollHeight - element.clientHeight;
     if (scrollHeight <= 0) {
-      setProgress(0);
+      setProgressState({ articleId: id, value: 0 });
       return;
     }
 
-    setProgress(Math.min(1, element.scrollTop / scrollHeight));
-  }, []);
+    setProgressState({ articleId: id, value: Math.min(1, element.scrollTop / scrollHeight) });
+  }, [id]);
 
   useEffect(() => {
-    if (!article || article.is_read || progress < 0.75 || hasAutoMarkedRead.current) {
+    if (!article || article.is_read || progress < 0.75 || autoMarkedArticleIds.current.has(article.id)) {
       return;
     }
 
-    hasAutoMarkedRead.current = true;
+    autoMarkedArticleIds.current.add(article.id);
     applyArticleStateChange(queryClient, { articleId: article.id, is_read: true });
 
     void apiFetch(`/api/articles/${article.id}/state`, {
@@ -91,7 +107,7 @@ export function ArticleView({ id, onClose, className = '' }: ArticleViewProps) {
         broadcast({ type: 'state-change', articleId: article.id, is_read: true });
       })
       .catch(() => {
-        hasAutoMarkedRead.current = false;
+        autoMarkedArticleIds.current.delete(article.id);
         applyArticleStateChange(queryClient, { articleId: article.id, is_read: article.is_read });
       });
   }, [article, progress, queryClient]);
@@ -127,14 +143,38 @@ export function ArticleView({ id, onClose, className = '' }: ArticleViewProps) {
     toggleReaderFocusMode(focusMode, layout, setLayout, setFocusMode);
   }, [focusMode, layout, setFocusMode, setLayout]);
 
+  const handleLoadOriginal = useCallback(async () => {
+    if (!article) return;
+
+    setLoadingOriginalId(id);
+    setOriginalErrorState(null);
+    try {
+      const content = await apiFetch<OriginalContent>(`/api/articles/${article.id}/original`, { method: 'POST' });
+      setOriginalContentState({ articleId: id, content });
+      queryClient.setQueryData<ArticleDetail>(['article', id], (previous) =>
+        previous ? { ...previous, content_html: content.content_html, content_text: content.content_text } : previous,
+      );
+      setProgressState({ articleId: id, value: 0 });
+      scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '原文加载失败，请稍后重试。';
+      setOriginalErrorState({ articleId: id, message });
+    } finally {
+      setLoadingOriginalId(null);
+    }
+  }, [article, id, queryClient]);
+
   const displayTitle = article
     ? ai?.title_translated || article.title_translated || getDisplayTitle(article)
     : '';
   const showOriginalTitle = Boolean(article && titleNeedsTranslation && displayTitle !== article.title);
   const titleLoading = Boolean(article && titleNeedsTranslation && !displayTitle && isFetchingAI);
   const summary = ai?.summary || article?.summary || '';
-  const readMinutes = article ? estimateReadMinutes(article) : null;
   const relativeTime = article?.published_at ? formatRelativeTime(article.published_at) : '';
+  const showSourceExcerptNotice = article ? isLikelySummaryOnly(article) && !originalContent : false;
+  const contentHtml = originalContent?.content_html || article?.content_html || '';
+  const contentText = originalContent?.content_text || article?.content_text || '';
+  const readMinutes = article ? estimateReadMinutes({ ...article, content_html: contentHtml, content_text: contentText }) : null;
 
   const bylineItems = useMemo(() => {
     if (!article) return [] as Array<{ key: string; content: React.ReactNode }>;
@@ -239,16 +279,25 @@ export function ArticleView({ id, onClose, className = '' }: ArticleViewProps) {
 
               {summary ? <KeyPointsCallout text={summary} /> : null}
 
+              {showSourceExcerptNotice ? (
+                <SourceExcerptNotice
+                  error={originalError}
+                  isLoading={isLoadingOriginal}
+                  link={article.link}
+                  onLoadOriginal={handleLoadOriginal}
+                />
+              ) : null}
+
               <div className="font-reader-text text-[var(--text)]" style={{ fontSize: `${fontSize}px`, lineHeight: 1.9 }}>
-                {article.content_html ? (
+                {contentHtml ? (
                   <BilingualBody
                     articleId={article.id}
-                    contentHtml={article.content_html}
+                    contentHtml={contentHtml}
                     language={article.language}
                     nativeLanguage={nativeLanguage}
                   />
                 ) : (
-                  <p>{article.content_text}</p>
+                  <p>{contentText}</p>
                 )}
               </div>
             </article>

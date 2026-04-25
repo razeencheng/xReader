@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { apiFetch } from '@/lib/api-client';
+import { ApiError, apiFetch } from '@/lib/api-client';
 import {
   useCreateSource,
   useDeleteSource,
@@ -22,6 +22,14 @@ type MessageState = {
   kind: 'idle' | 'loading' | 'success' | 'error';
   text: string;
 };
+
+type AddSourceStatus = {
+  kind: 'idle' | 'loading' | 'success' | 'error';
+  title: string;
+  detail?: string;
+};
+
+const ADD_SOURCE_STEPS = ['检查输入', '尝试直接解析订阅', '搜索网页声明', '尝试常见订阅路径'] as const;
 
 function timeAgo(iso: string | null): string {
   if (!iso) return '从未';
@@ -73,6 +81,47 @@ function ProgressBar({ progress }: { progress: number | null }) {
   );
 }
 
+function AddSourceProgress({ status }: { status: AddSourceStatus }) {
+  if (status.kind === 'idle') {
+    return null;
+  }
+
+  if (status.kind === 'loading') {
+    return (
+      <div className="mt-3 rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-body)] px-4 py-3 font-[system-ui]">
+        <div className="flex items-center justify-between gap-3 text-sm text-[var(--text-body)]">
+          <span>{status.title}</span>
+          <span className="text-xs text-[var(--text-muted)]">自动发现中</span>
+        </div>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--bg-callout)]">
+          <div className="h-full w-2/3 animate-pulse rounded-full bg-[var(--accent)]" />
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-4">
+          {ADD_SOURCE_STEPS.map((step) => (
+            <div key={step} className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+              <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[var(--accent)]" />
+              <span>{step}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`mt-3 rounded-2xl border px-4 py-3 font-[system-ui] text-sm ${
+        status.kind === 'success'
+          ? 'border-[var(--border-success)] bg-[var(--bg-badge-today)] text-[var(--text-success)]'
+          : 'border-[var(--border-error)] bg-[var(--bg-highlight-error)] text-[var(--text-error)]'
+      }`}
+    >
+      <div className="font-medium">{status.title}</div>
+      {status.detail ? <div className="mt-1 break-all text-xs opacity-85">{status.detail}</div> : null}
+    </div>
+  );
+}
+
 export function SourcesPage() {
   const { data: sources, isLoading, isFetching } = useSources();
   const createSource = useCreateSource();
@@ -85,8 +134,10 @@ export function SourcesPage() {
   const [editingTitle, setEditingTitle] = useState('');
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [message, setMessage] = useState<MessageState>({ kind: 'idle', text: '' });
+  const [addSourceStatus, setAddSourceStatus] = useState<AddSourceStatus>({ kind: 'idle', title: '' });
   const [importJobId, setImportJobId] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const handledImportJobId = useRef<string | null>(null);
 
   const importJob = useSourceImportJob(importJobId);
 
@@ -106,15 +157,24 @@ export function SourcesPage() {
 
   useEffect(() => {
     if (!importJobId || !importJob.data) return;
+    if (handledImportJobId.current === importJobId) return;
 
     if (importJob.data.status === 'done') {
-      setImportJobId(null);
-      setMessage({ kind: 'success', text: 'OPML 导入完成。' });
+      handledImportJobId.current = importJobId;
+      const timeoutId = window.setTimeout(() => {
+        setImportJobId(null);
+        setMessage({ kind: 'success', text: 'OPML 导入完成。' });
+      }, 0);
+      return () => window.clearTimeout(timeoutId);
     }
 
     if (importJob.data.status === 'failed') {
-      setImportJobId(null);
-      setMessage({ kind: 'error', text: 'OPML 导入失败。' });
+      handledImportJobId.current = importJobId;
+      const timeoutId = window.setTimeout(() => {
+        setImportJobId(null);
+        setMessage({ kind: 'error', text: 'OPML 导入失败。' });
+      }, 0);
+      return () => window.clearTimeout(timeoutId);
     }
   }, [importJob.data, importJobId]);
 
@@ -122,9 +182,32 @@ export function SourcesPage() {
     const url = sourceUrl.trim();
     if (!url) return;
 
-    await createSource.mutateAsync(url);
-    setSourceUrl('');
-    setMessage({ kind: 'success', text: '订阅源已添加。' });
+    setAddSourceStatus({
+      kind: 'loading',
+      title: `正在为「${url}」寻找可订阅地址…`,
+    });
+    try {
+      const source = await createSource.mutateAsync(url);
+      setSourceUrl('');
+      setAddSourceStatus({
+        kind: 'success',
+        title: `已找到并添加：${source.title}`,
+        detail: `${source.url}。首次抓取会默认只保留最近 7 天或最新 20 篇为未读，其余历史文章会自动归档为已读。`,
+      });
+    } catch (error) {
+      const raw = error instanceof ApiError ? error.message : '';
+      const detail = raw === 'source already exists'
+        ? '这个订阅源已经添加过了。'
+        : raw.includes('no RSS or Atom feed found')
+          ? '没有找到可用的 RSS / Atom 订阅地址。可以试试网站的博客页、新闻页，或直接粘贴 RSS 地址。'
+          : raw || '没有找到可用的 RSS / Atom 订阅地址。可以试试网站的博客页、新闻页，或直接粘贴 RSS 地址。';
+
+      setAddSourceStatus({
+        kind: 'error',
+        title: '添加失败',
+        detail,
+      });
+    }
   }
 
   function startRename(source: Source) {
@@ -238,20 +321,27 @@ export function SourcesPage() {
           <div className="mb-4 flex items-center justify-between gap-4">
             <div>
               <h2 className="font-serif text-xl font-semibold tracking-tight text-[var(--text-body)]">添加订阅源</h2>
-              <p className="font-[system-ui] text-sm text-[var(--text-muted)]">输入 RSS 或 Atom 地址后点击添加。</p>
+              <p className="font-[system-ui] text-sm text-[var(--text-muted)]">
+                输入域名、网站首页或 RSS / Atom 地址，我们会自动寻找可订阅地址。
+              </p>
             </div>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
             <input
-              type="url"
+              type="text"
               value={sourceUrl}
-              onChange={(event) => setSourceUrl(event.target.value)}
+              onChange={(event) => {
+                setSourceUrl(event.target.value);
+                if (addSourceStatus.kind !== 'idle') {
+                  setAddSourceStatus({ kind: 'idle', title: '' });
+                }
+              }}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   void handleCreateSource();
                 }
               }}
-              placeholder="https://example.com/feed.xml"
+              placeholder="razeen.me 或 https://example.com/feed.xml"
               className="min-w-0 flex-1 rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-body)] px-4 py-3 font-[system-ui] text-sm text-[var(--text-body)] outline-none transition focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--accent)]/20"
             />
             <button
@@ -260,9 +350,10 @@ export function SourcesPage() {
               disabled={createSource.isPending}
               className="rounded-2xl bg-[var(--bg-nav)] px-5 py-3 font-[system-ui] text-sm text-[var(--text-inverse)] transition-colors hover:bg-[var(--bg-surface)] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              添加
+              {createSource.isPending ? '寻找中…' : '寻找并添加'}
             </button>
           </div>
+          <AddSourceProgress status={addSourceStatus} />
         </section>
 
         <section className="mt-6 overflow-hidden rounded-3xl border border-[var(--border-strong)] bg-[var(--bg-input)]/80 shadow-[0_1px_0_rgba(0,0,0,0.02)]">

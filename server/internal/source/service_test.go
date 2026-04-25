@@ -117,7 +117,7 @@ func TestSourceService_Create_InvalidURL_ReturnsError(t *testing.T) {
 
 	_, err := svc.Create(ctx, userID, "://bad-url", "")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "invalid URL")
+	require.Contains(t, err.Error(), "discover feed")
 }
 
 func TestSourceService_Create_ValidateFails_ReturnsError(t *testing.T) {
@@ -137,7 +137,7 @@ func TestSourceService_Create_ValidateFails_ReturnsError(t *testing.T) {
 
 	_, err = svc.Create(ctx, userID, "https://example.com/feed.xml", "")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "validate feed")
+	require.Contains(t, err.Error(), "discover feed")
 }
 
 func TestSourceService_Delete_OwnerOnly(t *testing.T) {

@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 vi.mock('react-intersection-observer', () => ({
   useInView: () => ({ ref: vi.fn(), inView: false }),
@@ -80,4 +81,130 @@ test('FeedList follows externally selected article id', async () => {
 
   const title = await screen.findByText('Second Article');
   expect(title.closest('[role="button"]')).toHaveAttribute('aria-current', 'true');
+});
+
+test('keeps a just-read article visible in unread filter before delayed dismissal', async () => {
+  vi.mocked(apiFetch).mockImplementation(async (path) => {
+    if (String(path).startsWith('/api/articles?')) {
+      return {
+        items: [
+          {
+            id: 1,
+            source_id: 1,
+            title: 'Read Later Article',
+            link: 'https://example.com/1',
+            language: 'en',
+            is_read: false,
+          },
+        ],
+        next_cursor: null,
+      };
+    }
+
+    return {};
+  });
+
+  render(<FeedList />, { wrapper });
+
+  await userEvent.click(await screen.findByRole('button', { name: '标已读' }));
+
+  expect(screen.getByText('Read Later Article')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '撤销已读' })).toBeInTheDocument();
+});
+
+test('dismisses a just-read article from unread filter after the grace period', async () => {
+  vi.mocked(apiFetch).mockImplementation(async (path) => {
+    if (String(path).startsWith('/api/articles?')) {
+      return {
+        items: [
+          {
+            id: 1,
+            source_id: 1,
+            title: 'Delayed Archive Article',
+            link: 'https://example.com/1',
+            language: 'en',
+            is_read: false,
+          },
+        ],
+        next_cursor: null,
+      };
+    }
+
+    return {};
+  });
+
+  render(<FeedList />, { wrapper });
+
+  await userEvent.click(await screen.findByRole('button', { name: '标已读' }));
+  expect(screen.getByText('Delayed Archive Article')).toBeInTheDocument();
+
+  await new Promise((resolve) => setTimeout(resolve, 3100));
+
+  expect(screen.queryByText('Delayed Archive Article')).not.toBeInTheDocument();
+  expect(screen.getByText(/All caught up/i)).toBeInTheDocument();
+}, 8000);
+
+test('can batch mark the current view read and undo it', async () => {
+  vi.mocked(apiFetch).mockImplementation(async (path, options) => {
+    if (String(path).startsWith('/api/articles?')) {
+      return {
+        items: [
+          {
+            id: 1,
+            source_id: 1,
+            title: 'Bulk One',
+            link: 'https://example.com/1',
+            language: 'en',
+            is_read: false,
+          },
+          {
+            id: 2,
+            source_id: 1,
+            title: 'Bulk Two',
+            link: 'https://example.com/2',
+            language: 'en',
+            is_read: false,
+          },
+        ],
+        next_cursor: null,
+      };
+    }
+
+    if (String(path) === '/api/articles/batch/state' && options?.method === 'POST') {
+      return { status: 'updated', updated: 2, article_ids: [1, 2] };
+    }
+
+    if (String(path).startsWith('/api/articles/') && options?.method === 'PATCH') {
+      return { status: 'updated' };
+    }
+
+    return {};
+  });
+
+  render(<FeedList />, { wrapper });
+
+  expect(screen.queryByRole('button', { name: '整理未读' })).not.toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: '全部已读' })).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole('button', { name: 'All2' }));
+  expect(screen.queryByRole('button', { name: '全部已读' })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Unread2' }));
+  expect(screen.getByRole('button', { name: '全部已读' })).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole('button', { name: '全部已读' }));
+  expect(screen.getByText('标记当前列表中的所有为已读')).toBeInTheDocument();
+  expect(vi.mocked(apiFetch)).not.toHaveBeenCalledWith(
+    '/api/articles/batch/state',
+    expect.objectContaining({ method: 'POST' }),
+  );
+
+  await userEvent.click(screen.getByRole('button', { name: '确认标记全部已读' }));
+
+  expect(await screen.findByText(/已将当前视图 2 篇标为已读/)).toBeInTheDocument();
+  expect(screen.queryByText('Bulk One')).not.toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole('button', { name: '撤销批量标已读' }));
+
+  expect(await screen.findByText('Bulk One')).toBeInTheDocument();
+  expect(screen.getByText('Bulk Two')).toBeInTheDocument();
 });

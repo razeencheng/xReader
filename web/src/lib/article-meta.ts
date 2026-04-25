@@ -4,6 +4,18 @@ function stripHtml(html: string) {
   return html.replace(/<[^>]+>/g, ' ');
 }
 
+function countContentBlocks(html: string) {
+  const explicitBlocks = html.match(/<\/(?:p|li|blockquote|pre|h[1-6]|section|article)>/gi)?.length ?? 0;
+  if (explicitBlocks > 0) return explicitBlocks;
+
+  const textBlocks = stripHtml(html)
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  return textBlocks.length || (stripHtml(html).trim() ? 1 : 0);
+}
+
 export function formatRelativeTime(value?: string) {
   if (!value) return '';
 
@@ -52,6 +64,24 @@ export function estimateReadMinutes(
   const estimate = Math.max(words / 220, characters / 420);
 
   return Math.max(1, Math.round(estimate));
+}
+
+export function isLikelySummaryOnly(
+  article: Pick<ArticleItem, 'link'> & {
+    content_text?: string;
+    content_html?: string;
+  },
+) {
+  if (!article.link) return false;
+
+  const html = article.content_html?.trim() ?? '';
+  const text = (article.content_text || (html ? stripHtml(html) : '')).replace(/\s+/g, ' ').trim();
+  if (!text) return false;
+
+  const blockCount = html ? countContentBlocks(html) : 1;
+  const compactLength = text.replace(/\s+/g, '').length;
+
+  return blockCount <= 1 && compactLength < 700;
 }
 
 export function getDisplayTitle(article: Pick<ArticleItem, 'title' | 'title_translated'>) {

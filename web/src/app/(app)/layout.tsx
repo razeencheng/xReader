@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useBroadcastSync } from '@/hooks/useBroadcastSync';
@@ -10,6 +9,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { useUIStore } from '@/stores/useUIStore';
 
 import { Sidebar } from '@/components/layout/Sidebar';
+import { MobileBottomNav, MobileTopBar, TabletTopNav } from '@/components/layout/ResponsiveAppNav';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -51,25 +51,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--bg-body)] text-[var(--text-body)]">
-      <motion.div
-        animate={{ width: focusMode ? 0 : 52, opacity: focusMode ? 0 : 1 }}
-        transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-        className="hidden shrink-0 overflow-hidden md:flex"
-        style={{ pointerEvents: focusMode ? 'none' : 'auto' }}
-      >
-        <Sidebar className="shrink-0" />
-      </motion.div>
+    <div className="flex h-screen flex-col overflow-hidden bg-[var(--bg-body)] text-[var(--text-body)]">
+      <TabletTopNav focusMode={focusMode} />
+      <MobileTopBar focusMode={focusMode} />
 
-      <div className="flex-1 min-w-0 overflow-hidden">
-        <header className="glass-effect sticky top-0 z-30 flex h-14 shrink-0 items-center px-4 md:hidden">
-          <Link href="/" className="font-serif text-xl font-bold italic tracking-tight text-[var(--accent)]">
-            x
-          </Link>
-        </header>
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <motion.div
+          animate={{ width: focusMode ? 0 : 52, opacity: focusMode ? 0 : 1 }}
+          transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
+          className="hidden shrink-0 overflow-hidden lg:flex"
+          style={{ pointerEvents: focusMode ? 'none' : 'auto' }}
+        >
+          <Sidebar className="shrink-0" />
+        </motion.div>
 
-        <main className="h-full overflow-hidden">{children}</main>
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <main className="h-full overflow-hidden pb-[68px] md:pb-0">{children}</main>
+        </div>
       </div>
+
+      <MobileBottomNav focusMode={focusMode} />
     </div>
   );
 }

@@ -23,7 +23,7 @@ interface Props {
 }
 
 const iconButtonClass =
-  'flex h-[30px] w-[30px] items-center justify-center rounded-[7px] border-none bg-transparent text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]';
+  'flex h-10 w-10 items-center justify-center rounded-[9px] border-none bg-transparent text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)] md:h-[30px] md:w-[30px] md:rounded-[7px]';
 
 export function ReaderHeader({
   article,
@@ -42,8 +42,15 @@ export function ReaderHeader({
   return (
     <div className="flex shrink-0 items-center gap-3 border-b border-[var(--border-light)] bg-[var(--bg)] px-5 py-[9px]">
       {onBack ? (
-        <button type="button" onClick={onBack} className={`${iconButtonClass} mr-1`} title="Back">
+        <button
+          type="button"
+          onClick={onBack}
+          className={`${iconButtonClass} mr-1 w-auto gap-1 px-2 md:w-[30px] md:px-0`}
+          title="Back"
+          aria-label="返回列表"
+        >
           <ArrowLeft size={15} strokeWidth={1.8} />
+          <span className="text-[12px] font-medium md:hidden">返回</span>
         </button>
       ) : null}
 

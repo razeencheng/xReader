@@ -7,7 +7,7 @@ import { Languages } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api-client';
 import { applyArticleStateChange } from '@/lib/article-state-cache';
-import { estimateReadMinutes, formatRelativeTime, getDisplayTitle, isSameLanguage } from '@/lib/article-meta';
+import { estimateReadMinutes, formatRelativeTime, getDisplayTitle, isLikelySummaryOnly, isSameLanguage } from '@/lib/article-meta';
 import { broadcast } from '@/lib/broadcast';
 import { useReaderShortcuts } from '@/hooks/useReaderShortcuts';
 import { useUIStore } from '@/stores/useUIStore';
@@ -20,7 +20,8 @@ import { NextUpCard } from '@/components/reader/NextUpCard';
 import { TweaksPanel } from '@/components/reader/TweaksPanel';
 import { useArticleNeighbors } from '@/lib/queries/neighbors';
 import { HighlightLayer } from '@/components/reader/HighlightLayer';
-import { KeyboardShortcutsButton, KeyboardShortcutsModal } from '@/components/layout/KeyboardShortcutsModal';
+import { KeyboardShortcutsModal } from '@/components/layout/KeyboardShortcutsModal';
+import { SourceExcerptNotice } from '@/components/reader/SourceExcerptNotice';
 import type { ArticleItem, ArticleTab } from '@/lib/types';
 
 interface ArticleDetail extends ArticleItem {
@@ -36,6 +37,13 @@ interface ArticleAI {
   summary?: string;
 }
 
+interface OriginalContent {
+  url: string;
+  title?: string;
+  content_html: string;
+  content_text: string;
+}
+
 function normalizeTab(value: string | null): ArticleTab {
   return value === 'stream' || value === 'starred' ? value : 'today';
 }
@@ -45,8 +53,11 @@ function ReaderContent({ id }: { id: string }) {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const hasAutoMarkedRead = useRef(false);
-  const [progress, setProgress] = useState(0);
+  const autoMarkedArticleIds = useRef(new Set<number>());
+  const [progressState, setProgressState] = useState({ articleId: id, value: 0 });
+  const [originalContentState, setOriginalContentState] = useState<{ articleId: string; content: OriginalContent } | null>(null);
+  const [loadingOriginalId, setLoadingOriginalId] = useState<string | null>(null);
+  const [originalErrorState, setOriginalErrorState] = useState<{ articleId: string; message: string } | null>(null);
 
   const nativeLanguage = useUIStore((state) => state.nativeLanguage);
   const fontSize = useUIStore((state) => state.fontSize);
@@ -73,6 +84,11 @@ function ReaderContent({ id }: { id: string }) {
 
   const { prev, next, position, total } = useArticleNeighbors(articleId, tab);
 
+  const progress = progressState.articleId === id ? progressState.value : 0;
+  const originalContent = originalContentState?.articleId === id ? originalContentState.content : null;
+  const isLoadingOriginal = loadingOriginalId === id;
+  const originalError = originalErrorState?.articleId === id ? originalErrorState.message : null;
+
   const markRead = useCallback(
     async (articleToMarkReadId: number) => {
       try {
@@ -94,19 +110,19 @@ function ReaderContent({ id }: { id: string }) {
 
     const scrollHeight = element.scrollHeight - element.clientHeight;
     if (scrollHeight <= 0) {
-      setProgress(0);
+      setProgressState({ articleId: id, value: 0 });
       return;
     }
 
-    setProgress(Math.min(1, element.scrollTop / scrollHeight));
-  }, []);
+    setProgressState({ articleId: id, value: Math.min(1, element.scrollTop / scrollHeight) });
+  }, [id]);
 
   useEffect(() => {
-    if (!article || article.is_read || progress < 0.75 || hasAutoMarkedRead.current) {
+    if (!article || article.is_read || progress < 0.75 || autoMarkedArticleIds.current.has(article.id)) {
       return;
     }
 
-    hasAutoMarkedRead.current = true;
+    autoMarkedArticleIds.current.add(article.id);
     applyArticleStateChange(queryClient, { articleId: article.id, is_read: true });
 
     void apiFetch(`/api/articles/${article.id}/state`, {
@@ -117,7 +133,7 @@ function ReaderContent({ id }: { id: string }) {
         broadcast({ type: 'state-change', articleId: article.id, is_read: true });
       })
       .catch(() => {
-        hasAutoMarkedRead.current = false;
+        autoMarkedArticleIds.current.delete(article.id);
         applyArticleStateChange(queryClient, { articleId: article.id, is_read: article.is_read });
       });
   }, [article, progress, queryClient]);
@@ -169,6 +185,27 @@ function ReaderContent({ id }: { id: string }) {
     toggleReaderFocusMode(focusMode, layout, setLayout, setFocusMode);
   }, [focusMode, layout, setFocusMode, setLayout]);
 
+  const handleLoadOriginal = useCallback(async () => {
+    if (!article) return;
+
+    setLoadingOriginalId(id);
+    setOriginalErrorState(null);
+    try {
+      const content = await apiFetch<OriginalContent>(`/api/articles/${article.id}/original`, { method: 'POST' });
+      setOriginalContentState({ articleId: id, content });
+      queryClient.setQueryData<ArticleDetail>(['article', id], (previous) =>
+        previous ? { ...previous, content_html: content.content_html, content_text: content.content_text } : previous,
+      );
+      setProgressState({ articleId: id, value: 0 });
+      scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '原文加载失败，请稍后重试。';
+      setOriginalErrorState({ articleId: id, message });
+    } finally {
+      setLoadingOriginalId(null);
+    }
+  }, [article, id, queryClient]);
+
   const handleMarkReadCurrent = useCallback(
     async (targetArticle: ArticleDetail) => {
       if (targetArticle.is_read) return;
@@ -188,7 +225,7 @@ function ReaderContent({ id }: { id: string }) {
     [queryClient],
   );
 
-  const { isShortcutsOpen, openShortcuts, closeShortcuts } = useReaderShortcuts({
+  const { isShortcutsOpen, closeShortcuts } = useReaderShortcuts({
     onNext: () => navigateTo(next),
     onPrev: () => navigateTo(prev),
     onToggleStar: () => {
@@ -219,8 +256,11 @@ function ReaderContent({ id }: { id: string }) {
   const showOriginal = titleNeedsTranslation && displayTitle !== article.title;
   const titleLoading = titleNeedsTranslation && !displayTitle && isFetchingAI;
   const summary = ai?.summary || article.summary || '';
-  const readMinutes = estimateReadMinutes(article);
   const relativeTime = article.published_at ? formatRelativeTime(article.published_at) : '';
+  const showSourceExcerptNotice = isLikelySummaryOnly(article) && !originalContent;
+  const contentHtml = originalContent?.content_html || article.content_html || '';
+  const contentText = originalContent?.content_text || article.content_text || '';
+  const readMinutes = estimateReadMinutes({ ...article, content_html: contentHtml, content_text: contentText });
 
   const bylineItems = [
     relativeTime ? { key: 'age', content: <span>{relativeTime} ago</span> } : null,
@@ -304,16 +344,25 @@ function ReaderContent({ id }: { id: string }) {
 
               {summary ? <KeyPointsCallout text={summary} /> : null}
 
+              {showSourceExcerptNotice ? (
+                <SourceExcerptNotice
+                  error={originalError}
+                  isLoading={isLoadingOriginal}
+                  link={article.link}
+                  onLoadOriginal={handleLoadOriginal}
+                />
+              ) : null}
+
               <div className="font-reader-text text-[var(--text)]" style={{ fontSize: `${fontSize}px`, lineHeight: 1.9 }}>
-                {article.content_html ? (
+                {contentHtml ? (
                   <BilingualBody
                     articleId={article.id}
-                    contentHtml={article.content_html}
+                    contentHtml={contentHtml}
                     language={article.language}
                     nativeLanguage={nativeLanguage}
                   />
                 ) : (
-                  <p>{article.content_text}</p>
+                  <p>{contentText}</p>
                 )}
               </div>
 
@@ -331,7 +380,6 @@ function ReaderContent({ id }: { id: string }) {
         total={total}
         markRead={markRead}
       />
-      <KeyboardShortcutsButton onClick={openShortcuts} className="md:hidden" />
       <KeyboardShortcutsModal open={isShortcutsOpen} onClose={closeShortcuts} />
       <TweaksPanel />
     </div>
