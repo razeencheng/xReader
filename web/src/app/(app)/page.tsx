@@ -6,10 +6,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FeedList } from '@/components/feed/FeedList';
 import { ArticleView } from '@/components/reader/ArticleView';
 import { SourceBrowser } from '@/components/layout/SourceBrowser';
-import { KeyboardShortcutsModal } from '@/components/layout/KeyboardShortcutsModal';
 import { apiFetch } from '@/lib/api-client';
 import { applyArticleStateChange } from '@/lib/article-state-cache';
 import { broadcast } from '@/lib/broadcast';
+import { useI18n } from '@/lib/i18n';
 import { useReaderShortcuts } from '@/hooks/useReaderShortcuts';
 import { useArticles } from '@/lib/queries/articles';
 import { toggleReaderFocusMode } from '@/lib/reader-layout';
@@ -18,6 +18,7 @@ import type { ArticleItem, ArticleTab } from '@/lib/types';
 
 function FeedPageContent() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const currentView = useUIStore((state) => state.currentView);
   const selectedSourceId = useUIStore((state) => state.selectedSourceId);
   const readFilter = useUIStore((state) => state.readFilter);
@@ -102,7 +103,7 @@ function FeedPageContent() {
     [filteredItems],
   );
 
-  const { isShortcutsOpen, closeShortcuts } = useReaderShortcuts({
+  useReaderShortcuts({
     onNext: () => {
       if (currentIndex < filteredItems.length - 1) {
         selectArticleAtIndex(currentIndex + 1);
@@ -179,18 +180,13 @@ function FeedPageContent() {
           ) : (
             <div className="flex h-full items-center justify-center px-12 text-center select-none">
               <div className="max-w-sm space-y-6 text-[var(--text-3)]">
-                <div className="font-serif text-[22px] italic text-[var(--text-2)]">Select an article</div>
-                <p className="text-sm leading-6">
-                  Pick something from the left to start reading.<br />
-                  Focus mode and reading tweaks stay with you automatically.
-                </p>
+                <div className="font-serif text-[22px] italic text-[var(--text-2)]">{t('feed.selectArticle')}</div>
+                <p className="whitespace-pre-line text-sm leading-6">{t('feed.selectArticleHint')}</p>
               </div>
             </div>
           )}
         </AnimatePresence>
       </main>
-
-      <KeyboardShortcutsModal open={isShortcutsOpen} onClose={closeShortcuts} />
     </div>
   );
 }

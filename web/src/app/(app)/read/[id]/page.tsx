@@ -9,6 +9,7 @@ import { apiFetch } from '@/lib/api-client';
 import { applyArticleStateChange } from '@/lib/article-state-cache';
 import { estimateReadMinutes, formatRelativeTime, getDisplayTitle, isLikelySummaryOnly, isSameLanguage } from '@/lib/article-meta';
 import { broadcast } from '@/lib/broadcast';
+import { useI18n } from '@/lib/i18n';
 import { useReaderShortcuts } from '@/hooks/useReaderShortcuts';
 import { useUIStore } from '@/stores/useUIStore';
 import { getActiveReaderLayout, toggleReaderFocusMode } from '@/lib/reader-layout';
@@ -20,7 +21,6 @@ import { NextUpCard } from '@/components/reader/NextUpCard';
 import { TweaksPanel } from '@/components/reader/TweaksPanel';
 import { useArticleNeighbors } from '@/lib/queries/neighbors';
 import { HighlightLayer } from '@/components/reader/HighlightLayer';
-import { KeyboardShortcutsModal } from '@/components/layout/KeyboardShortcutsModal';
 import { SourceExcerptNotice } from '@/components/reader/SourceExcerptNotice';
 import type { ArticleItem, ArticleTab } from '@/lib/types';
 
@@ -49,6 +49,7 @@ function normalizeTab(value: string | null): ArticleTab {
 }
 
 function ReaderContent({ id }: { id: string }) {
+  const { t } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -199,12 +200,12 @@ function ReaderContent({ id }: { id: string }) {
       setProgressState({ articleId: id, value: 0 });
       scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
-      const message = error instanceof Error ? error.message : '原文加载失败，请稍后重试。';
+      const message = error instanceof Error ? error.message : t('reader.originalLoadError');
       setOriginalErrorState({ articleId: id, message });
     } finally {
       setLoadingOriginalId(null);
     }
-  }, [article, id, queryClient]);
+  }, [article, id, queryClient, t]);
 
   const handleMarkReadCurrent = useCallback(
     async (targetArticle: ArticleDetail) => {
@@ -225,7 +226,7 @@ function ReaderContent({ id }: { id: string }) {
     [queryClient],
   );
 
-  const { isShortcutsOpen, closeShortcuts } = useReaderShortcuts({
+  useReaderShortcuts({
     onNext: () => navigateTo(next),
     onPrev: () => navigateTo(prev),
     onToggleStar: () => {
@@ -247,7 +248,7 @@ function ReaderContent({ id }: { id: string }) {
   if (isLoading || !article) {
     return (
       <div className="flex h-full items-center justify-center bg-[var(--bg)]">
-        <p className="text-sm text-[var(--text-muted)]">Loading…</p>
+        <p className="text-sm text-[var(--text-muted)]">{t('common.loading')}</p>
       </div>
     );
   }
@@ -263,8 +264,8 @@ function ReaderContent({ id }: { id: string }) {
   const readMinutes = estimateReadMinutes({ ...article, content_html: contentHtml, content_text: contentText });
 
   const bylineItems = [
-    relativeTime ? { key: 'age', content: <span>{relativeTime} ago</span> } : null,
-    readMinutes ? { key: 'time', content: <span>{readMinutes} min read</span> } : null,
+    relativeTime ? { key: 'age', content: <span>{t('article.ago', { time: relativeTime })}</span> } : null,
+    readMinutes ? { key: 'time', content: <span>{t('article.minRead', { count: readMinutes })}</span> } : null,
     article.source_title
       ? {
           key: 'source',
@@ -277,7 +278,7 @@ function ReaderContent({ id }: { id: string }) {
           content: (
             <span className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[var(--accent)]">
               <Languages size={11} />
-              {nativeLanguage} translation
+              {t('reader.translationLabel', { language: nativeLanguage })}
             </span>
           ),
         }
@@ -314,7 +315,7 @@ function ReaderContent({ id }: { id: string }) {
               {titleLoading ? (
                 <div className="mb-3 inline-flex items-center gap-2 font-serif text-[18px] text-[var(--text-3)]">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
-                  Translating title…
+                  {t('reader.translatingTitle')}
                 </div>
               ) : (
                 <h1
@@ -380,20 +381,20 @@ function ReaderContent({ id }: { id: string }) {
         total={total}
         markRead={markRead}
       />
-      <KeyboardShortcutsModal open={isShortcutsOpen} onClose={closeShortcuts} />
       <TweaksPanel />
     </div>
   );
 }
 
 export default function ReaderPage({ params }: { params: Promise<{ id: string }> }) {
+  const { t } = useI18n();
   const { id } = use(params);
 
   return (
     <Suspense
       fallback={
         <div className="flex h-full items-center justify-center bg-[var(--bg)]">
-          <p className="text-sm text-[var(--text-muted)]">Loading…</p>
+          <p className="text-sm text-[var(--text-muted)]">{t('common.loading')}</p>
         </div>
       }
     >

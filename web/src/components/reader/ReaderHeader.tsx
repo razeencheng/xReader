@@ -1,5 +1,6 @@
 import { ArrowLeft, Maximize2, Minimize2, Share2, Star } from 'lucide-react';
 import { estimateReadMinutes } from '@/lib/article-meta';
+import { useI18n } from '@/lib/i18n';
 import { getSourceColor } from '@/lib/source-meta';
 import type { ArticleItem } from '@/lib/types';
 
@@ -34,8 +35,9 @@ export function ReaderHeader({
   focusMode = false,
   progress = 0,
 }: Props) {
+  const { t } = useI18n();
   const sourceColor = getSourceColor(article.source_title);
-  const sourceTitle = article.source_title?.trim() || 'Source';
+  const sourceTitle = article.source_title?.trim() || t('common.source');
   const readMinutes = estimateReadMinutes(article);
   const showReadState = progress > 0.75 || article.is_read;
 
@@ -46,11 +48,11 @@ export function ReaderHeader({
           type="button"
           onClick={onBack}
           className={`${iconButtonClass} mr-1 w-auto gap-1 px-2 md:w-[30px] md:px-0`}
-          title="Back"
-          aria-label="返回列表"
+          title={t('reader.back')}
+          aria-label={t('reader.backToList')}
         >
           <ArrowLeft size={15} strokeWidth={1.8} />
-          <span className="text-[12px] font-medium md:hidden">返回</span>
+          <span className="text-[12px] font-medium md:hidden">{t('reader.back')}</span>
         </button>
       ) : null}
 
@@ -58,8 +60,8 @@ export function ReaderHeader({
         <div className="flex items-center gap-1.5 overflow-hidden whitespace-nowrap">
           <span className="inline-block h-[10px] w-[10px] shrink-0 rounded-[2px]" style={{ backgroundColor: sourceColor }} />
           <span className="truncate font-medium text-[var(--text-2)]">{sourceTitle}</span>
-          {readMinutes ? <span>· {readMinutes} min read</span> : null}
-          {showReadState ? <span className="font-medium text-[var(--accent)]">· Read ✓</span> : null}
+          {readMinutes ? <span>· {t('article.minRead', { count: readMinutes })}</span> : null}
+          {showReadState ? <span className="font-medium text-[var(--accent)]">· {t('reader.readState')}</span> : null}
         </div>
       </div>
 
@@ -68,14 +70,14 @@ export function ReaderHeader({
           type="button"
           onClick={onToggleStar}
           className={`${iconButtonClass} ${article.is_starred ? 'text-[var(--star)] hover:text-[var(--star)]' : ''}`}
-          title="Star"
+          title={t('reader.star')}
         >
           <Star size={15} fill={article.is_starred ? 'currentColor' : 'none'} strokeWidth={article.is_starred ? 0 : 1.8} />
         </button>
       ) : null}
 
       {onShare ? (
-        <button type="button" onClick={onShare} className={iconButtonClass} title="Share">
+        <button type="button" onClick={onShare} className={iconButtonClass} title={t('reader.share')}>
           <Share2 size={15} strokeWidth={1.8} />
         </button>
       ) : null}
@@ -85,7 +87,7 @@ export function ReaderHeader({
           type="button"
           onClick={onToggleFocus}
           className={`${iconButtonClass} ${focusMode ? 'bg-[var(--accent-bg)] text-[var(--accent)] hover:bg-[var(--accent-bg)] hover:text-[var(--accent)]' : ''}`}
-          title={focusMode ? 'Exit focus mode' : 'Focus mode'}
+          title={focusMode ? t('reader.exitFocusMode') : t('reader.focusMode')}
         >
           {focusMode ? <Minimize2 size={15} strokeWidth={1.8} /> : <Maximize2 size={15} strokeWidth={1.8} />}
         </button>

@@ -38,12 +38,12 @@ beforeEach(() => {
     },
     isLoading: false,
   });
-  useUIStore.setState({ currentView: 'sources', selectedSourceId: null, readFilter: 'unread' });
+  useUIStore.setState({ currentView: 'sources', selectedSourceId: null, readFilter: 'unread', nativeLanguage: 'zh-CN' });
 });
 
 afterEach(() => {
   useAuthStore.setState({ user: null, isLoading: false });
-  useUIStore.setState({ currentView: 'today', selectedSourceId: null, readFilter: 'unread' });
+  useUIStore.setState({ currentView: 'today', selectedSourceId: null, readFilter: 'unread', nativeLanguage: 'zh-CN' });
 });
 
 test('renders grouped sources with all-sources summary and unread badges', async () => {
@@ -66,9 +66,9 @@ test('renders grouped sources with all-sources summary and unread badges', async
 
   render(<SourceBrowser />, { wrapper: createWrapper() });
 
-  expect(await screen.findByText('Sources')).toBeInTheDocument();
-  expect(screen.getByText('3 unread · 2 feeds')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /All Sources/i })).toBeInTheDocument();
+  expect(await screen.findByText('订阅源')).toBeInTheDocument();
+  expect(screen.getByText('3 未读 · 2 个订阅源')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /所有订阅源/i })).toBeInTheDocument();
   expect(screen.getByText('Technology')).toBeInTheDocument();
   expect(screen.getByText('Finance')).toBeInTheDocument();
 

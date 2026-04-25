@@ -3,6 +3,7 @@
 import { Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { estimateReadMinutes, formatRelativeTime, getDisplayTitle, getOriginalTitle } from '@/lib/article-meta';
+import { useI18n } from '@/lib/i18n';
 import { getSourceColor } from '@/lib/source-meta';
 import type { ArticleItem } from '@/lib/types';
 
@@ -25,11 +26,12 @@ export function FeedRowComfortable({
   onMarkRead,
   onUndoRead,
 }: Props) {
+  const { t } = useI18n();
   const displayTitle = getDisplayTitle(item);
   const originalTitle = getOriginalTitle(item);
   const relativeTime = formatRelativeTime(item.published_at);
   const readMinutes = estimateReadMinutes(item);
-  const sourceName = (item.source_title?.trim() || 'Untitled Source').toUpperCase();
+  const sourceName = (item.source_title?.trim() || t('article.untitledSource')).toUpperCase();
   const sourceColor = getSourceColor(item.source_title);
   const dimmed = (item.is_read || pendingRead) && !selected;
 
@@ -71,31 +73,31 @@ export function FeedRowComfortable({
       ) : null}
 
       <div className="mt-1 flex items-center">
-        {readMinutes ? <span className="text-[11px] text-[var(--text-3)]">{readMinutes} min read</span> : <span />}
+        {readMinutes ? <span className="text-[11px] text-[var(--text-3)]">{t('article.minRead', { count: readMinutes })}</span> : <span />}
         <div className="flex-1" />
         {pendingRead ? (
           <button
             type="button"
-            aria-label="撤销已读"
+            aria-label={t('feed.undoReadAria')}
             onClick={(event) => {
               event.stopPropagation();
               onUndoRead?.();
             }}
             className="mr-1 rounded-full bg-[var(--bg-elevated)] px-2 py-[3px] text-[10.5px] font-medium text-[var(--text-3)] shadow-[inset_0_0_0_1px_var(--border)] transition-colors hover:text-[var(--accent)]"
           >
-            已读 · 撤销
+            {t('feed.readUndo')}
           </button>
         ) : onMarkRead && !item.is_read ? (
           <button
             type="button"
-            aria-label="标已读"
+            aria-label={t('feed.markRead')}
             onClick={(event) => {
               event.stopPropagation();
               onMarkRead();
             }}
             className="mr-1 rounded-full px-2 py-[3px] text-[10.5px] font-medium text-[var(--text-3)] opacity-0 transition-[background,color,opacity] hover:bg-[var(--accent-bg)] hover:text-[var(--accent)] group-hover:opacity-100 focus:opacity-100"
           >
-            标已读
+            {t('feed.markRead')}
           </button>
         ) : null}
         {onStar ? (

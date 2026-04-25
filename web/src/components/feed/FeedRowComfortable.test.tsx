@@ -3,6 +3,7 @@
 import { render, screen } from '@testing-library/react';
 import { FeedRowComfortable } from './FeedRowComfortable';
 import type { ArticleItem } from '@/lib/types';
+import { useUIStore } from '@/stores/useUIStore';
 
 const mockTranslated: ArticleItem = {
   id: 1,
@@ -25,6 +26,10 @@ const mockNative: ArticleItem = {
   published_at: new Date(Date.now() - 5 * 3600000).toISOString(),
 };
 
+beforeEach(() => {
+  useUIStore.setState({ nativeLanguage: 'zh-CN' });
+});
+
 test('renders translated title with original subtitle', () => {
   render(<FeedRowComfortable item={mockTranslated} />);
   expect(screen.getByText(/Vercel AI SDK 为何/)).toBeInTheDocument();
@@ -39,5 +44,5 @@ test('does not render original subtitle for native-language article', () => {
 test('shows source name and reading time footer', () => {
   render(<FeedRowComfortable item={mockTranslated} />);
   expect(screen.getByText('VERCEL BLOG')).toBeInTheDocument();
-  expect(screen.getByText(/min read/i)).toBeInTheDocument();
+  expect(screen.getByText(/分钟阅读/i)).toBeInTheDocument();
 });

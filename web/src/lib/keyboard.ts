@@ -9,7 +9,8 @@ let pendingTimeout: ReturnType<typeof setTimeout> | null = null;
 let listenerAttached = false;
 
 function normalizeKey(key: string) {
-  return key.trim().toLowerCase();
+  const normalized = key.trim().toLowerCase();
+  return normalized === 'esc' ? 'escape' : normalized;
 }
 
 function normalizeShortcut(key: string) {
@@ -73,6 +74,18 @@ function shouldIgnoreShortcuts(target: EventTarget | null) {
   return target instanceof Element ? isEditableElement(target) : false;
 }
 
+function hasBrowserModifier(event: KeyboardEvent) {
+  return event.metaKey || event.ctrlKey || event.altKey;
+}
+
+function getShortcutKey(event: KeyboardEvent) {
+  if (event.shiftKey && event.key === '/') {
+    return '?';
+  }
+
+  return event.key;
+}
+
 function dispatchFromRoot(key: string) {
   const directHandler = shortcuts.get(key);
   if (directHandler) {
@@ -112,11 +125,11 @@ function ensureListener() {
   }
 
   document.addEventListener('keydown', (event) => {
-    if (shouldIgnoreShortcuts(event.target)) {
+    if (shouldIgnoreShortcuts(event.target) || hasBrowserModifier(event)) {
       return;
     }
 
-    if (dispatchKey(event.key)) {
+    if (dispatchKey(getShortcutKey(event))) {
       event.preventDefault();
     }
   });

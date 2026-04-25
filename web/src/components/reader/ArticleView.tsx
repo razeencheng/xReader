@@ -8,6 +8,7 @@ import { apiFetch } from '@/lib/api-client';
 import { applyArticleStateChange } from '@/lib/article-state-cache';
 import { broadcast } from '@/lib/broadcast';
 import { estimateReadMinutes, formatRelativeTime, getDisplayTitle, isLikelySummaryOnly, isSameLanguage } from '@/lib/article-meta';
+import { useI18n } from '@/lib/i18n';
 import { getActiveReaderLayout, toggleReaderFocusMode } from '@/lib/reader-layout';
 import { useUIStore } from '@/stores/useUIStore';
 import { KeyPointsCallout } from '@/components/reader/KeyPointsCallout';
@@ -45,6 +46,7 @@ interface ArticleViewProps {
 
 export function ArticleView({ id, onClose, className = '' }: ArticleViewProps) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoMarkedArticleIds = useRef(new Set<number>());
   const [progressState, setProgressState] = useState({ articleId: id, value: 0 });
@@ -157,12 +159,12 @@ export function ArticleView({ id, onClose, className = '' }: ArticleViewProps) {
       setProgressState({ articleId: id, value: 0 });
       scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
-      const message = error instanceof Error ? error.message : '原文加载失败，请稍后重试。';
+      const message = error instanceof Error ? error.message : t('reader.originalLoadError');
       setOriginalErrorState({ articleId: id, message });
     } finally {
       setLoadingOriginalId(null);
     }
-  }, [article, id, queryClient]);
+  }, [article, id, queryClient, t]);
 
   const displayTitle = article
     ? ai?.title_translated || article.title_translated || getDisplayTitle(article)
@@ -181,10 +183,10 @@ export function ArticleView({ id, onClose, className = '' }: ArticleViewProps) {
 
     const items: Array<{ key: string; content: React.ReactNode }> = [];
     if (relativeTime) {
-      items.push({ key: 'age', content: <span>{relativeTime} ago</span> });
+      items.push({ key: 'age', content: <span>{t('article.ago', { time: relativeTime })}</span> });
     }
     if (readMinutes) {
-      items.push({ key: 'time', content: <span>{readMinutes} min read</span> });
+      items.push({ key: 'time', content: <span>{t('article.minRead', { count: readMinutes })}</span> });
     }
     if (article.source_title) {
       items.push({
@@ -198,14 +200,14 @@ export function ArticleView({ id, onClose, className = '' }: ArticleViewProps) {
         content: (
           <span className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[var(--accent)]">
             <Languages size={11} />
-            {nativeLanguage} translation
+            {t('reader.translationLabel', { language: nativeLanguage })}
           </span>
         ),
       });
     }
 
     return items;
-  }, [article, nativeLanguage, readMinutes, relativeTime, titleNeedsTranslation]);
+  }, [article, nativeLanguage, readMinutes, relativeTime, titleNeedsTranslation, t]);
 
   if (isLoading) {
     return (
@@ -249,7 +251,7 @@ export function ArticleView({ id, onClose, className = '' }: ArticleViewProps) {
               {titleLoading ? (
                 <div className="mb-3 inline-flex items-center gap-2 font-serif text-[18px] text-[var(--text-3)]">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
-                  Translating title…
+                  {t('reader.translatingTitle')}
                 </div>
               ) : (
                 <h1

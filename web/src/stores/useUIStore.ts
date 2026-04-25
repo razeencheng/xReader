@@ -21,6 +21,7 @@ interface UIState {
   currentView: ViewTab;
   selectedSourceId: number | null;
   nativeLanguage: string;
+  isShortcutsOpen: boolean;
 
   setDensity: (d: Density) => void;
   toggleDensity: () => void;
@@ -32,6 +33,8 @@ interface UIState {
   setReadFilter: (f: ReadFilter) => void;
   setCurrentView: (v: ViewTab, sourceId?: number | null) => void;
   setNativeLanguage: (l: string) => void;
+  openShortcuts: () => void;
+  closeShortcuts: () => void;
   
   hydrate: (prefs: { 
     density_pref?: string; 
@@ -89,6 +92,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   currentView: (readStoredValue('currentView') as ViewTab) || 'today',
   selectedSourceId: readStoredValue('selectedSourceId') ? Number(readStoredValue('selectedSourceId')) : null,
   nativeLanguage: readStoredValue('nativeLanguage') || 'zh-CN',
+  isShortcutsOpen: false,
 
   setDensity: (density) => {
     set({ density });
@@ -134,6 +138,8 @@ export const useUIStore = create<UIState>((set, get) => ({
     set({ nativeLanguage });
     persist('nativeLanguage', nativeLanguage);
   },
+  openShortcuts: () => set({ isShortcutsOpen: true }),
+  closeShortcuts: () => set({ isShortcutsOpen: false }),
 
   hydrate: (prefs) => {
     const update: Partial<UIState> = {};

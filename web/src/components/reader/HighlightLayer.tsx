@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { deleteHighlight, fetchHighlights, updateHighlightNote, type Highlight } from '@/lib/queries/highlights';
 import { HighlightToolbar } from './HighlightToolbar';
 
@@ -10,9 +11,8 @@ interface Props {
   children?: ReactNode;
 }
 
-type ParagraphHighlight = Highlight & { top?: number };
-
 export function HighlightLayer({ articleId, refreshKey, children }: Props) {
+  const { t } = useI18n();
   const [highlights, setHighlights] = useState<Highlight[]>([]);
 
   useEffect(() => {
@@ -119,7 +119,7 @@ export function HighlightLayer({ articleId, refreshKey, children }: Props) {
     const highlight = highlights.find((item) => item.id === id);
     if (!highlight) return;
 
-    const action = window.prompt('输入 note / delete / copy', highlight.note ?? '');
+    const action = window.prompt(t('reader.highlightPrompt'), highlight.note ?? '');
     if (action == null) return;
     if (action === 'delete') {
       await deleteHighlight(id);

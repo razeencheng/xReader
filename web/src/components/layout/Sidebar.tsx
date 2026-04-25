@@ -5,21 +5,29 @@ import { useRouter } from 'next/navigation';
 import { Globe, Keyboard, Settings } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { LanguageModal } from '@/components/layout/LanguageModal';
-import { KeyboardShortcutsModal } from '@/components/layout/KeyboardShortcutsModal';
-import { LANGUAGE_OPTIONS, PRIMARY_NAV_ITEMS } from '@/components/layout/navigationConfig';
+import { getLanguageOption, PRIMARY_NAV_ITEMS } from '@/components/layout/navigationConfig';
+import { useI18n } from '@/lib/i18n';
 import { useUIStore } from '@/stores/useUIStore';
+
+const NAV_LABEL_KEYS = {
+  today: 'nav.today',
+  all: 'nav.all',
+  starred: 'nav.starred',
+  sources: 'nav.sources',
+} as const;
 
 export function Sidebar({ className = '' }: { className?: string }) {
   const [isLanguageOpen, setIsLanguageOpen] = useState(false);
-  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const router = useRouter();
   const currentView = useUIStore((state) => state.currentView);
   const setCurrentView = useUIStore((state) => state.setCurrentView);
   const nativeLanguage = useUIStore((state) => state.nativeLanguage);
   const setNativeLanguage = useUIStore((state) => state.setNativeLanguage);
+  const openShortcuts = useUIStore((state) => state.openShortcuts);
+  const { t } = useI18n();
 
   const currentLanguage = useMemo(
-    () => LANGUAGE_OPTIONS.find((option) => option.code === nativeLanguage) ?? LANGUAGE_OPTIONS[0],
+    () => getLanguageOption(nativeLanguage),
     [nativeLanguage],
   );
 
@@ -38,7 +46,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
               <button
                 key={item.id}
                 type="button"
-                title={item.title}
+                title={t(NAV_LABEL_KEYS[item.id])}
                 onClick={() => setCurrentView(item.id)}
                 className={`relative flex h-9 w-9 items-center justify-center rounded-[9px] transition-colors ${
                   active
@@ -55,8 +63,8 @@ export function Sidebar({ className = '' }: { className?: string }) {
 
         <button
           type="button"
-          title="快捷键"
-          onClick={() => setIsShortcutsOpen(true)}
+          title={t('shortcuts.open')}
+          onClick={openShortcuts}
           className="mb-1 flex h-9 w-9 items-center justify-center rounded-[9px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
         >
           <Keyboard size={16} strokeWidth={1.75} />
@@ -64,7 +72,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
 
         <button
           type="button"
-          title={`Native language: ${currentLanguage.name}`}
+          title={t('nav.nativeLanguageTitle', { language: currentLanguage.name })}
           onClick={() => setIsLanguageOpen(true)}
           className="flex h-9 w-9 flex-col items-center justify-center gap-[1px] rounded-[9px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
         >
@@ -76,7 +84,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
 
         <button
           type="button"
-          title="Settings"
+          title={t('nav.settings')}
           onClick={() => router.push('/settings')}
           className="flex h-9 w-9 items-center justify-center rounded-[9px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
         >
@@ -91,7 +99,6 @@ export function Sidebar({ className = '' }: { className?: string }) {
           onClose={() => setIsLanguageOpen(false)}
         />
       ) : null}
-      <KeyboardShortcutsModal open={isShortcutsOpen} onClose={() => setIsShortcutsOpen(false)} />
     </>
   );
 }

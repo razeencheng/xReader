@@ -273,7 +273,7 @@ After completing a sprint, update the plan file: check off all completed `- [ ]`
 ## 6. Language and i18n conventions
 
 - **Code**: English (variable names, comments, commit messages, docs)
-- **User-facing strings**: Chinese (zh-CN) as the default; use i18n keys where the spec calls for multi-language support
+- **User-facing strings**: Chinese (zh-CN) as the default; global UI chrome must use i18n keys and follow the user's `native_language` setting
 - **AI prompts**: Ship zh-CN and en-US versions (in `server/internal/ai/prompts.go`); parameterized by the user's `native_language`
 - **Test fixtures**: Use realistic Chinese + English content to catch encoding, rendering, and font-stack issues early
 

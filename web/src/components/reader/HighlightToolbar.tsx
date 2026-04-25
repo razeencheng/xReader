@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { computeAnchor, type HighlightAnchor } from './highlightAnchor';
+import { useI18n } from '@/lib/i18n';
 import { createHighlight } from '@/lib/queries/highlights';
 
 interface Props {
@@ -13,6 +14,7 @@ import { Highlighter, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export function HighlightToolbar({ articleId, onHighlightCreated }: Props) {
+  const { t } = useI18n();
   const [anchor, setAnchor] = useState<HighlightAnchor | null>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
 
@@ -76,8 +78,8 @@ export function HighlightToolbar({ articleId, onHighlightCreated }: Props) {
           <button
             onClick={() => save(false)}
             className="p-2 text-[var(--accent)] hover:bg-[var(--accent-bg)] rounded-full transition-colors"
-            title="高亮"
-            aria-label="高亮"
+            title={t('reader.highlight')}
+            aria-label={t('reader.highlight')}
           >
             <Highlighter size={16} strokeWidth={2.5} />
           </button>
@@ -85,8 +87,8 @@ export function HighlightToolbar({ articleId, onHighlightCreated }: Props) {
           <button
             onClick={() => save(true)}
             className="p-2 text-[var(--accent)] hover:bg-[var(--accent-bg)] rounded-full transition-colors"
-            title="高亮并添加备注"
-            aria-label="高亮并添加备注"
+            title={t('reader.highlightWithNote')}
+            aria-label={t('reader.highlightWithNote')}
           >
             <MessageSquare size={16} strokeWidth={2.5} />
           </button>

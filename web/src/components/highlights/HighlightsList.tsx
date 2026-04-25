@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { apiFetch } from '@/lib/api-client';
+import { useI18n } from '@/lib/i18n';
 
 interface HighlightRow {
   id: number;
@@ -15,6 +16,7 @@ interface HighlightRow {
 }
 
 export function HighlightsList() {
+  const { t } = useI18n();
   const [highlights, setHighlights] = useState<HighlightRow[]>([]);
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -24,11 +26,13 @@ export function HighlightsList() {
     if (query) params.set('q', query);
     params.set('limit', '50');
 
-    setIsLoading(true);
+    const timeoutId = window.setTimeout(() => setIsLoading(true), 0);
     apiFetch<HighlightRow[]>(`/api/highlights?${params}`)
       .then(setHighlights)
       .catch(() => setHighlights([]))
       .finally(() => setIsLoading(false));
+
+    return () => window.clearTimeout(timeoutId);
   }, [query]);
 
   return (
@@ -36,7 +40,7 @@ export function HighlightsList() {
       <div className="mb-4">
         <input
           type="text"
-          placeholder="搜索高亮和笔记…"
+          placeholder={t('highlights.searchPlaceholder')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--bg-input)] px-4 py-2 text-sm text-[var(--text-body)] placeholder-[var(--text-faint)] outline-none focus:border-[var(--border-accent)]"
@@ -44,10 +48,10 @@ export function HighlightsList() {
       </div>
 
       {isLoading ? (
-        <div className="py-8 text-center text-sm text-[var(--text-muted)]">Loading…</div>
+        <div className="py-8 text-center text-sm text-[var(--text-muted)]">{t('common.loading')}</div>
       ) : highlights.length === 0 ? (
         <div className="py-8 text-center text-sm text-[var(--text-muted)]">
-          {query ? '没有找到匹配的高亮' : '还没有任何高亮'}
+          {query ? t('highlights.noResults') : t('highlights.empty')}
         </div>
       ) : (
         <div className="divide-y divide-[var(--border-default)]">
@@ -58,10 +62,10 @@ export function HighlightsList() {
               className="block py-4 hover:bg-[var(--bg-badge-starred)] -mx-4 px-4 rounded"
             >
               <div className="mb-1 text-xs text-[var(--text-muted)]">
-                {h.article_title || `Article ${h.article_id}`}
+                {h.article_title || t('highlights.articleFallback', { id: h.article_id })}
               </div>
               <div className="mb-1 border-l-2 border-[var(--border-accent)] pl-3 text-sm text-[var(--text-body)]">
-                "{h.quoted_text}"
+                &ldquo;{h.quoted_text}&rdquo;
               </div>
               {h.note && (
                 <div className="pl-3 text-xs italic text-[var(--text-muted)]">

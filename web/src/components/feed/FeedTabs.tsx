@@ -1,12 +1,13 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useI18n } from '@/lib/i18n';
 import type { ArticleTab } from '@/lib/types';
 
-const TABS: Array<{ key: ArticleTab; label: string }> = [
-  { key: 'today', label: '今日' },
-  { key: 'stream', label: '全部' },
-  { key: 'starred', label: '收藏' },
+const TABS: Array<{ key: ArticleTab; labelKey: string }> = [
+  { key: 'today', labelKey: 'nav.today' },
+  { key: 'stream', labelKey: 'nav.all' },
+  { key: 'starred', labelKey: 'nav.starred' },
 ];
 
 function normalizeTab(value: string | null): ArticleTab {
@@ -14,6 +15,7 @@ function normalizeTab(value: string | null): ArticleTab {
 }
 
 export function FeedTabs() {
+  const { t } = useI18n();
   const searchParams = useSearchParams();
   const router = useRouter();
   const currentTab = normalizeTab(searchParams.get('tab'));
@@ -26,7 +28,7 @@ export function FeedTabs() {
 
   return (
     <div className="flex items-center gap-2 text-[13px] leading-none font-normal">
-      {TABS.map(({ key, label }) => {
+      {TABS.map(({ key, labelKey }) => {
         const active = currentTab === key;
 
         return (
@@ -40,7 +42,7 @@ export function FeedTabs() {
                 : 'opacity-55 hover:opacity-80'
             }`}
           >
-            {label}
+            {t(labelKey)}
           </button>
         );
       })}

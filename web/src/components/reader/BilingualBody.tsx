@@ -5,6 +5,7 @@ import { Languages } from 'lucide-react';
 import { useLazyTranslation } from '@/hooks/useLazyTranslation';
 import { fontForLang } from '@/lib/langFonts';
 import { isSameLanguage } from '@/lib/article-meta';
+import { useI18n } from '@/lib/i18n';
 
 interface Props {
   articleId: number;
@@ -104,6 +105,7 @@ function splitContentHtml(contentHtml: string) {
 }
 
 export function BilingualBody({ articleId, contentHtml, language, nativeLanguage }: Props) {
+  const { t } = useI18n();
   const paragraphs = useMemo(() => splitContentHtml(contentHtml), [contentHtml]);
   const sameLanguage = isSameLanguage(language, nativeLanguage);
   const originalFont = fontForLang(language);
@@ -174,7 +176,7 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
                     ) : (
                       <span className="inline-flex items-center gap-2 text-[11.5px] not-italic text-[var(--text-3)]">
                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--accent)]" />
-                        Translating…
+                        {t('reader.translatingParagraph')}
                       </span>
                     )}
                   </div>
@@ -188,7 +190,7 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
                   }`}
                 >
                   <Languages size={12} />
-                  {isLoading ? 'Translating…' : isOpen ? 'Hide translation' : 'Translate paragraph'}
+                  {isLoading ? t('reader.translatingParagraph') : isOpen ? t('reader.hideTranslation') : t('reader.translateParagraph')}
                 </button>
               </div>
             ) : null}

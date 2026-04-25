@@ -1,4 +1,5 @@
 import { ExternalLink } from 'lucide-react';
+import { useI18n } from '@/lib/i18n';
 
 interface SourceExcerptNoticeProps {
   link: string;
@@ -8,11 +9,13 @@ interface SourceExcerptNoticeProps {
 }
 
 export function SourceExcerptNotice({ error, isLoading = false, link, onLoadOriginal }: SourceExcerptNoticeProps) {
+  const { t } = useI18n();
+
   return (
     <aside className="mb-7 rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-callout)] px-4 py-3 font-[system-ui] text-sm leading-6 text-[var(--text-secondary)]">
-      <div className="font-medium text-[var(--text-body)]">这个订阅源可能只提供了摘要</div>
+      <div className="font-medium text-[var(--text-body)]">{t('reader.summaryOnlyTitle')}</div>
       <div className="mt-1">
-        当前 RSS 正文只有很短的一段。可以直接加载原文，xReader 会尽量提取正文并保持当前阅读样式。
+        {t('reader.summaryOnlyDescription')}
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button
@@ -24,10 +27,10 @@ export function SourceExcerptNotice({ error, isLoading = false, link, onLoadOrig
           {isLoading ? (
             <>
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
-              加载中…
+              {t('reader.loading')}
             </>
           ) : (
-            '加载原文'
+            t('reader.loadOriginal')
           )}
         </button>
         <a
@@ -36,7 +39,7 @@ export function SourceExcerptNotice({ error, isLoading = false, link, onLoadOrig
           rel="noreferrer"
           className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-strong)] bg-[var(--bg-body)] px-3 py-1.5 text-xs font-medium text-[var(--text-body)] transition-colors hover:border-[var(--border-accent)] hover:text-[var(--text-accent)]"
         >
-          新标签打开
+          {t('reader.openInNewTab')}
           <ExternalLink size={13} />
         </a>
       </div>

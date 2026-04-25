@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useShortcuts } from '@/hooks/useShortcuts';
+import { useUIStore } from '@/stores/useUIStore';
 
 interface ReaderShortcutHandlers {
   onNext?: () => void;
@@ -18,27 +19,17 @@ export function useReaderShortcuts({
   onToggleStar,
   onMarkRead,
   onToggleFocus,
-  onEscape,
 }: ReaderShortcutHandlers) {
-  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
-
-  const openShortcuts = useCallback(() => {
-    setIsShortcutsOpen(true);
-  }, []);
-
-  const closeShortcuts = useCallback(() => {
-    setIsShortcutsOpen(false);
-  }, []);
+  const isShortcutsOpen = useUIStore((state) => state.isShortcutsOpen);
+  const openShortcuts = useUIStore((state) => state.openShortcuts);
+  const closeShortcuts = useUIStore((state) => state.closeShortcuts);
 
   const shortcuts = useMemo<Record<string, () => void>>(() => {
-    const nextShortcuts: Record<string, () => void> = {
-      escape: isShortcutsOpen ? closeShortcuts : () => onEscape?.(),
-    };
-
     if (isShortcutsOpen) {
-      return nextShortcuts;
+      return {};
     }
 
+    const nextShortcuts: Record<string, () => void> = {};
     nextShortcuts.j = () => onNext?.();
     nextShortcuts.k = () => onPrev?.();
     nextShortcuts.arrowright = () => onNext?.();
@@ -46,10 +37,9 @@ export function useReaderShortcuts({
     nextShortcuts.s = () => onToggleStar?.();
     nextShortcuts.r = () => onMarkRead?.();
     nextShortcuts.f = () => onToggleFocus?.();
-    nextShortcuts['?'] = openShortcuts;
 
     return nextShortcuts;
-  }, [closeShortcuts, isShortcutsOpen, onEscape, onMarkRead, onNext, onPrev, onToggleFocus, onToggleStar, openShortcuts]);
+  }, [isShortcutsOpen, onMarkRead, onNext, onPrev, onToggleFocus, onToggleStar]);
 
   useShortcuts(shortcuts);
 

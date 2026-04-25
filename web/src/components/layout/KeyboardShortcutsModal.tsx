@@ -1,28 +1,29 @@
 'use client';
 
 import { Keyboard, X } from 'lucide-react';
+import { useI18n } from '@/lib/i18n';
 
 const SHORTCUT_GROUPS = [
   {
-    label: 'Navigation',
+    labelKey: 'shortcuts.navigation',
     items: [
-      ['j', 'Next article'],
-      ['k', 'Previous article'],
+      ['j', 'shortcuts.nextArticle'],
+      ['k', 'shortcuts.previousArticle'],
     ],
   },
   {
-    label: 'Article',
+    labelKey: 'shortcuts.article',
     items: [
-      ['s', 'Star / unstar current article'],
-      ['r', 'Mark current article as read'],
+      ['s', 'shortcuts.starArticle'],
+      ['r', 'shortcuts.markRead'],
     ],
   },
   {
-    label: 'View',
+    labelKey: 'shortcuts.view',
     items: [
-      ['f', 'Toggle focus mode'],
-      ['?', 'Show keyboard shortcuts'],
-      ['Esc', 'Close'],
+      ['f', 'shortcuts.toggleFocus'],
+      ['?', 'shortcuts.showShortcuts'],
+      ['Esc', 'shortcuts.close'],
     ],
   },
 ] as const;
@@ -42,16 +43,18 @@ export function KeyboardShortcutsButton({
   onClick: () => void;
   className?: string;
 }) {
+  const { t } = useI18n();
+
   return (
     <button
       type="button"
       onClick={onClick}
-      title="Keyboard shortcuts (?)"
-      aria-label="Open keyboard shortcuts"
+      title={`${t('shortcuts.open')} (?)`}
+      aria-label={t('shortcuts.openAria')}
       className={`fixed bottom-4 left-4 md:left-[68px] z-[90] inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[rgba(248,244,238,0.92)] px-3 py-2 text-[11px] text-[var(--text-3)] shadow-[0_16px_40px_rgba(65,52,35,0.12)] backdrop-blur transition-colors hover:bg-[var(--bg)] hover:text-[var(--text-2)] ${className}`}
     >
       <Keyboard size={13} />
-      <span className="font-medium">快捷键</span>
+      <span className="font-medium">{t('shortcuts.open')}</span>
       <Kbd>?</Kbd>
     </button>
   );
@@ -64,6 +67,8 @@ export function KeyboardShortcutsModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
+
   if (!open) {
     return null;
   }
@@ -76,19 +81,19 @@ export function KeyboardShortcutsModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Keyboard Shortcuts"
+        aria-label={t('shortcuts.title')}
         className="w-full max-w-[380px] rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-6 shadow-[0_24px_64px_rgba(0,0,0,0.25)]"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-5 flex items-center justify-between">
           <div>
-            <h2 className="text-[15px] font-semibold text-[var(--text)]">Keyboard Shortcuts</h2>
-            <p className="mt-1 text-[12px] text-[var(--text-3)]">Keep reading without leaving the keyboard.</p>
+            <h2 className="text-[15px] font-semibold text-[var(--text)]">{t('shortcuts.title')}</h2>
+            <p className="mt-1 text-[12px] text-[var(--text-3)]">{t('shortcuts.subtitle')}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close keyboard shortcuts"
+            aria-label={t('shortcuts.closeAria')}
             className="rounded-[9px] p-2 text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
           >
             <X size={16} />
@@ -97,19 +102,19 @@ export function KeyboardShortcutsModal({
 
         <div className="space-y-4">
           {SHORTCUT_GROUPS.map((group) => (
-            <section key={group.label}>
+            <section key={group.labelKey}>
               <div className="mb-2 text-[10.5px] font-medium uppercase tracking-[0.08em] text-[var(--text-3)]">
-                {group.label}
+                {t(group.labelKey)}
               </div>
               <div className="overflow-hidden rounded-[12px] border border-[var(--border-light)]">
-                {group.items.map(([key, label], index) => (
+                {group.items.map(([key, labelKey], index) => (
                   <div
                     key={key}
                     className={`flex items-center justify-between gap-4 bg-[rgba(255,255,255,0.6)] px-3 py-2.5 ${
                       index > 0 ? 'border-t border-[var(--border-light)]' : ''
                     }`}
                   >
-                    <span className="text-[13px] text-[var(--text-2)]">{label}</span>
+                    <span className="text-[13px] text-[var(--text-2)]">{t(labelKey)}</span>
                     <Kbd>{key}</Kbd>
                   </div>
                 ))}

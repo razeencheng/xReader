@@ -30,6 +30,10 @@ var (
 		"en-US": {},
 		"ja-JP": {},
 		"ko-KR": {},
+		"es-ES": {},
+		"fr-FR": {},
+		"de-DE": {},
+		"pt-PT": {},
 	}
 	allowedDensityPrefs = map[string]struct{}{
 		"comfortable": {},

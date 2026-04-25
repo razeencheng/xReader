@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ApiError, apiFetch } from '@/lib/api-client';
+import { useI18n } from '@/lib/i18n';
 import {
   useCreateSource,
   useDeleteSource,
@@ -29,19 +30,24 @@ type AddSourceStatus = {
   detail?: string;
 };
 
-const ADD_SOURCE_STEPS = ['检查输入', '尝试直接解析订阅', '搜索网页声明', '尝试常见订阅路径'] as const;
+const ADD_SOURCE_STEP_KEYS = [
+  'sources.stepCheckInput',
+  'sources.stepParseFeed',
+  'sources.stepSearchPage',
+  'sources.stepCommonPaths',
+] as const;
 
-function timeAgo(iso: string | null): string {
-  if (!iso) return '从未';
+function timeAgo(iso: string | null, t: (key: string, params?: Record<string, string | number>) => string): string {
+  if (!iso) return t('sources.never');
 
   const diffMinutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (diffMinutes < 1) return '刚刚';
-  if (diffMinutes < 60) return `${diffMinutes} 分钟前`;
+  if (diffMinutes < 1) return t('sources.justNow');
+  if (diffMinutes < 60) return t('sources.minutesAgo', { count: diffMinutes });
 
   const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours} 小时前`;
+  if (diffHours < 24) return t('sources.hoursAgo', { count: diffHours });
 
-  return `${Math.floor(diffHours / 24)} 天前`;
+  return t('sources.daysAgo', { count: Math.floor(diffHours / 24) });
 }
 
 function truncateUrl(url: string, maxLength = 48) {
@@ -62,7 +68,13 @@ function healthState(source: Source) {
   return { label: 'error', dotClass: 'bg-rose-500' };
 }
 
-function ProgressBar({ progress }: { progress: number | null }) {
+function ProgressBar({
+  progress,
+  t,
+}: {
+  progress: number | null;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
   const percent = progress == null ? null : Math.max(0, Math.min(100, progress <= 1 ? progress * 100 : progress));
 
   return (
@@ -75,13 +87,19 @@ function ProgressBar({ progress }: { progress: number | null }) {
         />
       </div>
       <p className="font-[system-ui] text-xs text-[var(--text-muted)]">
-        {percent == null ? '正在导入…' : `导入进度 ${Math.round(percent)}%`}
+        {percent == null ? t('sources.importProgressUnknown') : t('sources.importProgress', { percent: Math.round(percent) })}
       </p>
     </div>
   );
 }
 
-function AddSourceProgress({ status }: { status: AddSourceStatus }) {
+function AddSourceProgress({
+  status,
+  t,
+}: {
+  status: AddSourceStatus;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
   if (status.kind === 'idle') {
     return null;
   }
@@ -91,16 +109,16 @@ function AddSourceProgress({ status }: { status: AddSourceStatus }) {
       <div className="mt-3 rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-body)] px-4 py-3 font-[system-ui]">
         <div className="flex items-center justify-between gap-3 text-sm text-[var(--text-body)]">
           <span>{status.title}</span>
-          <span className="text-xs text-[var(--text-muted)]">自动发现中</span>
+          <span className="text-xs text-[var(--text-muted)]">{t('sources.autoDiscovering')}</span>
         </div>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--bg-callout)]">
           <div className="h-full w-2/3 animate-pulse rounded-full bg-[var(--accent)]" />
         </div>
         <div className="mt-3 grid gap-2 sm:grid-cols-4">
-          {ADD_SOURCE_STEPS.map((step) => (
-            <div key={step} className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+          {ADD_SOURCE_STEP_KEYS.map((stepKey) => (
+            <div key={stepKey} className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
               <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[var(--accent)]" />
-              <span>{step}</span>
+              <span>{t(stepKey)}</span>
             </div>
           ))}
         </div>
@@ -123,6 +141,7 @@ function AddSourceProgress({ status }: { status: AddSourceStatus }) {
 }
 
 export function SourcesPage() {
+  const { t } = useI18n();
   const { data: sources, isLoading, isFetching } = useSources();
   const createSource = useCreateSource();
   const renameSource = useRenameSource();
@@ -163,7 +182,7 @@ export function SourcesPage() {
       handledImportJobId.current = importJobId;
       const timeoutId = window.setTimeout(() => {
         setImportJobId(null);
-        setMessage({ kind: 'success', text: 'OPML 导入完成。' });
+        setMessage({ kind: 'success', text: t('sources.importCompleteMessage') });
       }, 0);
       return () => window.clearTimeout(timeoutId);
     }
@@ -172,11 +191,11 @@ export function SourcesPage() {
       handledImportJobId.current = importJobId;
       const timeoutId = window.setTimeout(() => {
         setImportJobId(null);
-        setMessage({ kind: 'error', text: 'OPML 导入失败。' });
+        setMessage({ kind: 'error', text: t('sources.importFailedMessage') });
       }, 0);
       return () => window.clearTimeout(timeoutId);
     }
-  }, [importJob.data, importJobId]);
+  }, [importJob.data, importJobId, t]);
 
   async function handleCreateSource() {
     const url = sourceUrl.trim();
@@ -184,27 +203,27 @@ export function SourcesPage() {
 
     setAddSourceStatus({
       kind: 'loading',
-      title: `正在为「${url}」寻找可订阅地址…`,
+      title: t('sources.addSearching', { url }),
     });
     try {
       const source = await createSource.mutateAsync(url);
       setSourceUrl('');
       setAddSourceStatus({
         kind: 'success',
-        title: `已找到并添加：${source.title}`,
-        detail: `${source.url}。首次抓取会默认只保留最近 7 天或最新 20 篇为未读，其余历史文章会自动归档为已读。`,
+        title: t('sources.addFound', { title: source.title }),
+        detail: t('sources.addFoundDetail', { url: source.url }),
       });
     } catch (error) {
       const raw = error instanceof ApiError ? error.message : '';
       const detail = raw === 'source already exists'
-        ? '这个订阅源已经添加过了。'
+        ? t('sources.alreadyExists')
         : raw.includes('no RSS or Atom feed found')
-          ? '没有找到可用的 RSS / Atom 订阅地址。可以试试网站的博客页、新闻页，或直接粘贴 RSS 地址。'
-          : raw || '没有找到可用的 RSS / Atom 订阅地址。可以试试网站的博客页、新闻页，或直接粘贴 RSS 地址。';
+          ? t('sources.noFeedFound')
+          : raw || t('sources.noFeedFound');
 
       setAddSourceStatus({
         kind: 'error',
-        title: '添加失败',
+        title: t('sources.addFailed'),
         detail,
       });
     }
@@ -221,7 +240,7 @@ export function SourcesPage() {
     if (!title) return;
 
     await renameSource.mutateAsync({ id: sourceId, title });
-    setMessage({ kind: 'success', text: '订阅源名称已更新。' });
+    setMessage({ kind: 'success', text: t('sources.nameUpdated') });
   }
 
   function queueDelete(source: Source) {
@@ -247,7 +266,7 @@ export function SourcesPage() {
 
   async function handleRefresh(sourceId: number) {
     await refreshSource.mutateAsync(sourceId);
-    setMessage({ kind: 'success', text: '已触发重新抓取。' });
+    setMessage({ kind: 'success', text: t('sources.refreshTriggered') });
   }
 
   async function handleImport() {
@@ -261,13 +280,13 @@ export function SourcesPage() {
     });
 
     setImportJobId(response.job_id);
-    setMessage({ kind: 'loading', text: '正在导入 OPML…' });
+    setMessage({ kind: 'loading', text: t('sources.importingMessage') });
   }
 
   async function handleExport() {
     const response = await fetch('/api/sources/export', { credentials: 'include' });
     if (!response.ok) {
-      setMessage({ kind: 'error', text: '导出 OPML 失败。' });
+      setMessage({ kind: 'error', text: t('sources.exportFailed') });
       return;
     }
 
@@ -278,19 +297,19 @@ export function SourcesPage() {
     anchor.download = 'xreader-sources.opml';
     anchor.click();
     URL.revokeObjectURL(url);
-    setMessage({ kind: 'success', text: 'OPML 已导出。' });
+    setMessage({ kind: 'success', text: t('sources.exportDone') });
   }
 
   const importProgress = importJob.data?.progress ?? null;
   const importBusy = Boolean(importJobId) || importJob.isFetching;
   const importStatusLabel =
     importJob.data?.status === 'done'
-      ? '导入已完成'
+      ? t('sources.importDone')
       : importJob.data?.status === 'failed'
-        ? '导入失败'
+        ? t('sources.importFailed')
         : importBusy
-          ? '导入中…'
-          : '选择文件后上传';
+          ? t('sources.importing')
+          : t('sources.chooseFile');
 
   return (
     <main className="min-h-screen bg-[var(--bg-body)] text-[var(--text-body)]">
@@ -298,31 +317,27 @@ export function SourcesPage() {
         <div className="mb-8 flex items-start justify-between gap-4">
           <div className="space-y-3">
             <Link href="/" className="font-[system-ui] text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-body)]">
-              ← 返回首页
+              ← {t('sources.backHome')}
             </Link>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border-strong)] bg-[var(--bg-input)] px-3 py-1.5 font-[system-ui] text-xs text-[var(--text-muted)]">
-              <span aria-hidden="true">☰</span>
-              <span>订阅源管理</span>
-            </div>
             <header className="space-y-3">
-              <h1 className="font-serif text-4xl font-semibold tracking-tight text-[var(--text-body)]">订阅源</h1>
+              <h1 className="font-serif text-4xl font-semibold tracking-tight text-[var(--text-body)]">{t('sources.title')}</h1>
               <p className="max-w-2xl font-[system-ui] text-sm leading-6 text-[var(--text-muted)]">
-                管理 RSS 订阅、导入导出 OPML、快速刷新抓取结果，保持阅读流始终新鲜。
+                {t('sources.description')}
               </p>
             </header>
           </div>
           <div className="rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-input)] px-4 py-3 text-right font-[system-ui] text-xs text-[var(--text-muted)] shadow-sm shadow-[var(--border-default)]/30">
-            <div>{isFetching ? '同步中…' : '已同步'}</div>
-            <div className="mt-1 text-[var(--text-body)]">{visibleSources.length} 个订阅源</div>
+            <div>{isFetching ? t('sources.syncing') : t('sources.synced')}</div>
+            <div className="mt-1 text-[var(--text-body)]">{t('sources.count', { count: visibleSources.length })}</div>
           </div>
         </div>
 
         <section className="rounded-3xl border border-[var(--border-strong)] bg-[var(--bg-input)]/80 p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
           <div className="mb-4 flex items-center justify-between gap-4">
             <div>
-              <h2 className="font-serif text-xl font-semibold tracking-tight text-[var(--text-body)]">添加订阅源</h2>
+              <h2 className="font-serif text-xl font-semibold tracking-tight text-[var(--text-body)]">{t('sources.addTitle')}</h2>
               <p className="font-[system-ui] text-sm text-[var(--text-muted)]">
-                输入域名、网站首页或 RSS / Atom 地址，我们会自动寻找可订阅地址。
+                {t('sources.addDescription')}
               </p>
             </div>
           </div>
@@ -341,7 +356,7 @@ export function SourcesPage() {
                   void handleCreateSource();
                 }
               }}
-              placeholder="razeen.me 或 https://example.com/feed.xml"
+              placeholder={t('sources.addPlaceholder')}
               className="min-w-0 flex-1 rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-body)] px-4 py-3 font-[system-ui] text-sm text-[var(--text-body)] outline-none transition focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--accent)]/20"
             />
             <button
@@ -350,21 +365,21 @@ export function SourcesPage() {
               disabled={createSource.isPending}
               className="rounded-2xl bg-[var(--bg-nav)] px-5 py-3 font-[system-ui] text-sm text-[var(--text-inverse)] transition-colors hover:bg-[var(--bg-surface)] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {createSource.isPending ? '寻找中…' : '寻找并添加'}
+              {createSource.isPending ? t('sources.finding') : t('sources.findAndAdd')}
             </button>
           </div>
-          <AddSourceProgress status={addSourceStatus} />
+          <AddSourceProgress status={addSourceStatus} t={t} />
         </section>
 
         <section className="mt-6 overflow-hidden rounded-3xl border border-[var(--border-strong)] bg-[var(--bg-input)]/80 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
           <div className="border-b border-[var(--border-strong)] px-5 py-4">
-            <h2 className="font-serif text-xl font-semibold tracking-tight text-[var(--text-body)]">订阅源列表</h2>
+            <h2 className="font-serif text-xl font-semibold tracking-tight text-[var(--text-body)]">{t('sources.listTitle')}</h2>
           </div>
 
           {isLoading ? (
-            <div className="px-5 py-10 font-[system-ui] text-sm text-[var(--text-muted)]">加载中…</div>
+            <div className="px-5 py-10 font-[system-ui] text-sm text-[var(--text-muted)]">{t('sources.loading')}</div>
           ) : visibleSources.length === 0 ? (
-            <div className="px-5 py-10 font-[system-ui] text-sm text-[var(--text-muted)]">还没有添加任何订阅源。</div>
+            <div className="px-5 py-10 font-[system-ui] text-sm text-[var(--text-muted)]">{t('sources.empty')}</div>
           ) : (
             <ul className="divide-y divide-[var(--border-strong)]">
               {visibleSources.map((source) => {
@@ -397,13 +412,17 @@ export function SourcesPage() {
                             type="button"
                             onClick={() => startRename(source)}
                             className="min-w-0 truncate text-left font-serif text-base font-semibold tracking-tight text-[var(--text-body)] transition-colors hover:text-[var(--text-accent)]"
-                            title="点击重命名"
+                            title={t('sources.renameTitle')}
                           >
                             {source.title}
                           </button>
                         )}
                         <span className="rounded-full border border-[var(--border-strong)] px-2.5 py-1 font-[system-ui] text-[11px] text-[var(--text-muted)]">
-                          {health.label === 'healthy' ? 'healthy' : health.label === 'degraded' ? 'degraded' : 'error'}
+                          {health.label === 'healthy'
+                            ? t('sources.healthHealthy')
+                            : health.label === 'degraded'
+                              ? t('sources.healthDegraded')
+                              : t('sources.healthError')}
                         </span>
                       </div>
 
@@ -411,7 +430,7 @@ export function SourcesPage() {
                         <div className="truncate" title={source.url}>
                           {truncateUrl(source.url)}
                         </div>
-                        <div>上次抓取：{timeAgo(source.last_fetched_at)}</div>
+                        <div>{t('sources.lastFetched', { time: timeAgo(source.last_fetched_at, t) })}</div>
                       </div>
                     </div>
 
@@ -422,14 +441,14 @@ export function SourcesPage() {
                         disabled={refreshSource.isPending}
                         className="rounded-xl border border-[var(--border-strong)] px-3 py-1.5 font-[system-ui] text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-callout)] hover:text-[var(--text-body)] disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        刷新
+                        {t('sources.refresh')}
                       </button>
                       <button
                         type="button"
                         onClick={() => queueDelete(source)}
                         className="rounded-xl border border-[var(--border-strong)] px-3 py-1.5 font-[system-ui] text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-callout)] hover:text-[var(--text-body)]"
                       >
-                        删除
+                        {t('sources.delete')}
                       </button>
                     </div>
                   </li>
@@ -442,8 +461,8 @@ export function SourcesPage() {
         <section className="mt-6 rounded-3xl border border-[var(--border-strong)] bg-[var(--bg-input)]/80 p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0 flex-1">
-              <h2 className="font-serif text-xl font-semibold tracking-tight text-[var(--text-body)]">OPML 导入 / 导出</h2>
-              <p className="mt-1 font-[system-ui] text-sm text-[var(--text-muted)]">上传 OPML 后会自动轮询任务状态直到完成。</p>
+              <h2 className="font-serif text-xl font-semibold tracking-tight text-[var(--text-body)]">{t('sources.opmlTitle')}</h2>
+              <p className="mt-1 font-[system-ui] text-sm text-[var(--text-muted)]">{t('sources.opmlDescription')}</p>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -462,14 +481,14 @@ export function SourcesPage() {
                 disabled={!selectedFile || importBusy}
                 className="rounded-2xl border border-[var(--border-strong)] px-4 py-3 font-[system-ui] text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-callout)] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                上传导入
+                {t('sources.uploadImport')}
               </button>
               <button
                 type="button"
                 onClick={() => void handleExport()}
                 className="rounded-2xl border border-[var(--border-strong)] px-4 py-3 font-[system-ui] text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-callout)]"
               >
-                导出 OPML
+                {t('sources.exportOpml')}
               </button>
             </div>
           </div>
@@ -482,7 +501,7 @@ export function SourcesPage() {
             {message.kind === 'loading' ? (
               <p className="mt-2 font-[system-ui] text-xs text-[var(--text-muted)]">{message.text}</p>
             ) : null}
-            {importBusy ? <ProgressBar progress={importProgress} /> : null}
+            {importBusy ? <ProgressBar progress={importProgress} t={t} /> : null}
           </div>
         </section>
 
@@ -501,13 +520,13 @@ export function SourcesPage() {
 
       {pendingDelete ? (
         <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl bg-[var(--bg-nav)] px-4 py-3 font-[system-ui] text-sm text-[var(--text-inverse)] shadow-lg shadow-black/20">
-          <span>已删除 {pendingDelete.source.title}</span>
+          <span>{t('sources.deleted', { title: pendingDelete.source.title })}</span>
           <button
             type="button"
             onClick={undoDelete}
             className="rounded-full border border-[var(--border-default)]/20 px-3 py-1 text-xs font-medium text-[var(--text-accent)] transition-colors hover:bg-[var(--bg-input)]/10"
           >
-            撤销
+            {t('feed.undo')}
           </button>
         </div>
       ) : null}

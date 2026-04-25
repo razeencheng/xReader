@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { estimateReadMinutes, formatRelativeTime, getDisplayTitle, getOriginalTitle } from '@/lib/article-meta';
+import { useI18n } from '@/lib/i18n';
 import { getSourceColor } from '@/lib/source-meta';
 import type { ArticleItem } from '@/lib/types';
 
@@ -23,6 +24,7 @@ function langLabel(lang?: string) {
 }
 
 export function NextUpCard({ next, currentId, markRead }: Props) {
+  const { t } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
   const displayTitle = getDisplayTitle(next);
@@ -31,7 +33,11 @@ export function NextUpCard({ next, currentId, markRead }: Props) {
   const readMinutes = estimateReadMinutes(next);
   const summary = next.summary?.trim();
   const sourceColor = getSourceColor(next.source_title);
-  const meta = [publishedAt ? `${publishedAt} ago` : null, readMinutes ? `${readMinutes} min read` : null, langLabel(next.language)]
+  const meta = [
+    publishedAt ? t('article.ago', { time: publishedAt }) : null,
+    readMinutes ? t('article.minRead', { count: readMinutes }) : null,
+    langLabel(next.language),
+  ]
     .filter(Boolean)
     .join(' · ');
 
@@ -57,9 +63,9 @@ export function NextUpCard({ next, currentId, markRead }: Props) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold tracking-[0.18em] text-[var(--text-3)]">
-            <span>下一篇</span>
+            <span>{t('reader.nextArticle')}</span>
             <span className="text-[var(--border-strong)]">·</span>
-            <span>按 J 或点击继续</span>
+            <span>{t('reader.pressNext')}</span>
           </div>
           <div className="mb-1 font-serif text-[23px] font-semibold leading-[1.24] tracking-[-0.02em] text-[var(--text-body)]">{displayTitle}</div>
           {originalTitle ? (
@@ -68,13 +74,13 @@ export function NextUpCard({ next, currentId, markRead }: Props) {
           <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-[var(--text-3)]">
             <span className="inline-flex items-center gap-2 rounded-full bg-[rgba(255,255,255,0.82)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-2)]">
               <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: sourceColor }} />
-              {next.source_title || 'Source'}
+              {next.source_title || t('common.source')}
             </span>
             {meta ? <span>{meta}</span> : null}
           </div>
           {summary ? (
             <div className="border-t border-[var(--border-light)] pt-3 text-[13px] leading-6 text-[var(--text-2)]">
-              <span className="mr-2 text-[10px] font-semibold tracking-[0.16em] text-[var(--text-3)]">要点</span>
+              <span className="mr-2 text-[10px] font-semibold tracking-[0.16em] text-[var(--text-3)]">{t('reader.keyPoints')}</span>
               {summary}
             </div>
           ) : null}

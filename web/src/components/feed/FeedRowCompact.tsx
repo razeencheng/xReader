@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { formatRelativeTime, getDisplayTitle, getOriginalTitle } from '@/lib/article-meta';
+import { useI18n } from '@/lib/i18n';
 import { getSourceColor } from '@/lib/source-meta';
 import type { ArticleItem } from '@/lib/types';
 
@@ -15,7 +16,8 @@ interface Props {
 }
 
 export function FeedRowCompact({ item, selected = false, pendingRead = false, onClick, onMarkRead, onUndoRead }: Props) {
-  const sourceName = (item.source_title?.trim() || 'Untitled Source').toUpperCase();
+  const { t } = useI18n();
+  const sourceName = (item.source_title?.trim() || t('article.untitledSource')).toUpperCase();
   const relativeTime = formatRelativeTime(item.published_at);
   const displayTitle = getDisplayTitle(item);
   const originalTitle = getOriginalTitle(item);
@@ -58,26 +60,26 @@ export function FeedRowCompact({ item, selected = false, pendingRead = false, on
       {pendingRead ? (
         <button
           type="button"
-          aria-label="撤销已读"
+          aria-label={t('feed.undoReadAria')}
           onClick={(event) => {
             event.stopPropagation();
             onUndoRead?.();
           }}
           className="mt-[6px] rounded-full bg-[var(--bg-elevated)] px-2 py-[3px] text-[10.5px] font-medium text-[var(--text-3)] shadow-[inset_0_0_0_1px_var(--border)] transition-colors hover:text-[var(--accent)]"
         >
-          已读 · 撤销
+          {t('feed.readUndo')}
         </button>
       ) : onMarkRead && !item.is_read ? (
         <button
           type="button"
-          aria-label="标已读"
+          aria-label={t('feed.markRead')}
           onClick={(event) => {
             event.stopPropagation();
             onMarkRead();
           }}
           className="mt-[6px] rounded-full px-2 py-[3px] text-[10.5px] font-medium text-[var(--text-3)] opacity-0 transition-[background,color,opacity] hover:bg-[var(--accent-bg)] hover:text-[var(--accent)] group-hover:opacity-100 focus:opacity-100"
         >
-          标已读
+          {t('feed.markRead')}
         </button>
       ) : null}
     </article>

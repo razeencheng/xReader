@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { FeedRowCompact } from './FeedRowCompact';
 import type { ArticleItem } from '@/lib/types';
+import { useUIStore } from '@/stores/useUIStore';
 
 const mockItem: ArticleItem = {
   id: 1,
@@ -13,6 +14,10 @@ const mockItem: ArticleItem = {
   published_at: new Date(Date.now() - 3 * 3_600_000).toISOString(),
 };
 
+beforeEach(() => {
+  useUIStore.setState({ nativeLanguage: 'zh-CN' });
+});
+
 test('renders compact row with source label and translated title', () => {
   render(<FeedRowCompact item={mockItem} />);
 
@@ -23,5 +28,5 @@ test('renders compact row with source label and translated title', () => {
 
 test('does not render reading-time footer in compact mode', () => {
   render(<FeedRowCompact item={mockItem} />);
-  expect(screen.queryByText(/min read/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/分钟阅读/i)).not.toBeInTheDocument();
 });

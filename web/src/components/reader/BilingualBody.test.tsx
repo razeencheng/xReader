@@ -8,11 +8,13 @@ vi.mock('@/hooks/useLazyTranslation', () => ({
 }));
 
 import { BilingualBody } from './BilingualBody';
+import { useUIStore } from '@/stores/useUIStore';
 
 const contentHtml = '<p>First paragraph</p><p>Second paragraph</p>';
 
 beforeEach(() => {
   useLazyTranslation.mockReset();
+  useUIStore.setState({ nativeLanguage: 'zh-CN' });
 });
 
 test('renders original paragraphs without translation controls in same-language mode', () => {
@@ -27,7 +29,7 @@ test('renders original paragraphs without translation controls in same-language 
 
   expect(screen.getByText('First paragraph')).toBeInTheDocument();
   expect(screen.getByText('Second paragraph')).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /Translate paragraph/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /翻译段落/i })).not.toBeInTheDocument();
 });
 
 test('toggles paragraph translation from a dedicated button', async () => {
@@ -41,14 +43,14 @@ test('toggles paragraph translation from a dedicated button', async () => {
     <BilingualBody articleId={1} contentHtml={contentHtml} language="en" nativeLanguage="zh-CN" />,
   );
 
-  const buttons = screen.getAllByRole('button', { name: /Translate paragraph/i });
+  const buttons = screen.getAllByRole('button', { name: /翻译段落/i });
   expect(buttons).toHaveLength(2);
 
   await user.click(buttons[0]);
   expect(screen.getByText('第一段翻译')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /Hide translation/i })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /隐藏翻译/i })).toBeInTheDocument();
 
-  await user.click(screen.getByRole('button', { name: /Hide translation/i }));
+  await user.click(screen.getByRole('button', { name: /隐藏翻译/i }));
   expect(screen.queryByText('第一段翻译')).not.toBeInTheDocument();
 });
 

@@ -212,6 +212,8 @@ Interaction rules:
 - Highlights anchor to **paragraph index + character offsets** in the post-sanitization plain text; they render on whichever layer(s) the user highlighted (typically both, mirrored).
 - End-of-article "next up" card is shown unconditionally — even for short articles where it would appear above the fold.
 - Reader opens at a new route `/read/:article_id` so back button returns to the feed with scroll position preserved.
+- A fixed reading settings panel in the article detail view is the single entry point for reader preferences: layout (`classic`, `focus`, `wide`), density (`comfortable`, `compact`), font size, theme (`light`, `dark`, `system`), and accent color.
+- The reading settings panel must be localized by `native_language`; do not hardcode English labels such as "Tweaks", "Layout", or "Density".
 
 Original-article loading rules:
 
@@ -224,9 +226,9 @@ Original-article loading rules:
 
 ### 5.3 Settings page (minimal v1)
 
-- Native language (dropdown, default `zh-CN`). Determines what gets translated *to*.
-- Density default (舒适 / 紧凑)
-- Theme (浅色 / 深色 / 跟随系统) — Phase 1 polish, see §9
+- The global Settings page is for account/system-level settings only. It should not duplicate reader preference controls.
+- Native language also determines the application chrome language: navigation labels, buttons, tabs, dialogs, empty states, settings, source management, reader actions, and admin/highlight labels should all resolve through the UI i18n dictionary. Supported picker values use BCP-47 codes (`zh-CN`, `zh-TW`, `en-US`, `ja-JP`, `ko-KR`, `es-ES`, `fr-FR`, `de-DE`, `pt-PT`), with legacy short codes normalized where possible.
+- Native language remains available from the language chip/modal in the app chrome; density, theme, layout, font size, and accent live in the article detail reading settings panel.
 - AI config view (read-only for regular users; admin can edit)
 - Manage sources (list / add / rename / delete / import OPML / export OPML)
 - Log out

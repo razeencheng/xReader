@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
 import { applyArticleStateChange } from '@/lib/article-state-cache';
 import { broadcast } from '@/lib/broadcast';
+import { useI18n } from '@/lib/i18n';
 import { useArticles } from '@/lib/queries/articles';
 import { useUIStore, type ReadFilter } from '@/stores/useUIStore';
 import { FeedRowComfortable } from './FeedRowComfortable';
@@ -31,10 +32,10 @@ interface BulkReadUndo {
   label: string;
 }
 
-const READ_FILTERS: Array<{ id: ReadFilter; label: string }> = [
-  { id: 'unread', label: 'Unread' },
-  { id: 'all', label: 'All' },
-  { id: 'read', label: 'Read' },
+const READ_FILTERS: Array<{ id: ReadFilter; labelKey: string }> = [
+  { id: 'unread', labelKey: 'feed.unread' },
+  { id: 'all', labelKey: 'feed.all' },
+  { id: 'read', labelKey: 'feed.read' },
 ];
 
 const READ_DISMISS_DELAY_MS = 3000;
@@ -46,6 +47,7 @@ interface FeedListProps {
 
 export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListProps) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const currentView = useUIStore((state) => state.currentView);
   const selectedSourceId = useUIStore((state) => state.selectedSourceId);
   const density = useUIStore((state) => state.density);
@@ -186,16 +188,16 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
 
   const bulkScope = useMemo(() => {
     if (currentView === 'sources' && selectedSourceId) {
-      return { scope: `source:${selectedSourceId}`, label: '当前源' };
+      return { scope: `source:${selectedSourceId}`, label: t('feed.bulkScopeCurrentSource') };
     }
     if (currentView === 'today') {
-      return { scope: 'tab:today', label: '当前视图' };
+      return { scope: 'tab:today', label: t('feed.bulkScopeCurrentView') };
     }
     if (currentView === 'all') {
-      return { scope: 'tab:stream', label: '当前视图' };
+      return { scope: 'tab:stream', label: t('feed.bulkScopeCurrentView') };
     }
     return null;
-  }, [currentView, selectedSourceId]);
+  }, [currentView, selectedSourceId, t]);
 
   const syncBatchReadState = useCallback(
     (articleIds: number[], isRead: boolean) => {
@@ -281,12 +283,12 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
   const RowComponent = density === 'compact' ? FeedRowCompact : FeedRowComfortable;
   const headerLabel =
     currentView === 'today'
-      ? 'Today'
+      ? t('nav.today')
       : currentView === 'starred'
-        ? 'Starred'
+        ? t('nav.starred')
         : currentView === 'sources'
-          ? selectedSource?.title ?? 'All Sources'
-          : 'All';
+          ? selectedSource?.title ?? t('feed.allSources')
+          : t('nav.all');
   const showReadFilters = currentView !== 'starred';
   const sourceColor = selectedSource ? getSourceColor(selectedSource) : null;
   const showBulkRead = Boolean(showReadFilters && readFilter === 'unread' && bulkScope && counts.unread > 0);
@@ -302,7 +304,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
             className="flex items-center gap-1 pb-[6px] text-[11.5px] text-[var(--text-3)] transition-colors hover:text-[var(--text-2)]"
           >
             <ChevronLeft size={13} />
-            All Sources
+            {t('feed.allSources')}
           </button>
         ) : null}
 
@@ -315,7 +317,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
           <>
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 gap-0.5">
-                {READ_FILTERS.map(({ id, label }) => {
+                {READ_FILTERS.map(({ id, labelKey }) => {
                   const active = readFilter === id;
                   const count = counts[id];
 
@@ -333,7 +335,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
                           : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)]'
                       }`}
                     >
-                      {label}
+                      {t(labelKey)}
                       <span className="text-[10px] opacity-75">{count}</span>
                     </button>
                   );
@@ -343,20 +345,20 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
                 <div className="relative shrink-0">
                   <button
                     type="button"
-                    aria-label="全部已读"
+                    aria-label={t('feed.allRead')}
                     aria-expanded={isBulkConfirmOpen}
                     onClick={() => setOpenBulkConfirmScope((scope) => (scope === bulkScope?.scope ? null : (bulkScope?.scope ?? null)))}
                     disabled={isBulkUpdating}
                     className="inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-2.5 py-[3px] text-[11px] font-semibold text-[var(--text-3)] shadow-[0_1px_0_rgba(65,52,35,0.04)] transition-colors hover:border-[var(--border-accent)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    全部已读
+                    {t('feed.allRead')}
                   </button>
                   {isBulkConfirmOpen ? (
                     <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-[238px] rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-2 shadow-[0_18px_48px_rgba(30,24,16,0.16)]">
                       <div className="px-2 pb-2 pt-1">
-                        <div className="text-[11.5px] font-semibold text-[var(--text)]">标记当前列表中的所有为已读</div>
+                        <div className="text-[11.5px] font-semibold text-[var(--text)]">{t('feed.confirmAllRead')}</div>
                         <div className="mt-0.5 text-[10.5px] leading-4 text-[var(--text-3)]">
-                          这些文章会离开未读队列，但仍会保留在全部文章中。
+                          {t('feed.confirmAllReadDescription')}
                         </div>
                       </div>
                       <div className="flex items-center justify-end gap-1.5 px-1 pt-1">
@@ -366,16 +368,16 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
                           disabled={isBulkUpdating}
                           className="rounded-full px-3 py-1.5 text-[11px] font-medium text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)] disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          取消
+                          {t('feed.cancel')}
                         </button>
                         <button
                           type="button"
-                          aria-label="确认标记全部已读"
+                          aria-label={t('feed.confirmAllReadAria')}
                           onClick={() => void handleBulkMarkRead()}
                           disabled={isBulkUpdating}
                           className="rounded-full bg-[var(--bg-nav)] px-3 py-1.5 text-[11px] font-semibold text-[var(--text-inverse)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          确认
+                          {t('feed.confirm')}
                         </button>
                       </div>
                     </div>
@@ -386,16 +388,16 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
             {bulkReadUndo ? (
               <div className="mt-2 rounded-xl bg-[var(--accent-bg)] px-3 py-2 text-[11.5px] text-[var(--accent)]">
                 <span>
-                  已将{bulkReadUndo.label} {bulkReadUndo.articleIds.length} 篇标为已读
+                  {t('feed.bulkReadNotice', { scope: bulkReadUndo.label, count: bulkReadUndo.articleIds.length })}
                 </span>
                 <button
                   type="button"
-                  aria-label="撤销批量标已读"
+                  aria-label={t('feed.undoBulkAria')}
                   onClick={() => void handleUndoBulkMarkRead()}
                   disabled={isBulkUpdating}
                   className="ml-2 font-semibold underline-offset-2 hover:underline disabled:opacity-60"
                 >
-                  撤销
+                  {t('feed.undo')}
                 </button>
               </div>
             ) : null}
@@ -408,7 +410,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
           density === 'compact' ? <CompactSkeleton /> : <FeedSkeleton />
         ) : filteredItems.length === 0 ? (
           <div className="px-7 py-10 text-center text-[13px] text-[var(--text-3)]">
-            {readFilter === 'unread' ? 'All caught up ✓' : 'Nothing here yet'}
+            {readFilter === 'unread' ? t('feed.allCaughtUp') : t('feed.nothingHere')}
           </div>
         ) : (
           <div className="flex flex-col">

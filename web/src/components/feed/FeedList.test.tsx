@@ -24,7 +24,13 @@ function wrapper({ children }: { children: React.ReactNode }) {
 
 beforeEach(() => {
   vi.mocked(apiFetch).mockReset();
-  useUIStore.setState({ currentView: 'today', selectedSourceId: null, readFilter: 'unread', density: 'comfortable' });
+  useUIStore.setState({
+    currentView: 'today',
+    selectedSourceId: null,
+    readFilter: 'unread',
+    density: 'comfortable',
+    nativeLanguage: 'zh-CN',
+  });
 });
 
 test('FeedList shows all caught up message when unread filter has no items', async () => {
@@ -32,7 +38,7 @@ test('FeedList shows all caught up message when unread filter has no items', asy
 
   render(<FeedList />, { wrapper });
 
-  expect(await screen.findByText(/All caught up/i)).toBeInTheDocument();
+  expect(await screen.findByText(/已全部处理/)).toBeInTheDocument();
 });
 
 test('FeedList renders items', async () => {
@@ -52,8 +58,8 @@ test('FeedList renders items', async () => {
   render(<FeedList />, { wrapper });
 
   expect(await screen.findByText('Test Article')).toBeInTheDocument();
-  expect(screen.getByText('Today')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /Unread/i })).toBeInTheDocument();
+  expect(screen.getByText('今日')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /未读/i })).toBeInTheDocument();
 });
 
 test('FeedList follows externally selected article id', async () => {
@@ -141,7 +147,7 @@ test('dismisses a just-read article from unread filter after the grace period', 
   await new Promise((resolve) => setTimeout(resolve, 3100));
 
   expect(screen.queryByText('Delayed Archive Article')).not.toBeInTheDocument();
-  expect(screen.getByText(/All caught up/i)).toBeInTheDocument();
+  expect(screen.getByText(/已全部处理/)).toBeInTheDocument();
 }, 8000);
 
 test('can batch mark the current view read and undo it', async () => {
@@ -186,9 +192,9 @@ test('can batch mark the current view read and undo it', async () => {
   expect(screen.queryByRole('button', { name: '整理未读' })).not.toBeInTheDocument();
   expect(await screen.findByRole('button', { name: '全部已读' })).toBeInTheDocument();
 
-  await userEvent.click(screen.getByRole('button', { name: 'All2' }));
+  await userEvent.click(screen.getByRole('button', { name: '全部2' }));
   expect(screen.queryByRole('button', { name: '全部已读' })).not.toBeInTheDocument();
-  await userEvent.click(screen.getByRole('button', { name: 'Unread2' }));
+  await userEvent.click(screen.getByRole('button', { name: '未读2' }));
   expect(screen.getByRole('button', { name: '全部已读' })).toBeInTheDocument();
 
   await userEvent.click(screen.getByRole('button', { name: '全部已读' }));

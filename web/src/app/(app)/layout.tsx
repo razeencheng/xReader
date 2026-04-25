@@ -5,17 +5,25 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useBroadcastSync } from '@/hooks/useBroadcastSync';
 import { useCrossDevicePoll } from '@/hooks/useCrossDevicePoll';
+import { useGlobalShortcuts } from '@/hooks/useGlobalShortcuts';
+import { useI18n } from '@/lib/i18n';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useUIStore } from '@/stores/useUIStore';
 
+import { KeyboardShortcutsModal } from '@/components/layout/KeyboardShortcutsModal';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileBottomNav, MobileTopBar, TabletTopNav } from '@/components/layout/ResponsiveAppNav';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
   const router = useRouter();
   const { user, isLoading, fetchMe } = useAuthStore();
   const hydrate = useUIStore((state) => state.hydrate);
   const focusMode = useUIStore((state) => state.focusMode);
+  const isShortcutsOpen = useUIStore((state) => state.isShortcutsOpen);
+  const closeShortcuts = useUIStore((state) => state.closeShortcuts);
+
+  useGlobalShortcuts();
 
   useEffect(() => {
     void fetchMe();
@@ -44,7 +52,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-body)]">
         <div className="flex flex-col items-center gap-4">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
-          <p className="text-sm font-medium tracking-wider text-[var(--text-muted)]">载入中…</p>
+          <p className="text-sm font-medium tracking-wider text-[var(--text-muted)]">{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -71,6 +79,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       <MobileBottomNav focusMode={focusMode} />
+      <KeyboardShortcutsModal open={isShortcutsOpen} onClose={closeShortcuts} />
     </div>
   );
 }

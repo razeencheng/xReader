@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
+import { useUIStore } from '@/stores/useUIStore';
 
 vi.mock('@/lib/queries/sources', () => ({
   useSources: () => ({ data: [], isLoading: false, isFetching: false }),
@@ -16,6 +17,10 @@ vi.mock('@/lib/api-client', () => ({
 
 import { SourcesPage } from '@/app/(app)/sources/page';
 
+beforeEach(() => {
+  useUIStore.setState({ nativeLanguage: 'zh-CN' });
+});
+
 function wrapper({ children }: { children: React.ReactNode }) {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -27,8 +32,19 @@ function wrapper({ children }: { children: React.ReactNode }) {
 test('SourcesPage renders title and add button', () => {
   render(<SourcesPage />, { wrapper });
 
-  expect(screen.getByText('订阅源管理')).toBeInTheDocument();
+  expect(screen.queryByText('订阅源管理')).not.toBeInTheDocument();
   expect(screen.getByRole('heading', { name: '订阅源' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '寻找并添加' })).toBeInTheDocument();
   expect(screen.getByRole('link', { name: '← 返回首页' })).toBeInTheDocument();
+});
+
+test('SourcesPage follows native language for global labels', () => {
+  useUIStore.setState({ nativeLanguage: 'en-US' });
+
+  render(<SourcesPage />, { wrapper });
+
+  expect(screen.queryByText('Manage Sources')).not.toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Sources' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Find and add' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: '← Back home' })).toBeInTheDocument();
 });

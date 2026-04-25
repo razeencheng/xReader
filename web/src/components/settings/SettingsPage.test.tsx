@@ -106,15 +106,12 @@ function renderPage() {
   );
 }
 
-test('renders settings title and language options', async () => {
+test('renders settings shell without duplicated reader preference controls', async () => {
   renderPage();
 
   expect(await screen.findByRole('heading', { name: '设置' })).toBeInTheDocument();
-  const select = screen.getByLabelText('母语');
-  expect(select).toHaveDisplayValue('zh-CN');
-  expect(screen.getByRole('option', { name: 'zh-CN' })).toBeInTheDocument();
-  expect(screen.getByRole('option', { name: 'zh-TW' })).toBeInTheDocument();
-  expect(screen.getByRole('option', { name: 'en-US' })).toBeInTheDocument();
-  expect(screen.getByRole('option', { name: 'ja-JP' })).toBeInTheDocument();
-  expect(screen.getByRole('option', { name: 'ko-KR' })).toBeInTheDocument();
+  expect(screen.queryByLabelText('母语')).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: '显示密度' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: '主题' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '保存设置' })).not.toBeInTheDocument();
 });

@@ -1,11 +1,13 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
+import { useUIStore } from '@/stores/useUIStore';
 
 test('renders handoff shortcut groups and closes from the close button', async () => {
   const user = userEvent.setup();
   const onClose = vi.fn();
 
+  useUIStore.setState({ nativeLanguage: 'en-US' });
   render(<KeyboardShortcutsModal open onClose={onClose} />);
 
   expect(screen.getByRole('dialog', { name: /keyboard shortcuts/i })).toBeInTheDocument();

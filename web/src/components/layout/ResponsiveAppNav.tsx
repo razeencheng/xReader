@@ -3,11 +3,18 @@
 import { useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { ChevronDown, Globe, Keyboard, LogOut, PlusCircle, Settings, ShieldCheck } from 'lucide-react';
-import { KeyboardShortcutsModal } from '@/components/layout/KeyboardShortcutsModal';
 import { LanguageModal } from '@/components/layout/LanguageModal';
-import { LANGUAGE_OPTIONS, PRIMARY_NAV_ITEMS } from '@/components/layout/navigationConfig';
+import { getLanguageOption, PRIMARY_NAV_ITEMS } from '@/components/layout/navigationConfig';
+import { useI18n } from '@/lib/i18n';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useUIStore, type ViewTab } from '@/stores/useUIStore';
+
+const NAV_LABEL_KEYS: Record<ViewTab, string> = {
+  today: 'nav.today',
+  all: 'nav.all',
+  starred: 'nav.starred',
+  sources: 'nav.sources',
+};
 
 function useAppNavigation() {
   const router = useRouter();
@@ -18,9 +25,11 @@ function useAppNavigation() {
   const setCurrentView = useUIStore((state) => state.setCurrentView);
   const nativeLanguage = useUIStore((state) => state.nativeLanguage);
   const setNativeLanguage = useUIStore((state) => state.setNativeLanguage);
+  const openShortcuts = useUIStore((state) => state.openShortcuts);
+  const { t } = useI18n();
 
   const currentLanguage = useMemo(
-    () => LANGUAGE_OPTIONS.find((option) => option.code === nativeLanguage) ?? LANGUAGE_OPTIONS[0],
+    () => getLanguageOption(nativeLanguage),
     [nativeLanguage],
   );
 
@@ -43,9 +52,11 @@ function useAppNavigation() {
     handleLogout,
     isAdmin: user?.role === 'admin',
     nativeLanguage,
+    openShortcuts,
     pathname,
     router,
     setNativeLanguage,
+    t,
   };
 }
 
@@ -78,7 +89,6 @@ function NavButton({
 
 export function TabletTopNav({ focusMode }: { focusMode: boolean }) {
   const [isLanguageOpen, setIsLanguageOpen] = useState(false);
-  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const nav = useAppNavigation();
 
   if (focusMode) {
@@ -102,7 +112,7 @@ export function TabletTopNav({ focusMode }: { focusMode: boolean }) {
               key={item.id}
               active={nav.currentView === item.id && nav.pathname === '/'}
               icon={item.icon}
-              label={item.shortLabel}
+              label={nav.t(NAV_LABEL_KEYS[item.id])}
               onClick={() => nav.goToView(item.id)}
             />
           ))}
@@ -112,7 +122,7 @@ export function TabletTopNav({ focusMode }: { focusMode: boolean }) {
           {nav.isAdmin ? (
             <button
               type="button"
-              title="Admin"
+              title={nav.t('nav.admin')}
               onClick={() => nav.router.push('/admin')}
               className={`flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors ${
                 nav.pathname === '/admin'
@@ -125,7 +135,7 @@ export function TabletTopNav({ focusMode }: { focusMode: boolean }) {
           ) : null}
           <button
             type="button"
-            title={`Native language: ${nav.currentLanguage.name}`}
+            title={nav.t('nav.nativeLanguageTitle', { language: nav.currentLanguage.name })}
             onClick={() => setIsLanguageOpen(true)}
             className="flex h-9 items-center gap-1 rounded-[10px] px-2 text-[12px] font-semibold text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
           >
@@ -134,15 +144,15 @@ export function TabletTopNav({ focusMode }: { focusMode: boolean }) {
           </button>
           <button
             type="button"
-            title="快捷键"
-            onClick={() => setIsShortcutsOpen(true)}
+            title={nav.t('shortcuts.open')}
+            onClick={nav.openShortcuts}
             className="flex h-9 w-9 items-center justify-center rounded-[10px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
           >
             <Keyboard size={16} strokeWidth={1.75} />
           </button>
           <button
             type="button"
-            title="Settings"
+            title={nav.t('nav.settings')}
             onClick={() => nav.router.push('/settings')}
             className={`flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors ${
               nav.pathname === '/settings'
@@ -162,7 +172,6 @@ export function TabletTopNav({ focusMode }: { focusMode: boolean }) {
           onClose={() => setIsLanguageOpen(false)}
         />
       ) : null}
-      <KeyboardShortcutsModal open={isShortcutsOpen} onClose={() => setIsShortcutsOpen(false)} />
     </>
   );
 }
@@ -170,7 +179,6 @@ export function TabletTopNav({ focusMode }: { focusMode: boolean }) {
 export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLanguageOpen, setIsLanguageOpen] = useState(false);
-  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const nav = useAppNavigation();
 
   if (focusMode) {
@@ -192,7 +200,7 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
           onClick={() => setIsMenuOpen((value) => !value)}
           className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-panel)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-2)] shadow-[0_10px_30px_rgba(65,52,35,0.08)]"
         >
-          更多
+          {nav.t('nav.more')}
           <ChevronDown size={13} strokeWidth={1.8} />
         </button>
       </header>
@@ -209,20 +217,20 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
           >
             <span className="inline-flex items-center gap-2">
               <Globe size={15} />
-              Native language
+              {nav.t('nav.nativeLanguage')}
             </span>
             <span className="text-[11px] font-semibold text-[var(--accent)]">{nav.currentLanguage.short}</span>
           </button>
           <button
             type="button"
             onClick={() => {
-              setIsShortcutsOpen(true);
+              nav.openShortcuts();
               setIsMenuOpen(false);
             }}
             className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
           >
             <Keyboard size={15} />
-            快捷键一览
+            {nav.t('shortcuts.title')}
           </button>
           <button
             type="button"
@@ -233,7 +241,7 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
             className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
           >
             <PlusCircle size={15} />
-            订阅源管理
+            {nav.t('nav.manageSources')}
           </button>
           {nav.isAdmin ? (
             <button
@@ -245,7 +253,7 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
               className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
             >
               <ShieldCheck size={15} />
-              Admin 管理
+              {nav.t('nav.admin')}
             </button>
           ) : null}
           <button
@@ -257,7 +265,7 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
             className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
           >
             <LogOut size={15} />
-            Log out
+            {nav.t('nav.logOut')}
           </button>
         </div>
       ) : null}
@@ -269,7 +277,6 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
           onClose={() => setIsLanguageOpen(false)}
         />
       ) : null}
-      <KeyboardShortcutsModal open={isShortcutsOpen} onClose={() => setIsShortcutsOpen(false)} />
     </>
   );
 }
@@ -297,7 +304,7 @@ export function MobileBottomNav({ focusMode }: { focusMode: boolean }) {
             }`}
           >
             <Icon size={18} strokeWidth={1.8} />
-            <span>{item.shortLabel}</span>
+            <span>{nav.t(NAV_LABEL_KEYS[item.id])}</span>
           </button>
         );
       })}
@@ -309,7 +316,7 @@ export function MobileBottomNav({ focusMode }: { focusMode: boolean }) {
         }`}
       >
         <Settings size={18} strokeWidth={1.8} />
-        <span>设置</span>
+        <span>{nav.t('nav.settings')}</span>
       </button>
     </nav>
   );

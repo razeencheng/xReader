@@ -3,13 +3,19 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Palette, Settings } from 'lucide-react';
-import { useUIStore, type AccentColor, type Density, type Layout } from '@/stores/useUIStore';
+import { useI18n } from '@/lib/i18n';
+import { useUIStore, type AccentColor, type Density, type Layout, type Theme } from '@/stores/useUIStore';
 import { applyReaderLayoutSelection, getActiveReaderLayout } from '@/lib/reader-layout';
 
 const CHIP_BASE =
   'rounded-md border px-[11px] py-1 text-[12px] transition-colors';
 
 const FONT_SIZES = [14, 16, 17, 19, 21] as const;
+const THEME_OPTIONS: Array<{ id: Theme; labelKey: string }> = [
+  { id: 'light', labelKey: 'settings.themeLight' },
+  { id: 'dark', labelKey: 'settings.themeDark' },
+  { id: 'system', labelKey: 'settings.themeSystem' },
+];
 const ACCENTS: Array<{ id: AccentColor; color: string }> = [
   { id: 'blue', color: 'oklch(50% 0.16 255)' },
   { id: 'sage', color: 'oklch(52% 0.12 160)' },
@@ -55,6 +61,7 @@ function Chip<T extends string | number>({
 }
 
 export function TweaksPanel() {
+  const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const accentColor = useUIStore((state) => state.accentColor);
   const setAccentColor = useUIStore((state) => state.setAccentColor);
@@ -62,6 +69,8 @@ export function TweaksPanel() {
   const setFontSize = useUIStore((state) => state.setFontSize);
   const density = useUIStore((state) => state.density);
   const setDensity = useUIStore((state) => state.setDensity);
+  const theme = useUIStore((state) => state.theme);
+  const setTheme = useUIStore((state) => state.setTheme);
   const layout = useUIStore((state) => state.layout);
   const setLayout = useUIStore((state) => state.setLayout);
   const focusMode = useUIStore((state) => state.focusMode);
@@ -84,22 +93,22 @@ export function TweaksPanel() {
             transition={{ duration: 0.16, ease: 'easeOut' }}
             className="min-w-[240px] rounded-[14px] border border-[var(--border)] bg-[var(--bg)] px-5 py-[18px] shadow-[0_8px_32px_rgba(0,0,0,0.14)]"
           >
-            <div className="mb-4 text-[13.5px] font-semibold text-[var(--text)]">Tweaks</div>
+            <div className="mb-4 text-[13.5px] font-semibold text-[var(--text)]">{t('tweaks.title')}</div>
 
-            <Section label="Layout">
+            <Section label={t('tweaks.layout')}>
               <div className="flex flex-wrap gap-[6px]">
-                <Chip label="Classic" value="classic" active={activeLayout === 'classic'} onSelect={handleSelectLayout} />
-                <Chip label="Focus" value="focus" active={activeLayout === 'focus'} onSelect={handleSelectLayout} />
-                <Chip label="Wide" value="wide" active={activeLayout === 'wide'} onSelect={handleSelectLayout} />
+                <Chip label={t('tweaks.layoutClassic')} value="classic" active={activeLayout === 'classic'} onSelect={handleSelectLayout} />
+                <Chip label={t('tweaks.layoutFocus')} value="focus" active={activeLayout === 'focus'} onSelect={handleSelectLayout} />
+                <Chip label={t('tweaks.layoutWide')} value="wide" active={activeLayout === 'wide'} onSelect={handleSelectLayout} />
               </div>
             </Section>
 
-            <Section label="Density">
+            <Section label={t('tweaks.density')}>
               <div className="flex flex-wrap gap-[6px]">
                 {(['comfortable', 'compact'] as const).map((value) => (
                   <Chip
                     key={value}
-                    label={value === 'comfortable' ? 'Comfortable' : 'Compact'}
+                    label={value === 'comfortable' ? t('settings.densityComfortable') : t('settings.densityCompact')}
                     value={value satisfies Density}
                     active={density === value}
                     onSelect={setDensity}
@@ -108,7 +117,7 @@ export function TweaksPanel() {
               </div>
             </Section>
 
-            <Section label="Font Size">
+            <Section label={t('tweaks.fontSize')}>
               <div className="flex flex-wrap gap-[6px]">
                 {FONT_SIZES.map((value) => (
                   <Chip key={value} label={`${value}`} value={value} active={fontSize === value} onSelect={setFontSize} />
@@ -116,7 +125,21 @@ export function TweaksPanel() {
               </div>
             </Section>
 
-            <Section label="Accent">
+            <Section label={t('tweaks.theme')}>
+              <div className="flex flex-wrap gap-[6px]">
+                {THEME_OPTIONS.map((option) => (
+                  <Chip
+                    key={option.id}
+                    label={t(option.labelKey)}
+                    value={option.id}
+                    active={theme === option.id}
+                    onSelect={setTheme}
+                  />
+                ))}
+              </div>
+            </Section>
+
+            <Section label={t('tweaks.accent')}>
               <div className="flex items-center gap-[9px]">
                 {ACCENTS.map((accent) => {
                   const active = accent.id === accentColor;
@@ -125,7 +148,7 @@ export function TweaksPanel() {
                     <button
                       key={accent.id}
                       type="button"
-                      aria-label={`Accent ${accent.id}`}
+                      aria-label={t(`tweaks.accent${accent.id[0].toUpperCase()}${accent.id.slice(1)}`)}
                       onClick={() => setAccentColor(accent.id)}
                       className="h-[22px] w-[22px] rounded-full border-none transition-transform hover:scale-105"
                       style={{
@@ -144,7 +167,7 @@ export function TweaksPanel() {
 
       <button
         type="button"
-        aria-label={isOpen ? 'Close tweaks' : 'Open tweaks'}
+        aria-label={isOpen ? t('tweaks.close') : t('tweaks.open')}
         onClick={() => setIsOpen((value) => !value)}
         className={`flex h-11 w-11 items-center justify-center rounded-full border transition-colors ${
           isOpen

@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getDisplayTitle } from '@/lib/article-meta';
+import { useI18n } from '@/lib/i18n';
 import { getSourceColor } from '@/lib/source-meta';
 import type { ArticleItem } from '@/lib/types';
 
@@ -29,11 +30,12 @@ function NavCard({
   onClick,
 }: {
   article: ArticleItem;
-  direction: '上一篇' | '下一篇';
+  direction: string;
   hotkey: string;
   align?: 'left' | 'right';
   onClick: () => void;
 }) {
+  const { t } = useI18n();
   const sourceColor = getSourceColor(article.source_title);
   const alignment = align === 'right' ? 'items-end text-right' : 'items-start text-left';
 
@@ -53,7 +55,7 @@ function NavCard({
         <div className="mb-1 text-[10px] font-semibold tracking-[0.16em] text-[var(--text-3)]">{direction}</div>
         <div className="mb-1 flex max-w-full items-center gap-2 text-[11px] text-[var(--text-3)]">
           <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: sourceColor }} />
-          <span className="truncate">{article.source_title || 'Source'}</span>
+          <span className="truncate">{article.source_title || t('common.source')}</span>
         </div>
         <div className="w-full truncate font-medium text-[var(--text-body)]">{getDisplayTitle(article)}</div>
       </div>
@@ -68,6 +70,7 @@ function NavCard({
 }
 
 export function PrevNextBar({ current, prev, next, position, total, markRead }: Props) {
+  const { t } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -85,16 +88,16 @@ export function PrevNextBar({ current, prev, next, position, total, markRead }: 
     <div className="sticky bottom-0 z-20 border-t border-[var(--border-light)] bg-[rgba(248,244,238,0.92)] px-4 pb-4 pt-3 font-sans text-[13px] text-[var(--text-body)] backdrop-blur md:px-6">
       <div className="flex items-center gap-3">
         {prev ? (
-          <NavCard article={prev} direction="上一篇" hotkey="← K" onClick={() => navigate(prev)} />
+          <NavCard article={prev} direction={t('reader.previousArticle')} hotkey="← K" onClick={() => navigate(prev)} />
         ) : null}
 
         <div className="shrink-0 px-2 text-center">
-          <div className="text-[10px] font-semibold tracking-[0.16em] text-[var(--text-3)]">位置</div>
+          <div className="text-[10px] font-semibold tracking-[0.16em] text-[var(--text-3)]">{t('reader.position')}</div>
           <div className="mt-1 text-[12px] text-[var(--text-2)]">{position != null && total != null ? `${position} / ${total}` : ''}</div>
         </div>
 
         {next ? (
-          <NavCard article={next} direction="下一篇" hotkey="J →" align="right" onClick={() => navigate(next)} />
+          <NavCard article={next} direction={t('reader.nextArticle')} hotkey="J →" align="right" onClick={() => navigate(next)} />
         ) : null}
       </div>
     </div>

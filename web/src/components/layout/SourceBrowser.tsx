@@ -7,6 +7,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
+import { useI18n } from '@/lib/i18n';
 import { getSourceColor, orderSourceGroups } from '@/lib/source-meta';
 import type { Source } from '@/lib/types';
 import { motion } from 'framer-motion';
@@ -59,6 +60,7 @@ function SourceButton({
 }
 
 export function SourceBrowser() {
+  const { t } = useI18n();
   const { user } = useAuthStore();
   const selectedSourceId = useUIStore((state) => state.selectedSourceId);
   const setCurrentView = useUIStore((state) => state.setCurrentView);
@@ -99,9 +101,9 @@ export function SourceBrowser() {
       <header className="shrink-0 border-b border-[var(--border-light)] px-4 pb-[10px] pt-[11px]">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-[14px] font-semibold text-[var(--text)]">Sources</h1>
+            <h1 className="text-[14px] font-semibold text-[var(--text)]">{t('sources.title')}</h1>
             <p className="mt-[2px] text-[11.5px] text-[var(--text-3)]">
-              {totalUnread} unread · {sources.length} feeds
+              {t('sources.unreadFeeds', { unread: totalUnread, feeds: sources.length })}
             </p>
           </div>
           <Link
@@ -109,7 +111,7 @@ export function SourceBrowser() {
             className="inline-flex shrink-0 items-center gap-1 rounded-[9px] border border-[var(--border)] bg-[var(--bg-panel)] px-2.5 py-1.5 text-[11.5px] font-medium text-[var(--text-2)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--accent)]"
           >
             <Plus size={13} strokeWidth={1.9} />
-            添加
+            {t('sources.add')}
           </Link>
         </div>
       </header>
@@ -123,7 +125,7 @@ export function SourceBrowser() {
           }`}
         >
           {selectedSourceId === null ? <span className="absolute inset-y-[20%] left-0 w-[2.5px] rounded-r bg-[var(--accent)]" /> : null}
-          <span className="flex-1 text-[13px] font-semibold text-[var(--text)]">All Sources</span>
+          <span className="flex-1 text-[13px] font-semibold text-[var(--text)]">{t('sources.allSources')}</span>
           <UnreadBadge count={totalUnread} />
         </button>
 
