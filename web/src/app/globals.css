@@ -29,14 +29,23 @@
   --text-3: oklch(56% 0.01 260);
   --text-muted: var(--text-3);
   --text-faint: oklch(73% 0.008 260);
-  --text-accent: var(--accent);
+  --text-accent: var(--accent-text);
   --text-inverse: oklch(98.5% 0.004 80);
-  --text-warning: oklch(43% 0.09 82);
-  --text-link: var(--accent);
+  --status-warning: oklch(43% 0.09 82);
+  --status-warning-bg: oklch(96.2% 0.03 86);
+  --status-warning-border: oklch(84% 0.04 84);
+  --text-warning: var(--status-warning);
+  --text-link: var(--accent-text);
   --text-error: oklch(54% 0.18 25);
   --text-success: oklch(48% 0.12 155);
 
   --accent: oklch(49% 0.12 252);
+  --accent-text: var(--accent);
+  --accent-border: color-mix(in srgb, var(--accent-text) 34%, white);
+  --accent-solid: oklch(46% 0.14 252);
+  --accent-solid-hover: oklch(42% 0.14 252);
+  --accent-on-solid: oklch(98.5% 0.004 80);
+  --accent-ring: color-mix(in srgb, var(--accent-text) 38%, transparent);
   --accent-bg: oklch(95.2% 0.03 252);
   --accent-soft: oklch(97% 0.018 252);
   --star: oklch(74% 0.14 82);
@@ -45,7 +54,7 @@
   --border-default: var(--border);
   --border-light: oklch(92.6% 0.006 80);
   --border-strong: oklch(84.5% 0.008 80);
-  --border-accent: color-mix(in srgb, var(--accent) 35%, white);
+  --border-accent: var(--accent-border);
   --border-callout: oklch(86% 0.055 86);
   --border-error: oklch(79% 0.05 24);
   --border-success: oklch(80% 0.04 155);
@@ -94,11 +103,20 @@ html.theme-dark {
   --text-3: oklch(62% 0.008 80);
   --text-muted: var(--text-3);
   --text-faint: oklch(45% 0.008 80);
-  --text-accent: var(--accent);
+  --text-accent: var(--accent-text);
   --text-inverse: oklch(18% 0.01 260);
-  --text-warning: oklch(84% 0.06 84);
+  --status-warning: oklch(84% 0.06 84);
+  --status-warning-bg: oklch(28% 0.05 84);
+  --status-warning-border: oklch(48% 0.06 84);
+  --text-warning: var(--status-warning);
 
   --accent: oklch(70% 0.13 252);
+  --accent-text: var(--accent);
+  --accent-border: color-mix(in srgb, var(--accent-text) 45%, black);
+  --accent-solid: oklch(73% 0.13 252);
+  --accent-solid-hover: oklch(77% 0.12 252);
+  --accent-on-solid: oklch(17% 0.012 260);
+  --accent-ring: color-mix(in srgb, var(--accent-text) 52%, transparent);
   --accent-bg: oklch(26% 0.04 252);
   --accent-soft: oklch(23% 0.03 252);
   --star: oklch(82% 0.14 82);
@@ -107,7 +125,7 @@ html.theme-dark {
   --border-default: var(--border);
   --border-light: oklch(24% 0.01 260);
   --border-strong: oklch(35% 0.012 260);
-  --border-accent: color-mix(in srgb, var(--accent) 55%, black);
+  --border-accent: var(--accent-border);
   --border-callout: oklch(44% 0.06 86);
   --border-error: oklch(44% 0.06 24);
   --border-success: oklch(44% 0.05 155);
@@ -120,22 +138,98 @@ html.theme-dark {
 
 [data-accent="blue"] {
   --accent: oklch(49% 0.12 252);
+  --accent-text: var(--accent);
+  --accent-border: color-mix(in srgb, var(--accent-text) 34%, white);
+  --accent-solid: oklch(46% 0.14 252);
+  --accent-solid-hover: oklch(42% 0.14 252);
+  --accent-on-solid: oklch(98.5% 0.004 80);
+  --accent-ring: color-mix(in srgb, var(--accent-text) 38%, transparent);
   --accent-bg: oklch(95.2% 0.03 252);
+  --accent-soft: oklch(97% 0.018 252);
 }
 
 [data-accent="sage"] {
   --accent: oklch(52% 0.08 168);
+  --accent-text: var(--accent);
+  --accent-border: color-mix(in srgb, var(--accent-text) 34%, white);
+  --accent-solid: oklch(47% 0.1 168);
+  --accent-solid-hover: oklch(43% 0.1 168);
+  --accent-on-solid: oklch(98.5% 0.004 80);
+  --accent-ring: color-mix(in srgb, var(--accent-text) 38%, transparent);
   --accent-bg: oklch(95.3% 0.02 168);
+  --accent-soft: oklch(97% 0.014 168);
 }
 
 [data-accent="ember"] {
   --accent: oklch(58% 0.12 52);
+  --accent-text: var(--accent);
+  --accent-border: color-mix(in srgb, var(--accent-text) 34%, white);
+  --accent-solid: oklch(53% 0.14 52);
+  --accent-solid-hover: oklch(49% 0.14 52);
+  --accent-on-solid: oklch(98.5% 0.004 80);
+  --accent-ring: color-mix(in srgb, var(--accent-text) 38%, transparent);
   --accent-bg: oklch(96% 0.03 52);
+  --accent-soft: oklch(97.1% 0.02 52);
 }
 
 [data-accent="rose"] {
   --accent: oklch(56% 0.14 18);
+  --accent-text: var(--accent);
+  --accent-border: color-mix(in srgb, var(--accent-text) 34%, white);
+  --accent-solid: oklch(51% 0.15 18);
+  --accent-solid-hover: oklch(47% 0.15 18);
+  --accent-on-solid: oklch(98.5% 0.004 80);
+  --accent-ring: color-mix(in srgb, var(--accent-text) 38%, transparent);
   --accent-bg: oklch(95.5% 0.03 18);
+  --accent-soft: oklch(96.8% 0.02 18);
+}
+
+html.theme-dark[data-accent="blue"] {
+  --accent: oklch(70% 0.13 252);
+  --accent-text: var(--accent);
+  --accent-border: color-mix(in srgb, var(--accent-text) 45%, black);
+  --accent-solid: oklch(73% 0.13 252);
+  --accent-solid-hover: oklch(77% 0.12 252);
+  --accent-on-solid: oklch(17% 0.012 260);
+  --accent-ring: color-mix(in srgb, var(--accent-text) 52%, transparent);
+  --accent-bg: oklch(26% 0.04 252);
+  --accent-soft: oklch(23% 0.03 252);
+}
+
+html.theme-dark[data-accent="sage"] {
+  --accent: oklch(73% 0.09 168);
+  --accent-text: var(--accent);
+  --accent-border: color-mix(in srgb, var(--accent-text) 45%, black);
+  --accent-solid: oklch(75% 0.1 168);
+  --accent-solid-hover: oklch(79% 0.09 168);
+  --accent-on-solid: oklch(17% 0.012 260);
+  --accent-ring: color-mix(in srgb, var(--accent-text) 52%, transparent);
+  --accent-bg: oklch(26% 0.03 168);
+  --accent-soft: oklch(23% 0.02 168);
+}
+
+html.theme-dark[data-accent="ember"] {
+  --accent: oklch(78% 0.11 55);
+  --accent-text: var(--accent);
+  --accent-border: color-mix(in srgb, var(--accent-text) 45%, black);
+  --accent-solid: oklch(80% 0.12 55);
+  --accent-solid-hover: oklch(83% 0.11 55);
+  --accent-on-solid: oklch(17% 0.012 260);
+  --accent-ring: color-mix(in srgb, var(--accent-text) 52%, transparent);
+  --accent-bg: oklch(28% 0.04 55);
+  --accent-soft: oklch(24% 0.03 55);
+}
+
+html.theme-dark[data-accent="rose"] {
+  --accent: oklch(77% 0.12 18);
+  --accent-text: var(--accent);
+  --accent-border: color-mix(in srgb, var(--accent-text) 45%, black);
+  --accent-solid: oklch(79% 0.13 18);
+  --accent-solid-hover: oklch(82% 0.12 18);
+  --accent-on-solid: oklch(17% 0.012 260);
+  --accent-ring: color-mix(in srgb, var(--accent-text) 52%, transparent);
+  --accent-bg: oklch(27% 0.04 18);
+  --accent-soft: oklch(24% 0.03 18);
 }
 
 @theme inline {
@@ -148,10 +242,12 @@ html.theme-dark {
 html,
 body {
   min-height: 100%;
+  background-color: var(--bg-body);
 }
 
 body {
-  background:
+  background-color: var(--bg-body);
+  background-image:
     radial-gradient(circle at top, color-mix(in srgb, var(--bg-body) 82%, white 18%), var(--bg-body) 55%, color-mix(in srgb, var(--bg-body) 90%, var(--bg-surface) 10%) 100%);
   color: var(--text-body);
   font-family: var(--font-ui);
@@ -172,10 +268,20 @@ a {
 
 .reader-content {
   color: var(--text-2);
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.reader-content,
+.reader-content * {
+  box-sizing: border-box;
 }
 
 .reader-content > [data-layer='original'],
 .reader-content > [data-block-tag='pre'] {
+  max-width: 100%;
+  min-width: 0;
   margin-top: 1.45em;
 }
 
@@ -185,7 +291,14 @@ a {
 }
 
 .reader-content :is(p, ul, ol, blockquote, figure, pre, table, details) {
+  max-width: 100%;
   margin: 0;
+}
+
+.reader-content :is(p, li, h1, h2, h3, h4, h5, h6, blockquote, summary, figcaption, th, td),
+.overflow-wrap-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .reader-content :is(h2, h3, h4, h5, h6) {
@@ -302,6 +415,7 @@ a {
 }
 
 .reader-content figure {
+  max-width: 100%;
   overflow: hidden;
   border-radius: 1rem;
   background: var(--bg-panel);
@@ -309,13 +423,19 @@ a {
 
 .reader-content img {
   display: block;
+  width: auto !important;
   height: auto;
-  max-width: 100%;
+  max-width: 100% !important;
   margin-inline: auto;
+}
+
+.reader-content :is(video, canvas, svg, iframe) {
+  max-width: 100% !important;
 }
 
 .reader-content table {
   display: block;
+  max-width: 100%;
   overflow-x: auto;
   border-collapse: collapse;
   font-family: var(--font-ui);
@@ -371,7 +491,179 @@ mark {
   padding: 0 2px;
 }
 
-@media (max-width: 767px) {
+@layer components {
+  .ui-btn-primary,
+  .ui-btn-solid,
+  .ui-btn-secondary,
+  .ui-btn-ghost {
+    display: inline-flex;
+    min-height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    border-radius: 0.8rem;
+    border: 1px solid transparent;
+    padding: 0.5rem 0.95rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1;
+    text-decoration: none;
+    transition:
+      background-color 150ms ease,
+      color 150ms ease,
+      border-color 150ms ease,
+      box-shadow 150ms ease;
+  }
+
+  .ui-btn-primary {
+    border-color: var(--accent-border);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+  }
+
+  .ui-btn-primary:hover:not(:disabled) {
+    border-color: var(--accent-border);
+    background: var(--accent-bg);
+    color: var(--accent-text);
+  }
+
+  .ui-btn-solid {
+    border-color: var(--accent-solid);
+    background: var(--accent-solid);
+    color: var(--accent-on-solid);
+  }
+
+  .ui-btn-solid:hover:not(:disabled) {
+    border-color: var(--accent-solid-hover);
+    background: var(--accent-solid-hover);
+  }
+
+  .ui-btn-secondary {
+    border-color: var(--border-strong);
+    background: var(--bg-elevated);
+    color: var(--text-2);
+  }
+
+  .ui-btn-secondary:hover:not(:disabled) {
+    border-color: var(--accent-border);
+    background: var(--bg-hover);
+    color: var(--text);
+  }
+
+  .ui-btn-ghost {
+    background: transparent;
+    color: var(--text-2);
+  }
+
+  .ui-btn-ghost:hover:not(:disabled) {
+    background: var(--bg-hover);
+    color: var(--text);
+  }
+
+  .ui-btn-primary:focus-visible,
+  .ui-btn-solid:focus-visible,
+  .ui-btn-secondary:focus-visible,
+  .ui-btn-ghost:focus-visible,
+  .ui-pill-active:focus-visible,
+  .ui-pill-neutral:focus-visible,
+  .ui-input:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--bg-body),
+      0 0 0 4px var(--accent-ring);
+  }
+
+  .ui-btn-primary:disabled,
+  .ui-btn-solid:disabled,
+  .ui-btn-secondary:disabled,
+  .ui-btn-ghost:disabled {
+    cursor: not-allowed;
+    opacity: 0.58;
+  }
+
+  .ui-btn-primary svg,
+  .ui-btn-solid svg,
+  .ui-btn-secondary svg,
+  .ui-btn-ghost svg {
+    color: currentColor;
+    stroke: currentColor;
+  }
+
+  .ui-pill-active,
+  .ui-pill-neutral {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    padding: 0.18rem 0.62rem;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    transition:
+      background-color 150ms ease,
+      color 150ms ease,
+      border-color 150ms ease,
+      box-shadow 150ms ease;
+  }
+
+  .ui-pill-active {
+    border-color: var(--accent-border);
+    background: var(--accent-bg);
+    color: var(--accent-text);
+    font-weight: 600;
+  }
+
+  .ui-pill-neutral {
+    border-color: var(--border);
+    background: var(--bg-elevated);
+    color: var(--text-3);
+  }
+
+  .ui-pill-neutral:hover:not(:disabled) {
+    background: var(--bg-hover);
+    color: var(--text-2);
+  }
+
+  .ui-pill-active:disabled,
+  .ui-pill-neutral:disabled {
+    cursor: not-allowed;
+    opacity: 0.58;
+  }
+
+  .ui-input {
+    width: 100%;
+    min-height: 2.75rem;
+    border-radius: 1rem;
+    border: 1px solid var(--border-strong);
+    background: var(--bg-body);
+    color: var(--text-body);
+    padding: 0.66rem 0.9rem;
+    font-size: 0.875rem;
+    line-height: 1.35;
+    outline: none;
+    transition:
+      border-color 150ms ease,
+      box-shadow 150ms ease,
+      background-color 150ms ease;
+  }
+
+  .ui-input::placeholder {
+    color: var(--text-muted);
+  }
+
+  .ui-input:focus {
+    border-color: var(--accent-border);
+  }
+
+  .ui-input:disabled {
+    cursor: not-allowed;
+    background: var(--bg-panel);
+    color: var(--text-muted);
+  }
+}
+
+@media (max-width: 1023px) {
   :root {
     --list-width: 100%;
   }

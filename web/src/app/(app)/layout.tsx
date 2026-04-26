@@ -12,7 +12,7 @@ import { useUIStore } from '@/stores/useUIStore';
 
 import { KeyboardShortcutsModal } from '@/components/layout/KeyboardShortcutsModal';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { MobileBottomNav, MobileTopBar, TabletTopNav } from '@/components/layout/ResponsiveAppNav';
+import { MobileTopBar, TabletTopNav } from '@/components/layout/ResponsiveAppNav';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useI18n();
@@ -74,11 +74,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </motion.div>
 
         <div className="min-w-0 flex-1 overflow-hidden">
-          <main className="h-full overflow-hidden pb-[68px] md:pb-0">{children}</main>
+          <main className="h-full overflow-hidden">{children}</main>
         </div>
       </div>
 
-      <MobileBottomNav focusMode={focusMode} />
       <KeyboardShortcutsModal open={isShortcutsOpen} onClose={closeShortcuts} />
     </div>
   );

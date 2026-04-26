@@ -310,9 +310,10 @@ export function SourcesPage() {
         : importBusy
           ? t('sources.importing')
           : t('sources.chooseFile');
+  const fileInputId = 'sources-opml-file-input';
 
   return (
-    <main className="min-h-screen bg-[var(--bg-body)] text-[var(--text-body)]">
+    <main className="h-full overflow-y-auto bg-[var(--bg-body)] text-[var(--text-body)]">
       <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8 flex items-start justify-between gap-4">
           <div className="space-y-3">
@@ -357,13 +358,13 @@ export function SourcesPage() {
                 }
               }}
               placeholder={t('sources.addPlaceholder')}
-              className="min-w-0 flex-1 rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-body)] px-4 py-3 font-[system-ui] text-sm text-[var(--text-body)] outline-none transition focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--accent)]/20"
+              className="ui-input min-w-0 flex-1 font-[system-ui] text-sm"
             />
             <button
               type="button"
               onClick={() => void handleCreateSource()}
               disabled={createSource.isPending}
-              className="rounded-2xl bg-[var(--bg-nav)] px-5 py-3 font-[system-ui] text-sm text-[var(--text-inverse)] transition-colors hover:bg-[var(--bg-surface)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="ui-btn-primary rounded-2xl px-5 py-3 font-[system-ui] text-sm"
             >
               {createSource.isPending ? t('sources.finding') : t('sources.findAndAdd')}
             </button>
@@ -405,7 +406,7 @@ export function SourcesPage() {
                                 setEditingId(null);
                               }
                             }}
-                            className="min-w-0 flex-1 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-body)] px-3 py-2 font-[system-ui] text-sm text-[var(--text-body)] outline-none focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--accent)]/20"
+                            className="ui-input min-h-9 rounded-xl px-3 py-2 font-[system-ui] text-sm"
                           />
                         ) : (
                           <button
@@ -417,7 +418,7 @@ export function SourcesPage() {
                             {source.title}
                           </button>
                         )}
-                        <span className="rounded-full border border-[var(--border-strong)] px-2.5 py-1 font-[system-ui] text-[11px] text-[var(--text-muted)]">
+                        <span className="ui-pill-neutral border-[var(--border-strong)] px-2.5 py-1 font-[system-ui] text-[11px]">
                           {health.label === 'healthy'
                             ? t('sources.healthHealthy')
                             : health.label === 'degraded'
@@ -439,14 +440,14 @@ export function SourcesPage() {
                         type="button"
                         onClick={() => void handleRefresh(source.id)}
                         disabled={refreshSource.isPending}
-                        className="rounded-xl border border-[var(--border-strong)] px-3 py-1.5 font-[system-ui] text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-callout)] hover:text-[var(--text-body)] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="ui-btn-secondary rounded-xl px-3 py-1.5 font-[system-ui] text-xs"
                       >
                         {t('sources.refresh')}
                       </button>
                       <button
                         type="button"
                         onClick={() => queueDelete(source)}
-                        className="rounded-xl border border-[var(--border-strong)] px-3 py-1.5 font-[system-ui] text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-callout)] hover:text-[var(--text-body)]"
+                        className="ui-btn-secondary rounded-xl px-3 py-1.5 font-[system-ui] text-xs"
                       >
                         {t('sources.delete')}
                       </button>
@@ -467,26 +468,33 @@ export function SourcesPage() {
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <input
+                id={fileInputId}
                 type="file"
                 accept=".opml,.xml,application/xml,text/xml"
                 onChange={(event) => {
                   const file = event.target.files?.[0] ?? null;
                   setSelectedFile(file);
                 }}
-                className="block w-full text-sm text-[var(--text-muted)] file:mr-4 file:rounded-2xl file:border-0 file:bg-[var(--bg-nav)] file:px-4 file:py-2 file:font-[system-ui] file:text-sm file:text-[var(--text-inverse)] hover:file:bg-[var(--bg-surface)]"
+                className="sr-only"
               />
+              <label htmlFor={fileInputId} className="ui-btn-secondary cursor-pointer rounded-2xl px-4 py-3 font-[system-ui] text-sm">
+                {t('sources.chooseFile')}
+              </label>
+              <span className="max-w-[240px] truncate font-[system-ui] text-xs text-[var(--text-muted)]">
+                {selectedFile ? selectedFile.name : t('sources.chooseFile')}
+              </span>
               <button
                 type="button"
                 onClick={() => void handleImport()}
                 disabled={!selectedFile || importBusy}
-                className="rounded-2xl border border-[var(--border-strong)] px-4 py-3 font-[system-ui] text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-callout)] disabled:cursor-not-allowed disabled:opacity-50"
+                className={`${selectedFile ? 'ui-btn-primary' : 'ui-btn-secondary'} rounded-2xl px-4 py-3 font-[system-ui] text-sm`}
               >
                 {t('sources.uploadImport')}
               </button>
               <button
                 type="button"
                 onClick={() => void handleExport()}
-                className="rounded-2xl border border-[var(--border-strong)] px-4 py-3 font-[system-ui] text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-callout)]"
+                className="ui-btn-secondary rounded-2xl px-4 py-3 font-[system-ui] text-sm"
               >
                 {t('sources.exportOpml')}
               </button>

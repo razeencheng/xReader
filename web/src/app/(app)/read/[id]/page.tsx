@@ -11,9 +11,11 @@ import { estimateReadMinutes, formatRelativeTime, getDisplayTitle, isLikelySumma
 import { broadcast } from '@/lib/broadcast';
 import { useI18n } from '@/lib/i18n';
 import { useReaderShortcuts } from '@/hooks/useReaderShortcuts';
+import { useReaderGestures } from '@/hooks/useReaderGestures';
 import { useUIStore } from '@/stores/useUIStore';
 import { getActiveReaderLayout, toggleReaderFocusMode } from '@/lib/reader-layout';
 import { ReaderHeader } from '@/components/reader/ReaderHeader';
+import { ReaderGestureHint } from '@/components/reader/ReaderGestureHint';
 import { KeyPointsCallout } from '@/components/reader/KeyPointsCallout';
 import { BilingualBody } from '@/components/reader/BilingualBody';
 import { PrevNextBar } from '@/components/reader/PrevNextBar';
@@ -155,6 +157,13 @@ function ReaderContent({ id }: { id: string }) {
     [articleId, markRead, router, searchParams],
   );
 
+  const handleBackToList = useCallback(() => {
+    const ctx = searchParams.get('ctx') ?? searchParams.get('tab');
+    const params = new URLSearchParams();
+    if (ctx) params.set('tab', ctx);
+    router.push(`/${params.toString() ? `?${params.toString()}` : ''}`);
+  }, [router, searchParams]);
+
   const handleToggleStar = useCallback(async () => {
     if (!article) return;
 
@@ -245,6 +254,16 @@ function ReaderContent({ id }: { id: string }) {
     },
   });
 
+  const { gestureHint, touchHandlers } = useReaderGestures({
+    scrollRef,
+    progress,
+    hasNext: Boolean(next),
+    hasPrev: Boolean(prev),
+    onNext: () => navigateTo(next),
+    onPrev: () => navigateTo(prev),
+    onBack: handleBackToList,
+  });
+
   if (isLoading || !article) {
     return (
       <div className="flex h-full items-center justify-center bg-[var(--bg)]">
@@ -297,18 +316,21 @@ function ReaderContent({ id }: { id: string }) {
         total={total}
         progress={progress}
         focusMode={focusMode}
-        onBack={() => {
-          const ctx = searchParams.get('ctx') ?? searchParams.get('tab');
-          const params = new URLSearchParams();
-          if (ctx) params.set('tab', ctx);
-          router.push(`/?${params.toString()}`);
-        }}
+        onBack={handleBackToList}
         onToggleStar={handleToggleStar}
         onToggleFocus={handleToggleFocus}
         onShare={handleShare}
       />
 
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
+      <ReaderGestureHint hint={gestureHint} />
+
+      <div
+        ref={scrollRef}
+        data-reader-scroll="true"
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto overflow-x-hidden overscroll-x-none touch-pan-y"
+        {...touchHandlers}
+      >
         <HighlightLayer articleId={articleId}>
           <div className={`pb-12 pt-[44px] ${activeLayout === 'wide' ? 'px-7 md:px-14' : 'px-7 md:px-7'}`}>
             <article className={activeLayout === 'wide' ? 'max-w-none' : 'mx-auto max-w-[680px]'}>
@@ -354,7 +376,7 @@ function ReaderContent({ id }: { id: string }) {
                 />
               ) : null}
 
-              <div className="font-reader-text text-[var(--text)]" style={{ fontSize: `${fontSize}px`, lineHeight: 1.9 }}>
+              <div className="font-reader-text min-w-0 max-w-full text-[var(--text)]" style={{ fontSize: `${fontSize}px`, lineHeight: 1.9 }}>
                 {contentHtml ? (
                   <BilingualBody
                     articleId={article.id}
@@ -363,7 +385,7 @@ function ReaderContent({ id }: { id: string }) {
                     nativeLanguage={nativeLanguage}
                   />
                 ) : (
-                  <p>{contentText}</p>
+                  <p className="overflow-wrap-anywhere">{contentText}</p>
                 )}
               </div>
 

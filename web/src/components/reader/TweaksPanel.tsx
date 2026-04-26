@@ -7,8 +7,7 @@ import { useI18n } from '@/lib/i18n';
 import { useUIStore, type AccentColor, type Density, type Layout, type Theme } from '@/stores/useUIStore';
 import { applyReaderLayoutSelection, getActiveReaderLayout } from '@/lib/reader-layout';
 
-const CHIP_BASE =
-  'rounded-md border px-[11px] py-1 text-[12px] transition-colors';
+const CHIP_BASE = 'rounded-md px-[11px] py-1 text-[12px]';
 
 const FONT_SIZES = [14, 16, 17, 19, 21] as const;
 const THEME_OPTIONS: Array<{ id: Theme; labelKey: string }> = [
@@ -49,11 +48,7 @@ function Chip<T extends string | number>({
     <button
       type="button"
       onClick={() => onSelect(value)}
-      className={`${CHIP_BASE} ${
-        active
-          ? 'border-[var(--accent)] bg-[var(--accent-bg)] font-medium text-[var(--accent)]'
-          : 'border-[var(--border)] bg-transparent text-[var(--text-2)] hover:bg-[var(--bg-hover)]'
-      }`}
+      className={`${active ? 'ui-pill-active' : 'ui-pill-neutral'} ${CHIP_BASE}`}
     >
       {label}
     </button>
@@ -150,13 +145,20 @@ export function TweaksPanel() {
                       type="button"
                       aria-label={t(`tweaks.accent${accent.id[0].toUpperCase()}${accent.id.slice(1)}`)}
                       onClick={() => setAccentColor(accent.id)}
-                      className="h-[22px] w-[22px] rounded-full border-none transition-transform hover:scale-105"
-                      style={{
-                        background: accent.color,
-                        outline: active ? `2.5px solid ${accent.color}` : 'none',
-                        outlineOffset: 2,
-                      }}
-                    />
+                      className={`flex h-[24px] w-[24px] items-center justify-center rounded-full border transition-transform hover:scale-105 ${
+                        active
+                          ? 'border-[var(--accent-border)] bg-[var(--accent-soft)]'
+                          : 'border-[var(--border)] bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)]'
+                      }`}
+                    >
+                      <span
+                        className="block h-[14px] w-[14px] rounded-full"
+                        style={{
+                          background: accent.color,
+                          boxShadow: active ? '0 0 0 2px var(--accent-ring)' : 'none',
+                        }}
+                      />
+                    </button>
                   );
                 })}
               </div>
@@ -171,8 +173,8 @@ export function TweaksPanel() {
         onClick={() => setIsOpen((value) => !value)}
         className={`flex h-11 w-11 items-center justify-center rounded-full border transition-colors ${
           isOpen
-            ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
-            : 'border-[var(--border)] bg-[var(--bg-panel)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+            ? 'border-[var(--accent-solid)] bg-[var(--accent-solid)] text-[var(--accent-on-solid)]'
+            : 'border-[var(--border)] bg-[var(--bg-panel)] text-[var(--text-2)] hover:border-[var(--accent-border)] hover:text-[var(--accent-text)]'
         }`}
       >
         {isOpen ? <Palette size={18} strokeWidth={1.8} /> : <Settings size={18} strokeWidth={1.8} />}

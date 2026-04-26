@@ -180,6 +180,8 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLanguageOpen, setIsLanguageOpen] = useState(false);
   const nav = useAppNavigation();
+  const isListPage = nav.pathname === '/';
+  const menuLabel = isListPage ? nav.t(NAV_LABEL_KEYS[nav.currentView]) : nav.t('nav.more');
 
   if (focusMode) {
     return null;
@@ -187,87 +189,154 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
 
   return (
     <>
-      <header className="glass-effect flex h-14 shrink-0 items-center justify-between px-4 md:hidden">
-        <button
-          type="button"
-          onClick={() => nav.goToView('today')}
-          className="font-serif text-xl font-bold italic tracking-tight text-[var(--accent)]"
-        >
-          xReader
-        </button>
-        <button
-          type="button"
-          onClick={() => setIsMenuOpen((value) => !value)}
-          className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-panel)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-2)] shadow-[0_10px_30px_rgba(65,52,35,0.08)]"
-        >
-          {nav.t('nav.more')}
-          <ChevronDown size={13} strokeWidth={1.8} />
-        </button>
+      <header className="glass-effect h-14 shrink-0 border-b border-[var(--border-light)] md:hidden">
+        <div className="flex h-14 items-center justify-between px-4">
+          <button
+            type="button"
+            onClick={() => nav.goToView('today')}
+            className="font-serif text-xl font-bold italic tracking-tight text-[var(--accent)]"
+          >
+            xReader
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsMenuOpen((value) => !value)}
+            className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-panel)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-2)] shadow-[0_10px_30px_rgba(65,52,35,0.08)]"
+            aria-expanded={isMenuOpen}
+          >
+            {menuLabel}
+            <ChevronDown size={13} strokeWidth={1.8} />
+          </button>
+        </div>
       </header>
 
       {isMenuOpen ? (
-        <div className="fixed right-3 top-[58px] z-[130] w-[210px] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.16)] md:hidden">
+        <>
           <button
             type="button"
-            onClick={() => {
-              setIsLanguageOpen(true);
-              setIsMenuOpen(false);
-            }}
-            className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+            aria-label={nav.t('nav.closeMenu')}
+            className="fixed inset-0 z-[120] bg-black/10 md:hidden"
+            onClick={() => setIsMenuOpen(false)}
+          />
+          <div
+            role="dialog"
+            aria-label={nav.t('nav.mobileMenu')}
+            className="fixed inset-x-0 bottom-0 z-[130] max-h-[82vh] overflow-y-auto rounded-t-[28px] border border-[var(--border)] bg-[var(--bg)] px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-4 shadow-[0_-22px_70px_rgba(0,0,0,0.18)] md:hidden"
           >
-            <span className="inline-flex items-center gap-2">
-              <Globe size={15} />
-              {nav.t('nav.nativeLanguage')}
-            </span>
-            <span className="text-[11px] font-semibold text-[var(--accent)]">{nav.currentLanguage.short}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              nav.openShortcuts();
-              setIsMenuOpen(false);
-            }}
-            className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
-          >
-            <Keyboard size={15} />
-            {nav.t('shortcuts.title')}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              nav.router.push('/sources');
-              setIsMenuOpen(false);
-            }}
-            className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
-          >
-            <PlusCircle size={15} />
-            {nav.t('nav.manageSources')}
-          </button>
-          {nav.isAdmin ? (
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--border-strong)]" />
+
+            <section>
+              <div className="px-1 pb-2 text-[11px] font-semibold tracking-[0.16em] text-[var(--text-3)]">
+                {nav.t('nav.viewSection')}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {PRIMARY_NAV_ITEMS.map((item) => {
+                  const Icon = item.icon;
+                  const active = nav.currentView === item.id && isListPage;
+
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        nav.goToView(item.id);
+                        setIsMenuOpen(false);
+                      }}
+                      className={`flex items-center gap-2 rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition-colors ${
+                        active
+                          ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--text-accent)]'
+                          : 'border-[var(--border-light)] bg-[var(--bg-panel)] text-[var(--text-2)] hover:bg-[var(--bg-hover)]'
+                      }`}
+                    >
+                      <Icon size={17} strokeWidth={1.8} />
+                      {nav.t(NAV_LABEL_KEYS[item.id])}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="mt-5">
+              <div className="px-1 pb-2 text-[11px] font-semibold tracking-[0.16em] text-[var(--text-3)]">
+                {nav.t('nav.toolSection')}
+              </div>
+              <div className="space-y-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    nav.router.push('/sources');
+                    setIsMenuOpen(false);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+                >
+                  <PlusCircle size={17} />
+                  {nav.t('nav.manageSources')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    nav.openShortcuts();
+                    setIsMenuOpen(false);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+                >
+                  <Keyboard size={17} />
+                  {nav.t('shortcuts.title')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLanguageOpen(true);
+                    setIsMenuOpen(false);
+                  }}
+                  className="flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+                >
+                  <span className="inline-flex items-center gap-3">
+                    <Globe size={17} />
+                    {nav.t('nav.nativeLanguage')}
+                  </span>
+                  <span className="text-[11px] font-semibold text-[var(--accent)]">{nav.currentLanguage.short}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    nav.router.push('/settings');
+                    setIsMenuOpen(false);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+                >
+                  <Settings size={17} />
+                  {nav.t('nav.settings')}
+                </button>
+                {nav.isAdmin ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      nav.router.push('/admin');
+                      setIsMenuOpen(false);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+                  >
+                    <ShieldCheck size={17} />
+                    {nav.t('nav.admin')}
+                  </button>
+                ) : null}
+              </div>
+            </section>
+
             <button
               type="button"
               onClick={() => {
-                nav.router.push('/admin');
+                void nav.handleLogout();
                 setIsMenuOpen(false);
               }}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+              className="mt-4 flex w-full items-center gap-3 rounded-2xl border border-[var(--border-light)] px-3 py-3 text-left text-sm font-medium text-[var(--text-3)] hover:bg-[var(--bg-hover)]"
             >
-              <ShieldCheck size={15} />
-              {nav.t('nav.admin')}
+              <LogOut size={17} />
+              {nav.t('nav.logOut')}
             </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => {
-              void nav.handleLogout();
-              setIsMenuOpen(false);
-            }}
-            className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
-          >
-            <LogOut size={15} />
-            {nav.t('nav.logOut')}
-          </button>
-        </div>
+          </div>
+        </>
       ) : null}
 
       {isLanguageOpen ? (
@@ -278,46 +347,5 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
         />
       ) : null}
     </>
-  );
-}
-
-export function MobileBottomNav({ focusMode }: { focusMode: boolean }) {
-  const nav = useAppNavigation();
-
-  if (focusMode) {
-    return null;
-  }
-
-  return (
-    <nav className="fixed inset-x-0 bottom-0 z-[80] grid h-[68px] grid-cols-5 border-t border-[var(--border)] bg-[rgba(252,250,246,0.94)] px-2 pb-[env(safe-area-inset-bottom)] pt-1.5 shadow-[0_-18px_50px_rgba(65,52,35,0.08)] backdrop-blur md:hidden">
-      {PRIMARY_NAV_ITEMS.map((item) => {
-        const active = nav.currentView === item.id && nav.pathname === '/';
-        const Icon = item.icon;
-
-        return (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => nav.goToView(item.id)}
-            className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-[14px] text-[11px] font-medium transition-colors ${
-              active ? 'bg-[var(--accent-bg)] text-[var(--accent)]' : 'text-[var(--text-3)]'
-            }`}
-          >
-            <Icon size={18} strokeWidth={1.8} />
-            <span>{nav.t(NAV_LABEL_KEYS[item.id])}</span>
-          </button>
-        );
-      })}
-      <button
-        type="button"
-        onClick={() => nav.router.push('/settings')}
-        className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-[14px] text-[11px] font-medium transition-colors ${
-          nav.pathname === '/settings' ? 'bg-[var(--accent-bg)] text-[var(--accent)]' : 'text-[var(--text-3)]'
-        }`}
-      >
-        <Settings size={18} strokeWidth={1.8} />
-        <span>{nav.t('nav.settings')}</span>
-      </button>
-    </nav>
   );
 }

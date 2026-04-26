@@ -287,7 +287,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
       : currentView === 'starred'
         ? t('nav.starred')
         : currentView === 'sources'
-          ? selectedSource?.title ?? t('feed.allSources')
+          ? selectedSource?.title ?? t('sources.title')
           : t('nav.all');
   const showReadFilters = currentView !== 'starred';
   const sourceColor = selectedSource ? getSourceColor(selectedSource) : null;
@@ -295,7 +295,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
   const isBulkConfirmOpen = Boolean(showBulkRead && bulkScope && openBulkConfirmScope === bulkScope.scope);
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden border-r border-[var(--border)] bg-[var(--bg)] md:w-[300px]">
+    <div className="flex h-full w-full flex-col overflow-hidden bg-[var(--bg)] lg:w-[300px] lg:border-r lg:border-[var(--border)]">
       <header className="shrink-0 border-b border-[var(--border-light)] px-3 pb-2 pt-[10px]">
         {currentView === 'sources' && selectedSource ? (
           <button
@@ -329,11 +329,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
                         setReadFilter(id);
                         setOpenBulkConfirmScope(null);
                       }}
-                      className={`inline-flex items-center gap-1 rounded-md px-2 py-[3px] text-[11.5px] transition-colors ${
-                        active
-                          ? 'bg-[var(--accent-bg)] font-semibold text-[var(--accent)]'
-                          : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)]'
-                      }`}
+                      className={`${active ? 'ui-pill-active' : 'ui-pill-neutral'} text-[11.5px]`}
                     >
                       {t(labelKey)}
                       <span className="text-[10px] opacity-75">{count}</span>
@@ -349,7 +345,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
                     aria-expanded={isBulkConfirmOpen}
                     onClick={() => setOpenBulkConfirmScope((scope) => (scope === bulkScope?.scope ? null : (bulkScope?.scope ?? null)))}
                     disabled={isBulkUpdating}
-                    className="inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-2.5 py-[3px] text-[11px] font-semibold text-[var(--text-3)] shadow-[0_1px_0_rgba(65,52,35,0.04)] transition-colors hover:border-[var(--border-accent)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="ui-pill-neutral px-2.5 py-[3px] text-[11px] font-semibold shadow-[0_1px_0_rgba(65,52,35,0.04)]"
                   >
                     {t('feed.allRead')}
                   </button>
@@ -366,7 +362,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
                           type="button"
                           onClick={() => setOpenBulkConfirmScope(null)}
                           disabled={isBulkUpdating}
-                          className="rounded-full px-3 py-1.5 text-[11px] font-medium text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)] disabled:cursor-not-allowed disabled:opacity-60"
+                          className="ui-btn-ghost h-8 rounded-full px-3 py-1.5 text-[11px] font-medium"
                         >
                           {t('feed.cancel')}
                         </button>
@@ -375,7 +371,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
                           aria-label={t('feed.confirmAllReadAria')}
                           onClick={() => void handleBulkMarkRead()}
                           disabled={isBulkUpdating}
-                          className="rounded-full bg-[var(--bg-nav)] px-3 py-1.5 text-[11px] font-semibold text-[var(--text-inverse)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="ui-btn-solid h-8 rounded-full px-3 py-1.5 text-[11px] font-semibold"
                         >
                           {t('feed.confirm')}
                         </button>
@@ -386,7 +382,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
               ) : null}
             </div>
             {bulkReadUndo ? (
-              <div className="mt-2 rounded-xl bg-[var(--accent-bg)] px-3 py-2 text-[11.5px] text-[var(--accent)]">
+              <div className="mt-2 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-2 text-[11.5px] text-[var(--accent-text)]">
                 <span>
                   {t('feed.bulkReadNotice', { scope: bulkReadUndo.label, count: bulkReadUndo.articleIds.length })}
                 </span>

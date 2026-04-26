@@ -76,6 +76,19 @@ test('renders grouped sources with all-sources summary and unread badges', async
   expect(within(hackerNewsRow).getByText('2')).toBeInTheDocument();
 });
 
+test('uses a single-column shell below desktop widths', async () => {
+  vi.mocked(apiFetch).mockResolvedValue([]);
+
+  const { container } = render(<SourceBrowser />, { wrapper: createWrapper() });
+  await screen.findByText('订阅源');
+
+  const shell = container.firstElementChild;
+  expect(shell).toHaveClass('lg:border-r');
+  expect(shell).toHaveClass('lg:w-[300px]');
+  expect(shell).not.toHaveClass('border-r');
+  expect(shell).not.toHaveClass('md:w-[300px]');
+});
+
 test('selects a source when clicking a grouped row', async () => {
   vi.mocked(apiFetch).mockResolvedValue([
     {

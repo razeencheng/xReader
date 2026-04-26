@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { useUIStore } from '@/stores/useUIStore';
 
 vi.mock('@/lib/queries/sources', () => ({
@@ -38,6 +39,15 @@ test('SourcesPage renders title and add button', () => {
   expect(screen.getByRole('link', { name: '← 返回首页' })).toBeInTheDocument();
 });
 
+test('SourcesPage owns its scroll area inside the app shell', () => {
+  const { container } = render(<SourcesPage />, { wrapper });
+  const shell = container.firstElementChild;
+
+  expect(shell).toHaveClass('h-full');
+  expect(shell).toHaveClass('overflow-y-auto');
+  expect(shell).not.toHaveClass('min-h-screen');
+});
+
 test('SourcesPage follows native language for global labels', () => {
   useUIStore.setState({ nativeLanguage: 'en-US' });
 
@@ -47,4 +57,15 @@ test('SourcesPage follows native language for global labels', () => {
   expect(screen.getByRole('heading', { name: 'Sources' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Find and add' })).toBeInTheDocument();
   expect(screen.getByRole('link', { name: '← Back home' })).toBeInTheDocument();
+});
+
+test('SourcesPage shows selected OPML file name after choosing a file', async () => {
+  const user = userEvent.setup();
+  render(<SourcesPage />, { wrapper });
+
+  const input = screen.getByLabelText('选择文件后上传');
+  const file = new File(['<opml></opml>'], 'subscriptions.opml', { type: 'text/x-opml' });
+  await user.upload(input, file);
+
+  expect(await screen.findByText('subscriptions.opml')).toBeInTheDocument();
 });

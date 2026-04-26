@@ -41,6 +41,18 @@ test('FeedList shows all caught up message when unread filter has no items', asy
   expect(await screen.findByText(/已全部处理/)).toBeInTheDocument();
 });
 
+test('FeedList only draws the split-pane divider on desktop widths', () => {
+  vi.mocked(apiFetch).mockResolvedValue({ items: [], next_cursor: null });
+
+  const { container } = render(<FeedList />, { wrapper });
+  const shell = container.firstElementChild;
+
+  expect(shell).toHaveClass('lg:border-r');
+  expect(shell).toHaveClass('lg:w-[300px]');
+  expect(shell).not.toHaveClass('border-r');
+  expect(shell).not.toHaveClass('md:w-[300px]');
+});
+
 test('FeedList renders items', async () => {
   vi.mocked(apiFetch).mockResolvedValue({
     items: [
@@ -60,6 +72,22 @@ test('FeedList renders items', async () => {
   expect(await screen.findByText('Test Article')).toBeInTheDocument();
   expect(screen.getByText('今日')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /未读/i })).toBeInTheDocument();
+});
+
+test('FeedList aligns the aggregate sources title with the source browser title', async () => {
+  useUIStore.setState({
+    currentView: 'sources',
+    selectedSourceId: null,
+    readFilter: 'unread',
+    density: 'comfortable',
+    nativeLanguage: 'zh-CN',
+  });
+  vi.mocked(apiFetch).mockResolvedValue({ items: [], next_cursor: null });
+
+  render(<FeedList />, { wrapper });
+
+  expect(await screen.findByText('订阅源')).toBeInTheDocument();
+  expect(screen.queryByText('所有订阅源')).not.toBeInTheDocument();
 });
 
 test('FeedList follows externally selected article id', async () => {

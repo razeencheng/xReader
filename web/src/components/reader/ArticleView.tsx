@@ -10,11 +10,13 @@ import { broadcast } from '@/lib/broadcast';
 import { estimateReadMinutes, formatRelativeTime, getDisplayTitle, isLikelySummaryOnly, isSameLanguage } from '@/lib/article-meta';
 import { useI18n } from '@/lib/i18n';
 import { getActiveReaderLayout, toggleReaderFocusMode } from '@/lib/reader-layout';
+import { useReaderGestures } from '@/hooks/useReaderGestures';
 import { useUIStore } from '@/stores/useUIStore';
 import { KeyPointsCallout } from '@/components/reader/KeyPointsCallout';
 import { BilingualBody } from '@/components/reader/BilingualBody';
 import { HighlightLayer } from '@/components/reader/HighlightLayer';
 import { ReaderHeader } from '@/components/reader/ReaderHeader';
+import { ReaderGestureHint } from '@/components/reader/ReaderGestureHint';
 import { SourceExcerptNotice } from '@/components/reader/SourceExcerptNotice';
 import { TweaksPanel } from '@/components/reader/TweaksPanel';
 import type { ArticleItem } from '@/lib/types';
@@ -41,10 +43,12 @@ interface OriginalContent {
 interface ArticleViewProps {
   id: string;
   onClose?: () => void;
+  onNext?: () => void;
+  onPrev?: () => void;
   className?: string;
 }
 
-export function ArticleView({ id, onClose, className = '' }: ArticleViewProps) {
+export function ArticleView({ id, onClose, onNext, onPrev, className = '' }: ArticleViewProps) {
   const queryClient = useQueryClient();
   const { t } = useI18n();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -177,6 +181,15 @@ export function ArticleView({ id, onClose, className = '' }: ArticleViewProps) {
   const contentHtml = originalContent?.content_html || article?.content_html || '';
   const contentText = originalContent?.content_text || article?.content_text || '';
   const readMinutes = article ? estimateReadMinutes({ ...article, content_html: contentHtml, content_text: contentText }) : null;
+  const { gestureHint, touchHandlers } = useReaderGestures({
+    scrollRef,
+    progress,
+    hasNext: Boolean(onNext),
+    hasPrev: Boolean(onPrev),
+    onNext: () => onNext?.(),
+    onPrev: () => onPrev?.(),
+    onBack: () => onClose?.(),
+  });
 
   const bylineItems = useMemo(() => {
     if (!article) return [] as Array<{ key: string; content: React.ReactNode }>;
@@ -244,7 +257,15 @@ export function ArticleView({ id, onClose, className = '' }: ArticleViewProps) {
         onShare={handleShare}
       />
 
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
+      <ReaderGestureHint hint={gestureHint} />
+
+      <div
+        ref={scrollRef}
+        data-reader-scroll="true"
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto overflow-x-hidden overscroll-x-none touch-pan-y"
+        {...touchHandlers}
+      >
         <HighlightLayer articleId={Number(id)}>
           <div className={`pb-20 pt-[44px] ${activeLayout === 'wide' ? 'px-7 md:px-14' : 'px-7 md:px-7'}`}>
             <article className={activeLayout === 'wide' ? 'max-w-none' : 'mx-auto max-w-[680px]'}>
@@ -290,7 +311,7 @@ export function ArticleView({ id, onClose, className = '' }: ArticleViewProps) {
                 />
               ) : null}
 
-              <div className="font-reader-text text-[var(--text)]" style={{ fontSize: `${fontSize}px`, lineHeight: 1.9 }}>
+              <div className="font-reader-text min-w-0 max-w-full text-[var(--text)]" style={{ fontSize: `${fontSize}px`, lineHeight: 1.9 }}>
                 {contentHtml ? (
                   <BilingualBody
                     articleId={article.id}
@@ -299,7 +320,7 @@ export function ArticleView({ id, onClose, className = '' }: ArticleViewProps) {
                     nativeLanguage={nativeLanguage}
                   />
                 ) : (
-                  <p>{contentText}</p>
+                  <p className="overflow-wrap-anywhere">{contentText}</p>
                 )}
               </div>
             </article>

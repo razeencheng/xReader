@@ -16,7 +16,7 @@ function UnreadBadge({ count }: { count?: number }) {
   if (!count) return null;
 
   return (
-    <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--accent)] px-[5px] text-[10px] font-semibold leading-none text-white">
+    <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--accent-solid)] px-[5px] text-[10px] font-semibold leading-none text-[var(--accent-on-solid)]">
       {count}
     </span>
   );
@@ -79,7 +79,7 @@ export function SourceBrowser() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full w-full flex-col gap-3 border-r border-[var(--border)] bg-[var(--bg)] px-4 py-4 md:w-[300px]">
+      <div className="flex h-full w-full flex-col gap-3 bg-[var(--bg)] px-4 py-4 lg:w-[300px] lg:border-r lg:border-[var(--border)]">
         <div className="h-10 animate-pulse rounded-xl bg-[var(--bg-hover)]" />
         <div className="h-9 animate-pulse rounded-xl bg-[var(--bg-hover)]" />
         <div className="space-y-2 pt-2">
@@ -96,7 +96,7 @@ export function SourceBrowser() {
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.18, ease: 'easeOut' }}
-      className="flex h-full w-full flex-col overflow-hidden border-r border-[var(--border)] bg-[var(--bg)] md:w-[300px]"
+      className="flex h-full w-full flex-col overflow-hidden bg-[var(--bg)] lg:w-[300px] lg:border-r lg:border-[var(--border)]"
     >
       <header className="shrink-0 border-b border-[var(--border-light)] px-4 pb-[10px] pt-[11px]">
         <div className="flex items-start justify-between gap-3">
@@ -108,7 +108,7 @@ export function SourceBrowser() {
           </div>
           <Link
             href="/sources"
-            className="inline-flex shrink-0 items-center gap-1 rounded-[9px] border border-[var(--border)] bg-[var(--bg-panel)] px-2.5 py-1.5 text-[11.5px] font-medium text-[var(--text-2)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--accent)]"
+            className="ui-btn-primary h-8 shrink-0 rounded-[10px] px-2.5 py-1.5 text-[11.5px] font-medium"
           >
             <Plus size={13} strokeWidth={1.9} />
             {t('sources.add')}

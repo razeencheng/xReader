@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useState, Suspense } from 'react';
+import { useCallback, useMemo, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FeedList } from '@/components/feed/FeedList';
@@ -18,6 +19,8 @@ import type { ArticleItem, ArticleTab } from '@/lib/types';
 
 function FeedPageContent() {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useI18n();
   const currentView = useUIStore((state) => state.currentView);
   const selectedSourceId = useUIStore((state) => state.selectedSourceId);
@@ -26,26 +29,55 @@ function FeedPageContent() {
   const focusMode = useUIStore((state) => state.focusMode);
   const setLayout = useUIStore((state) => state.setLayout);
   const setFocusMode = useUIStore((state) => state.setFocusMode);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  const handleOpenArticle = useCallback((article: ArticleItem) => {
-    setSelectedId(article.id.toString());
-  }, []);
 
   const tab: ArticleTab = currentView === 'starred' ? 'starred' : currentView === 'today' ? 'today' : 'stream';
+  const articleParam = searchParams.get('article');
+  const selectedArticleId = articleParam ? Number(articleParam) : null;
+  const selectedArticleIdForList =
+    typeof selectedArticleId === 'number' && Number.isFinite(selectedArticleId) ? selectedArticleId : null;
+  const selectedId = selectedArticleIdForList == null ? null : selectedArticleIdForList.toString();
+
+  const buildReaderUrl = useCallback(
+    (articleId: number) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('article', articleId.toString());
+      params.set('ctx', tab);
+      return `/?${params.toString()}`;
+    },
+    [searchParams, tab],
+  );
+
+  const handleOpenArticle = useCallback(
+    (article: ArticleItem) => {
+      router.push(buildReaderUrl(article.id));
+    },
+    [buildReaderUrl, router],
+  );
+
+  const closeArticle = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('article');
+    params.delete('ctx');
+    const query = params.toString();
+    const nextUrl = query ? `/?${query}` : '/';
+
+    // For same-page reader state, native history updates useSearchParams
+    // immediately and reliably strips stale query params after a hard refresh.
+    window.history.pushState(null, '', nextUrl);
+  }, [searchParams]);
+
   const showSourceBrowser = currentView === 'sources' && selectedSourceId === null;
   const { data } = useArticles(tab, currentView === 'sources' ? selectedSourceId : null, undefined, {
     enabled: !showSourceBrowser,
   });
   const items = useMemo(() => data?.pages.flatMap((page) => page.items) ?? [], [data]);
-  const selectedArticleId = selectedId ? Number(selectedId) : null;
   const filteredItems = useMemo(() => {
     if (currentView === 'starred') return items;
-    if (readFilter === 'unread') return items.filter((item) => !item.is_read || item.id === selectedArticleId);
+    if (readFilter === 'unread') return items.filter((item) => !item.is_read || item.id === selectedArticleIdForList);
     if (readFilter === 'read') return items.filter((item) => item.is_read);
     return items;
-  }, [currentView, items, readFilter, selectedArticleId]);
-  const currentIndex = filteredItems.findIndex((item) => item.id === selectedArticleId);
+  }, [currentView, items, readFilter, selectedArticleIdForList]);
+  const currentIndex = filteredItems.findIndex((item) => item.id === selectedArticleIdForList);
   const currentArticle = currentIndex >= 0 ? filteredItems[currentIndex] : null;
 
   const updateArticleState = useCallback(
@@ -98,9 +130,9 @@ function FeedPageContent() {
     (index: number) => {
       const article = filteredItems[index];
       if (!article) return;
-      setSelectedId(article.id.toString());
+      router.push(buildReaderUrl(article.id));
     },
-    [filteredItems],
+    [buildReaderUrl, filteredItems, router],
   );
 
   useReaderShortcuts({
@@ -133,8 +165,8 @@ function FeedPageContent() {
           pointerEvents: focusMode ? 'none' : 'auto',
         }}
         transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-        className={`relative z-20 h-full shrink-0 overflow-hidden border-r border-[var(--border)] bg-[var(--bg)] ${
-          selectedId ? 'hidden md:flex' : 'flex w-full md:w-auto'
+        className={`relative z-20 h-full shrink-0 overflow-hidden bg-[var(--bg)] lg:border-r lg:border-[var(--border)] ${
+          selectedId ? 'hidden lg:flex' : 'flex w-full lg:w-auto'
         }`}
       >
         <AnimatePresence mode="popLayout" initial={false}>
@@ -145,7 +177,7 @@ function FeedPageContent() {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: -8, opacity: 0 }}
               transition={{ duration: 0.18 }}
-              className="h-full"
+              className="h-full w-full"
             >
               <SourceBrowser />
             </motion.div>
@@ -156,15 +188,15 @@ function FeedPageContent() {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 8, opacity: 0 }}
               transition={{ duration: 0.18 }}
-              className="flex h-full flex-col"
+              className="flex h-full w-full flex-col"
             >
-              <FeedList onOpenArticle={handleOpenArticle} selectedArticleId={selectedArticleId} />
+              <FeedList onOpenArticle={handleOpenArticle} selectedArticleId={selectedArticleIdForList} />
             </motion.div>
           )}
         </AnimatePresence>
       </motion.div>
 
-      <main className={`relative h-full min-w-0 flex-1 overflow-hidden bg-[var(--bg)] ${selectedId ? 'block' : 'hidden md:block'}`}>
+      <main className={`relative h-full min-w-0 flex-1 overflow-hidden bg-[var(--bg)] ${selectedId ? 'block' : 'hidden lg:block'}`}>
         <AnimatePresence mode="wait">
           {selectedId ? (
             <motion.div
@@ -175,7 +207,13 @@ function FeedPageContent() {
               transition={{ duration: 0.15 }}
               className="h-full"
             >
-              <ArticleView id={selectedId} onClose={() => setSelectedId(null)} className="h-full" />
+              <ArticleView
+                id={selectedId}
+                onClose={closeArticle}
+                onNext={currentIndex >= 0 && currentIndex < filteredItems.length - 1 ? () => selectArticleAtIndex(currentIndex + 1) : undefined}
+                onPrev={currentIndex > 0 ? () => selectArticleAtIndex(currentIndex - 1) : undefined}
+                className="h-full"
+              />
             </motion.div>
           ) : (
             <div className="flex h-full items-center justify-center px-12 text-center select-none">
