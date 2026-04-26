@@ -187,3 +187,57 @@ test('marks semantic article blocks so the reader stylesheet can preserve hierar
   expect(container.querySelector('[data-block-tag="h3"] h3')).toHaveTextContent('章节标题');
   expect(container.querySelector('[data-block-tag="p"] p')).toHaveTextContent('正文段落');
 });
+
+test('keeps paragraphs with inline code in normal text flow', () => {
+  const { container } = render(
+    <BilingualBody
+      articleId={1}
+      contentHtml="<p>老习惯，最后贴一下全部的配置。<code>.gitlab-ci.yml</code>。加了一个<code>resource_group</code>。</p><pre><code>image: docker:latest</code></pre>"
+      language="zh-CN"
+      nativeLanguage="zh"
+    />,
+  );
+
+  const paragraphBlock = container.querySelector('[data-block-tag="p"]');
+  expect(paragraphBlock).toHaveClass('paragraph-container');
+  expect(paragraphBlock).toHaveTextContent('老习惯，最后贴一下全部的配置。');
+  expect(paragraphBlock).not.toHaveClass('font-mono');
+  expect(container.querySelector('[data-block-tag="pre"]')).toHaveClass('font-mono');
+});
+
+test('removes hidden heading anchors from sanitized article html', () => {
+  render(
+    <BilingualBody
+      articleId={1}
+      contentHtml='<h3>详细配置<a hidden class="anchor" aria-hidden="true" href="#详细配置">#</a></h3><h3>总结#</h3>'
+      language="zh-CN"
+      nativeLanguage="zh"
+    />,
+  );
+
+  expect(screen.getByRole('heading', { name: '详细配置' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '总结' })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: '详细配置#' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: '总结#' })).not.toBeInTheDocument();
+});
+
+test('stabilizes external images without dimensions and suppresses filename-like fallback alt text', () => {
+  const { container } = render(
+    <BilingualBody
+      articleId={1}
+      contentHtml='<p><img src="https://st.razeen.me/img/2025/image-20250412165248283.webp" alt="image-20250412165248283"/></p>'
+      language="zh-CN"
+      nativeLanguage="zh"
+    />,
+  );
+
+  const image = container.querySelector('img');
+  expect(image).toBeInTheDocument();
+  expect(image?.getAttribute('src')).toBe(
+    '/api/images/proxy?url=https%3A%2F%2Fst.razeen.me%2Fimg%2F2025%2Fimage-20250412165248283.webp',
+  );
+  expect(image).toHaveAttribute('data-original-alt', 'image-20250412165248283');
+  expect(image).toHaveAttribute('alt', '');
+  expect(image?.getAttribute('style')).toContain('aspect-ratio: 16 / 9');
+  expect(image?.getAttribute('style')).toContain('min-height: 12rem');
+});

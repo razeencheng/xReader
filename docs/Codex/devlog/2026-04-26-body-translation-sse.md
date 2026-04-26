@@ -53,3 +53,25 @@
 - `cd web && pnpm build` passed.
 - `docker compose up -d --build api web` succeeded.
 - Browser verified `/sources` shows `健康` and `上次抓取：刚刚`; source browser action now shows `管理`.
+
+## Reader HTML And Image Stability Fixes
+
+**Date:** 2026-04-26
+**Scope:** Reader article rendering
+
+### Summary
+
+- Fixed reader block classification so paragraphs with inline `<code>` stay in normal text flow; only `<pre>` blocks receive code-block styling.
+- Removed feed/source heading anchor artifacts such as trailing `#` from reader rendering and future sanitized RSS content.
+- Adjusted reader h3 styling back to a plain typographic heading instead of a left-accent callout style.
+- Stabilized external images that do not provide width/height by adding a fallback aspect ratio and suppressing filename-like alt text during loading/failure.
+- Updated the image proxy to accept servers that return valid WebP bytes with `Content-Type: application/octet-stream`, while still rejecting non-images and SVG.
+
+### Verification
+
+- `cd web && pnpm vitest run src/components/reader/BilingualBody.test.tsx` passed.
+- `cd server && go test ./internal/article -run 'TestNormalizeProxiedImageContentType_AllowsSniffedWebPFromOctetStream|TestImageProxyHandler_ProxiesImage' -count=1` passed.
+- `cd server && go test ./internal/source -run TestSanitizeHTML_StripsHiddenHeadingAnchors -count=1` passed.
+- `cd web && pnpm build` passed.
+- `docker compose up -d --build api web` succeeded.
+- Browser verified article `16677`: `详细配置` no longer shows a trailing `#`, the inline-code paragraph renders as normal prose, and the formerly broken WebP image loads through the proxy without filename flicker.

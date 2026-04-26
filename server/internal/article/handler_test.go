@@ -165,6 +165,20 @@ func TestImageProxyHandler_ProxiesImage(t *testing.T) {
 	require.Equal(t, "image-bytes", w.Body.String())
 }
 
+func TestNormalizeProxiedImageContentType_AllowsSniffedWebPFromOctetStream(t *testing.T) {
+	webpHeader := []byte{
+		'R', 'I', 'F', 'F',
+		0x1a, 0x00, 0x00, 0x00,
+		'W', 'E', 'B', 'P',
+		'V', 'P', '8', ' ',
+	}
+
+	contentType, err := normalizeProxiedImageContentType("application/octet-stream", webpHeader)
+
+	require.NoError(t, err)
+	require.Equal(t, "image/webp", contentType)
+}
+
 func TestImageProxyHandler_RejectsMissingURL(t *testing.T) {
 	r, _, _, _, userID, _, cleanup := setupArticleHandlerTest(t)
 	t.Cleanup(cleanup)

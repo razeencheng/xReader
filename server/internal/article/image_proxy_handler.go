@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"mime"
 	"net"
 	"net/http"
 	"strings"
@@ -101,18 +102,47 @@ func fetchProxiedImage(ctx context.Context, rawURL string) (ProxiedImage, error)
 		return ProxiedImage{}, fmt.Errorf("fetch image: status %d", resp.StatusCode)
 	}
 
-	contentType := strings.ToLower(resp.Header.Get("Content-Type"))
-	if contentType != "" && !strings.HasPrefix(contentType, "image/") {
-		return ProxiedImage{}, fmt.Errorf("fetch image: unsupported content type %s", contentType)
-	}
-	if strings.HasPrefix(contentType, "image/svg") {
-		return ProxiedImage{}, fmt.Errorf("fetch image: unsupported content type %s", contentType)
-	}
-
 	body, err := readLimited(resp.Body, imageProxyMaxBody)
 	if err != nil {
 		return ProxiedImage{}, err
 	}
 
-	return ProxiedImage{ContentType: resp.Header.Get("Content-Type"), Body: body}, nil
+	contentType, err := normalizeProxiedImageContentType(resp.Header.Get("Content-Type"), body)
+	if err != nil {
+		return ProxiedImage{}, err
+	}
+
+	return ProxiedImage{ContentType: contentType, Body: body}, nil
+}
+
+func normalizeProxiedImageContentType(header string, body []byte) (string, error) {
+	contentType := strings.ToLower(strings.TrimSpace(header))
+	if mediaType, _, err := mime.ParseMediaType(contentType); err == nil {
+		contentType = mediaType
+	}
+
+	if strings.HasPrefix(contentType, "image/svg") {
+		return "", fmt.Errorf("fetch image: unsupported content type %s", contentType)
+	}
+	if strings.HasPrefix(contentType, "image/") {
+		return contentType, nil
+	}
+
+	if contentType != "" && contentType != "application/octet-stream" && contentType != "binary/octet-stream" {
+		return "", fmt.Errorf("fetch image: unsupported content type %s", contentType)
+	}
+
+	sniffed := strings.ToLower(http.DetectContentType(body))
+	if strings.HasPrefix(sniffed, "image/svg") {
+		return "", fmt.Errorf("fetch image: unsupported content type %s", sniffed)
+	}
+	if strings.HasPrefix(sniffed, "image/") {
+		return sniffed, nil
+	}
+
+	if len(body) >= 12 && string(body[0:4]) == "RIFF" && string(body[8:12]) == "WEBP" {
+		return "image/webp", nil
+	}
+
+	return "", fmt.Errorf("fetch image: unsupported content type %s", sniffed)
 }

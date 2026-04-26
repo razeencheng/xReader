@@ -339,9 +339,7 @@ a {
 }
 
 .reader-content h3 {
-  border-left: 3px solid var(--accent);
-  padding-left: 0.72em;
-  font-size: 1.24em;
+  font-size: 1.34em;
 }
 
 .reader-content h4 {

@@ -81,3 +81,15 @@ func TestSanitizeHTML_StripsDangerousContent(t *testing.T) {
 	require.NotContains(t, out, "onclick")
 	require.True(t, strings.Contains(out, "Hello"))
 }
+
+func TestSanitizeHTML_StripsHiddenHeadingAnchors(t *testing.T) {
+	input := `<h3 id="详细配置">详细配置<a hidden class="anchor" aria-hidden="true" href="#详细配置">#</a></h3><h3>总结#</h3>`
+
+	out := SanitizeHTML(input)
+
+	require.Contains(t, out, "详细配置")
+	require.Contains(t, out, "总结")
+	require.NotContains(t, out, "详细配置#")
+	require.NotContains(t, out, "总结#")
+	require.NotContains(t, out, "anchor")
+}

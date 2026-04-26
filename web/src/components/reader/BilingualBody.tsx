@@ -58,6 +58,28 @@ function primaryTagFromHtml(html: string) {
   return firstElement?.tagName.toLowerCase() ?? 'p';
 }
 
+function isFilenameLikeAlt(text: string, src: string) {
+  const normalized = text.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  const basename = src.split('/').pop()?.split('?')[0]?.replace(/\.[a-z0-9]+$/i, '').toLowerCase();
+  return normalized === basename || /^image[-_]\d+$/i.test(normalized);
+}
+
+function removeHiddenHeadingAnchors(root: HTMLElement) {
+  root.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((heading) => {
+    heading.querySelectorAll('a[hidden], a.anchor[aria-hidden="true"]').forEach((anchor) => {
+      anchor.remove();
+    });
+
+    const text = heading.textContent?.trim() ?? '';
+    if (text.length > 2 && text.endsWith('#') && !text.endsWith('C#') && !text.endsWith('F#')) {
+      heading.textContent = text.slice(0, -1).trim();
+    }
+  });
+}
+
 function normalizeReaderImages(root: HTMLElement) {
   root.querySelectorAll('img').forEach((image) => {
     const src = image.getAttribute('src')?.trim();
@@ -75,6 +97,16 @@ function normalizeReaderImages(root: HTMLElement) {
       const existingStyle = image.getAttribute('style')?.trim();
       const stableStyle = `aspect-ratio: ${width} / ${height}; max-width: ${width}px !important;`;
       image.setAttribute('style', existingStyle ? `${existingStyle}; ${stableStyle}` : stableStyle);
+    } else {
+      const existingStyle = image.getAttribute('style')?.trim();
+      const stableStyle = 'aspect-ratio: 16 / 9; min-height: 12rem;';
+      image.setAttribute('style', existingStyle ? `${existingStyle}; ${stableStyle}` : stableStyle);
+    }
+
+    const alt = image.getAttribute('alt')?.trim() ?? '';
+    if (src && isFilenameLikeAlt(alt, src)) {
+      image.setAttribute('data-original-alt', alt);
+      image.setAttribute('alt', '');
     }
   });
 }
@@ -82,6 +114,7 @@ function normalizeReaderImages(root: HTMLElement) {
 function splitContentHtml(contentHtml: string) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(`<body>${contentHtml}</body>`, 'text/html');
+  removeHiddenHeadingAnchors(doc.body);
   normalizeReaderImages(doc.body);
   const paragraphs: string[] = [];
 
@@ -270,8 +303,8 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
   return (
     <div className="reader-content">
       {paragraphs.map((paragraph, index) => {
-        const isCode = /<pre|<code/i.test(paragraph);
         const blockTag = primaryTagFromHtml(paragraph);
+        const isCode = blockTag === 'pre';
         const translation = translations.get(index);
         const isLoading = pendingTranslations.has(index) && !translation;
 
