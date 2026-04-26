@@ -23,6 +23,7 @@ import { NextUpCard } from '@/components/reader/NextUpCard';
 import { TweaksPanel } from '@/components/reader/TweaksPanel';
 import { useArticleNeighbors } from '@/lib/queries/neighbors';
 import { HighlightLayer } from '@/components/reader/HighlightLayer';
+import { OriginalArticleButton } from '@/components/reader/OriginalArticleButton';
 import { SourceExcerptNotice } from '@/components/reader/SourceExcerptNotice';
 import type { ArticleItem, ArticleTab } from '@/lib/types';
 
@@ -189,6 +190,11 @@ function ReaderContent({ id }: { id: string }) {
     } catch {
       window.open(article.link, '_blank', 'noopener,noreferrer');
     }
+  }, [article]);
+
+  const handleOpenOriginal = useCallback(() => {
+    if (!article) return;
+    window.open(article.link, '_blank', 'noopener,noreferrer');
   }, [article]);
 
   const handleToggleFocus = useCallback(() => {
@@ -362,6 +368,8 @@ function ReaderContent({ id }: { id: string }) {
                       {item.content}
                     </div>
                   ))}
+                  <span className="text-[var(--border)]">·</span>
+                  <OriginalArticleButton href={article.link} onOpen={handleOpenOriginal} />
                 </div>
               ) : null}
 

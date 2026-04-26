@@ -15,6 +15,10 @@ interface HighlightRow {
   article_link?: string;
 }
 
+interface HighlightsResponse {
+  items: HighlightRow[];
+}
+
 export function HighlightsList() {
   const { t } = useI18n();
   const [highlights, setHighlights] = useState<HighlightRow[]>([]);
@@ -26,13 +30,24 @@ export function HighlightsList() {
     if (query) params.set('q', query);
     params.set('limit', '50');
 
-    const timeoutId = window.setTimeout(() => setIsLoading(true), 0);
-    apiFetch<HighlightRow[]>(`/api/highlights?${params}`)
-      .then(setHighlights)
-      .catch(() => setHighlights([]))
-      .finally(() => setIsLoading(false));
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setIsLoading(true);
+    });
+    apiFetch<HighlightsResponse>(`/api/highlights?${params}`)
+      .then((response) => {
+        if (!cancelled) setHighlights(response?.items ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setHighlights([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
 
-    return () => window.clearTimeout(timeoutId);
+    return () => {
+      cancelled = true;
+    };
   }, [query]);
 
   return (

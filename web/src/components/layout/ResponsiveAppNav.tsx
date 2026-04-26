@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { ChevronDown, Globe, Keyboard, LogOut, PlusCircle, Settings, ShieldCheck } from 'lucide-react';
+import { ChevronDown, Globe, Highlighter, Keyboard, LogOut, PlusCircle, Settings, ShieldCheck } from 'lucide-react';
 import { LanguageModal } from '@/components/layout/LanguageModal';
 import { getLanguageOption, PRIMARY_NAV_ITEMS } from '@/components/layout/navigationConfig';
 import { useI18n } from '@/lib/i18n';
@@ -144,6 +144,18 @@ export function TabletTopNav({ focusMode }: { focusMode: boolean }) {
           </button>
           <button
             type="button"
+            title={nav.t('nav.highlights')}
+            onClick={() => nav.router.push('/highlights')}
+            className={`flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors ${
+              nav.pathname === '/highlights'
+                ? 'bg-[var(--accent-bg)] text-[var(--accent)]'
+                : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]'
+            }`}
+          >
+            <Highlighter size={16} strokeWidth={1.75} />
+          </button>
+          <button
+            type="button"
             title={nav.t('shortcuts.open')}
             onClick={nav.openShortcuts}
             className="flex h-9 w-9 items-center justify-center rounded-[10px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
@@ -271,6 +283,17 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
                 >
                   <PlusCircle size={17} />
                   {nav.t('nav.manageSources')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    nav.router.push('/highlights');
+                    setIsMenuOpen(false);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+                >
+                  <Highlighter size={17} />
+                  {nav.t('nav.highlights')}
                 </button>
                 <button
                   type="button"

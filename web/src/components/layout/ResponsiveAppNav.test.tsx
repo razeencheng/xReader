@@ -53,6 +53,17 @@ test('MobileTopBar exposes one current-view menu on list pages', async () => {
   expect(useUIStore.getState().currentView).toBe('starred');
 });
 
+test('MobileTopBar links to the highlights and notes page from tools', async () => {
+  const user = userEvent.setup();
+
+  render(<MobileTopBar focusMode={false} />);
+
+  await user.click(screen.getByRole('button', { name: '今日' }));
+  await user.click(screen.getByRole('button', { name: '我的高亮' }));
+
+  expect(push).toHaveBeenCalledWith('/highlights');
+});
+
 test('MobileTopBar hides primary navigation on reader pages', () => {
   usePathname.mockReturnValue('/read/123');
 

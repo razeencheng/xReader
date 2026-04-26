@@ -34,3 +34,13 @@ test('clicking sidebar view routes back home from settings page', async () => {
   expect(useUIStore.getState().currentView).toBe('today');
   expect(push).toHaveBeenCalledWith('/');
 });
+
+test('sidebar exposes the highlights and notes page', async () => {
+  const user = userEvent.setup();
+
+  render(<Sidebar />);
+
+  await user.click(screen.getByTitle('My Highlights'));
+
+  expect(push).toHaveBeenCalledWith('/highlights');
+});

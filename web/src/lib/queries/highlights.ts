@@ -33,8 +33,8 @@ export async function createHighlight(params: {
 }
 
 export async function updateHighlightNote(id: number, note: string): Promise<void> {
-  await apiFetch(`/api/highlights/${id}`, {
-    method: 'PATCH',
+  await apiFetch(`/api/highlights/${id}/note`, {
+    method: 'PUT',
     body: JSON.stringify({ note }),
   });
 }

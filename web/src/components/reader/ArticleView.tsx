@@ -15,6 +15,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { KeyPointsCallout } from '@/components/reader/KeyPointsCallout';
 import { BilingualBody } from '@/components/reader/BilingualBody';
 import { HighlightLayer } from '@/components/reader/HighlightLayer';
+import { OriginalArticleButton } from '@/components/reader/OriginalArticleButton';
 import { ReaderHeader } from '@/components/reader/ReaderHeader';
 import { ReaderGestureHint } from '@/components/reader/ReaderGestureHint';
 import { SourceExcerptNotice } from '@/components/reader/SourceExcerptNotice';
@@ -259,7 +260,6 @@ export function ArticleView({ id, onClose, onNext, onPrev, className = '' }: Art
         onBack={onClose}
         onToggleStar={handleToggleStar}
         onToggleFocus={handleToggleFocus}
-        onOpenOriginal={handleOpenOriginal}
         onShare={handleShare}
       />
 
@@ -303,6 +303,8 @@ export function ArticleView({ id, onClose, onNext, onPrev, className = '' }: Art
                       {item.content}
                     </div>
                   ))}
+                  <span className="text-[var(--border)]">·</span>
+                  <OriginalArticleButton href={article.link} onOpen={handleOpenOriginal} />
                 </div>
               ) : null}
 

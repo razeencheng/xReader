@@ -24,6 +24,7 @@ const en: MessageMap = {
   'nav.all': 'All',
   'nav.starred': 'Starred',
   'nav.sources': 'Sources',
+  'nav.highlights': 'My Highlights',
   'nav.allArticles': 'All Articles',
   'nav.more': 'More',
   'nav.settings': 'Settings',
@@ -180,7 +181,12 @@ const en: MessageMap = {
   'reader.translateParagraph': 'Translate paragraph',
   'reader.highlight': 'Highlight',
   'reader.highlightWithNote': 'Highlight with note',
-  'reader.highlightPrompt': 'Enter note / delete / copy',
+  'reader.highlightNoteTitle': 'Highlight note',
+  'reader.noteLabel': 'Note',
+  'reader.copyQuote': 'Copy',
+  'reader.deleteHighlight': 'Delete',
+  'reader.cancelNote': 'Cancel',
+  'reader.saveNote': 'Save',
 
   'settings.backHome': 'Back home',
   'settings.breadcrumb': 'Home / Settings',
@@ -238,7 +244,7 @@ const en: MessageMap = {
 
   'auth.signInWithGitHub': 'Sign in with GitHub',
 
-  'highlights.title': 'My Highlights',
+  'highlights.title': 'Highlights and Notes',
   'highlights.searchPlaceholder': 'Search highlights and notes…',
   'highlights.noResults': 'No matching highlights found',
   'highlights.empty': 'No highlights yet',
@@ -268,6 +274,7 @@ const zh: MessageMap = {
   'nav.all': '全部',
   'nav.starred': '收藏',
   'nav.sources': '源',
+  'nav.highlights': '我的高亮',
   'nav.allArticles': '全部文章',
   'nav.more': '更多',
   'nav.settings': '设置',
@@ -424,7 +431,12 @@ const zh: MessageMap = {
   'reader.translateParagraph': '翻译段落',
   'reader.highlight': '高亮',
   'reader.highlightWithNote': '高亮并添加备注',
-  'reader.highlightPrompt': '输入 note / delete / copy',
+  'reader.highlightNoteTitle': '高亮备注',
+  'reader.noteLabel': '备注',
+  'reader.copyQuote': '复制',
+  'reader.deleteHighlight': '删除',
+  'reader.cancelNote': '取消',
+  'reader.saveNote': '保存',
 
   'settings.backHome': '返回首页',
   'settings.breadcrumb': '主页 / 设置',
@@ -482,7 +494,7 @@ const zh: MessageMap = {
 
   'auth.signInWithGitHub': '使用 GitHub 登录',
 
-  'highlights.title': '我的高亮',
+  'highlights.title': '高亮和笔记',
   'highlights.searchPlaceholder': '搜索高亮和笔记…',
   'highlights.noResults': '没有找到匹配的高亮',
   'highlights.empty': '还没有任何高亮',

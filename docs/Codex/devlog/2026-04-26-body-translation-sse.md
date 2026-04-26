@@ -98,3 +98,25 @@
 - `cd web && pnpm build` passed.
 - `docker compose up -d --build api web` succeeded.
 - Browser verified `/settings` shows `模型接入设置` with endpoint `https://newapi.razeen.cn/v1` and model `qwen-turbo`; article `16799` shows the `阅读原文` header action and streamed translation layers no longer include `border-l` classes.
+
+## Reader Highlight And Notes Polish
+
+**Date:** 2026-04-26
+**Scope:** Reader original link placement, highlights, and notes
+
+### Summary
+
+- Moved `阅读原文` out of the sticky reader chrome and into the article metadata row as an inline text action, so the byline reads like `16d 前 · 26 分钟阅读 · 阅读原文`.
+- Fixed highlight rendering to anchor by `layer + paragraph_index` instead of paragraph index alone, so translation-layer highlights no longer render on the original paragraph with the same index.
+- Scoped highlight DOM cleanup to the current reader instance and assigned `id="highlight-<id>"` to marks so saved-highlight links can scroll back into the original article.
+- Replaced native `prompt()` note editing with an inline reader dialog for both existing highlights and new `高亮并添加备注` actions.
+- Added a visible `我的高亮` navigation entry and fixed `/highlights` to read the backend `{ items }` response envelope without getting stuck in loading state.
+
+### Verification
+
+- `cd web && pnpm vitest run src/components/highlights/HighlightsList.test.tsx src/components/reader/HighlightLayer.test.tsx src/components/reader/HighlightToolbar.test.tsx src/lib/queries/highlights.test.ts src/components/reader/OriginalArticleButton.test.tsx src/components/reader/ReaderHeader.test.tsx src/components/layout/Sidebar.test.tsx src/components/layout/ResponsiveAppNav.test.tsx src/components/reader/BilingualBody.test.tsx` passed.
+- `cd web && pnpm vitest run` passed: 35 files, 104 tests.
+- `cd web && pnpm exec eslint <changed files>` passed.
+- `cd web && pnpm build` passed.
+- `docker compose up -d --build web` succeeded.
+- Browser verified article `16799` shows `阅读原文` inline in the title metadata area and `/highlights` opens from the top navigation, lists saved highlights, and links back to `/read/<id>#highlight-<id>`.

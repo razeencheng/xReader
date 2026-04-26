@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Globe, Keyboard, Settings } from 'lucide-react';
+import { Globe, Highlighter, Keyboard, Settings } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { LanguageModal } from '@/components/layout/LanguageModal';
 import { getLanguageOption, PRIMARY_NAV_ITEMS } from '@/components/layout/navigationConfig';
@@ -76,6 +76,15 @@ export function Sidebar({ className = '' }: { className?: string }) {
           className="mb-1 flex h-9 w-9 items-center justify-center rounded-[9px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
         >
           <Keyboard size={16} strokeWidth={1.75} />
+        </button>
+
+        <button
+          type="button"
+          title={t('nav.highlights')}
+          onClick={() => router.push('/highlights')}
+          className="mb-1 flex h-9 w-9 items-center justify-center rounded-[9px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
+        >
+          <Highlighter size={16} strokeWidth={1.75} />
         </button>
 
         <button
