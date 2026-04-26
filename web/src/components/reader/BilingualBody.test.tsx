@@ -125,6 +125,22 @@ test('opens an SSE stream for the visible paragraph range and renders translatio
   expect(screen.queryByTestId('translation-loading')).not.toBeInTheDocument();
 });
 
+test('renders translated paragraphs without decorative left rule', () => {
+  const { container } = render(
+    <BilingualBody articleId={1} contentHtml="<p>Hello world</p>" language="en" nativeLanguage="zh-CN" />,
+  );
+
+  enterParagraph(container, 0);
+  act(() => {
+    sse.pushParagraph(0, { index: 0, translation: '你好，世界' });
+  });
+
+  const translation = screen.getByText('你好，世界');
+  expect(translation).toHaveAttribute('data-layer', 'translation');
+  expect(translation.className).not.toContain('border-l');
+  expect(translation.className).not.toContain('pl-4');
+});
+
 test('does not render loading placeholders for prefetched paragraphs', () => {
   const longContent = Array.from({ length: 6 }, (_, index) => `<p>Paragraph ${index}</p>`).join('');
   const { container } = render(

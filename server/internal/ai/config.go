@@ -1,13 +1,6 @@
 package ai
 
-import (
-	"fmt"
-	"os"
-	"strings"
-	"time"
-
-	"gopkg.in/yaml.v3"
-)
+import "time"
 
 type Config struct {
 	Provider ProviderConfig `yaml:"provider"`
@@ -32,44 +25,5 @@ type ResolvedConfig struct {
 }
 
 func LoadConfig(path string) (ResolvedConfig, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return ResolvedConfig{}, fmt.Errorf("read config: %w", err)
-	}
-	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return ResolvedConfig{}, fmt.Errorf("parse config: %w", err)
-	}
-
-	apiKey := os.Getenv(cfg.Provider.APIKeyEnv)
-	baseURL := cfg.Provider.BaseURL
-	if endpoint := strings.TrimSpace(os.Getenv("OPENAI_ENDPOINT")); endpoint != "" {
-		normalized := strings.TrimRight(endpoint, "/")
-		if !strings.HasSuffix(normalized, "/v1") {
-			normalized += "/v1"
-		}
-		baseURL = normalized
-	}
-
-	maxRetries := cfg.Provider.MaxRetries
-	if maxRetries <= 0 {
-		maxRetries = 3
-	}
-	timeout := cfg.Provider.Timeout
-	if timeout <= 0 {
-		timeout = 30 * time.Second
-	}
-	batchSize := cfg.Provider.BatchSize
-	if batchSize <= 0 {
-		batchSize = 5
-	}
-
-	return ResolvedConfig{
-		BaseURL:    baseURL,
-		APIKey:     apiKey,
-		Model:      cfg.Provider.Model,
-		MaxRetries: maxRetries,
-		Timeout:    timeout,
-		BatchSize:  batchSize,
-	}, nil
+	return NewSettingsService(path, nil).LoadResolved(nil)
 }

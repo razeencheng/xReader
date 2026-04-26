@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 
 const invalidateQueries = vi.fn();
@@ -90,6 +91,15 @@ beforeEach(() => {
       };
     }
 
+    if (input === '/api/ai/settings' && (!init || !init.method || init.method === 'GET')) {
+      return {
+        endpoint: 'https://newapi.razeen.cn/v1',
+        model: 'qwen-turbo',
+        api_key_set: true,
+        api_key_hint: 'sk-...test',
+      };
+    }
+
     return {};
   });
 });
@@ -114,4 +124,32 @@ test('renders settings shell without duplicated reader preference controls', asy
   expect(screen.queryByRole('heading', { name: '显示密度' })).not.toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: '主题' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '保存设置' })).not.toBeInTheDocument();
+});
+
+test('renders and saves model integration settings', async () => {
+  const user = userEvent.setup();
+  renderPage();
+
+  expect(await screen.findByRole('heading', { name: '模型接入设置' })).toBeInTheDocument();
+  expect(await screen.findByDisplayValue('https://newapi.razeen.cn/v1')).toBeInTheDocument();
+  expect(screen.getByLabelText('模型')).toHaveValue('qwen-turbo');
+  expect(screen.getByText('当前 API Key：sk-...test')).toBeInTheDocument();
+
+  await user.clear(screen.getByLabelText('OpenAI 接入点'));
+  await user.type(screen.getByLabelText('OpenAI 接入点'), 'https://relay.example.com/v1');
+  await user.clear(screen.getByLabelText('模型'));
+  await user.type(screen.getByLabelText('模型'), 'deepseek-chat');
+  await user.type(screen.getByLabelText('API Key'), 'sk-new');
+  await user.click(screen.getByRole('button', { name: '保存模型接入设置' }));
+
+  await waitFor(() => {
+    expect(apiFetch).toHaveBeenCalledWith('/api/ai/settings', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        endpoint: 'https://relay.example.com/v1',
+        model: 'deepseek-chat',
+        api_key: 'sk-new',
+      }),
+    });
+  });
 });

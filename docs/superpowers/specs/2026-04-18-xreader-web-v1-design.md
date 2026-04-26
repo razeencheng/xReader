@@ -29,7 +29,7 @@ v1 is considered done when the owner and their small group of invited users can,
 4. Switch between **舒适** (Comfortable) and **紧凑** (Compact) feed density with a toggle or `C` keyboard shortcut.
 5. Click an item → reader view renders with clean typography, 要点 at the top, alternating-paragraph translation for non-native content.
 6. Highlight text, save the item, navigate to the next article via the sticky bottom bar, the end-of-article "next up" card, or `J` / `→`.
-7. AI translation and summarization use an **OpenAI-compatible API** configured via file (base URL + API key + model name). Works with relay stations, OpenRouter, DeepSeek, Moonshot, one-api, etc.
+7. AI translation and summarization use an **OpenAI-compatible API** with file/env defaults and admin Settings overrides for base URL, API key, and model name. Works with relay stations, OpenRouter, DeepSeek, Moonshot, one-api, etc.
 
 **Explicitly not measured in v1**: DAU/WAU, growth funnels, retention, moderation throughput — this is a private tool for a known small group.
 
@@ -358,9 +358,9 @@ Concurrency:
 
 #### 6.3.3 AI provider abstraction
 
-**All AI calls go through an OpenAI-compatible client**: `POST /v1/chat/completions` shape. The entire integration is config-driven so the owner can point it at a relay station, OpenRouter, DeepSeek, Moonshot, or a local `one-api` instance by changing the config file alone.
+**All AI calls go through an OpenAI-compatible client**: `POST /v1/chat/completions` shape. The integration has file/env defaults and a Settings page `模型接入设置` surface so the owner can point it at a relay station, OpenRouter, DeepSeek, Moonshot, or a local `one-api` instance without touching code.
 
-Configuration file (loaded at startup, path from `XREADER_AI_CONFIG` env var, default `./config/ai.yaml`):
+Configuration file (path from `XREADER_AI_CONFIG` env var, default `./config/ai.yaml`) provides defaults:
 
 ```yaml
 provider:
@@ -402,7 +402,9 @@ type ChatRequest struct {
 }
 ```
 
-One implementation: `openai.Client` wrapping `net/http`. If the user swaps relays, only the config changes.
+Runtime admin overrides are stored outside the tracked config file and supersede file/env defaults for API lazy translation and worker AI jobs. The UI never returns the API key in plaintext; it only shows whether a key is configured plus a masked hint.
+
+One implementation: `openai.Client` wrapping `net/http`. If the user swaps relays, only the config or admin setting changes.
 
 #### 6.3.4 Failure modes
 

@@ -75,3 +75,26 @@
 - `cd web && pnpm build` passed.
 - `docker compose up -d --build api web` succeeded.
 - Browser verified article `16677`: `详细配置` no longer shows a trailing `#`, the inline-code paragraph renders as normal prose, and the formerly broken WebP image loads through the proxy without filename flicker.
+
+## Reader Original Link And AI Settings
+
+**Date:** 2026-04-26
+**Scope:** Reader chrome and model integration settings
+
+### Summary
+
+- Removed the decorative left rule from streamed translation paragraphs so translated text follows the source paragraph rhythm without an extra callout style.
+- Added a reader header action `阅读原文` that opens the article canonical link in a new browser tab.
+- Added `模型接入设置` on the Settings page for OpenAI-compatible endpoint, API key, and model name.
+- Added Redis-backed AI settings overrides so the API and worker can resolve the latest model integration settings without database migrations and without writing API keys into tracked config files.
+- Updated the design spec to document file/env defaults plus runtime admin overrides.
+
+### Verification
+
+- `cd web && pnpm vitest run src/components/reader/BilingualBody.test.tsx src/components/reader/ReaderHeader.test.tsx src/components/settings/SettingsPage.test.tsx` passed.
+- `cd server && go test ./internal/ai -run 'TestSettingsService|TestLoadConfig' -count=1` passed.
+- `cd server && go test ./internal/ai ./internal/article -run 'TestSettingsService|TestLoadConfig|TestSSE_StreamsRequestedRangeOnly' -count=1` passed.
+- `cd web && pnpm vitest run src/components/reader/BilingualBody.test.tsx src/components/reader/ReaderHeader.test.tsx src/components/settings/SettingsPage.test.tsx src/lib/i18n.test.ts` passed.
+- `cd web && pnpm build` passed.
+- `docker compose up -d --build api web` succeeded.
+- Browser verified `/settings` shows `模型接入设置` with endpoint `https://newapi.razeen.cn/v1` and model `qwen-turbo`; article `16799` shows the `阅读原文` header action and streamed translation layers no longer include `border-l` classes.

@@ -145,6 +145,11 @@ export function ArticleView({ id, onClose, onNext, onPrev, className = '' }: Art
     }
   }, [article]);
 
+  const handleOpenOriginal = useCallback(() => {
+    if (!article) return;
+    window.open(article.link, '_blank', 'noopener,noreferrer');
+  }, [article]);
+
   const handleToggleFocus = useCallback(() => {
     toggleReaderFocusMode(focusMode, layout, setLayout, setFocusMode);
   }, [focusMode, layout, setFocusMode, setLayout]);
@@ -254,6 +259,7 @@ export function ArticleView({ id, onClose, onNext, onPrev, className = '' }: Art
         onBack={onClose}
         onToggleStar={handleToggleStar}
         onToggleFocus={handleToggleFocus}
+        onOpenOriginal={handleOpenOriginal}
         onShare={handleShare}
       />
 

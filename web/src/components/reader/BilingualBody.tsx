@@ -164,6 +164,7 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
   const paragraphs = useMemo(() => splitContentHtml(contentHtml), [contentHtml]);
   const sameLanguage = isSameLanguage(language, nativeLanguage);
   const originalFont = fontForLang(language);
+  const translationFont = fontForLang(nativeLanguage);
   const resetKey = `${articleId}:${language}:${nativeLanguage}:${contentHtml}`;
   const paragraphRefs = useRef<Array<HTMLDivElement | null>>([]);
   const activeClientsRef = useRef<SSEClient[]>([]);
@@ -345,7 +346,8 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
               <div
                 data-layer="translation"
                 data-paragraph-index={index}
-                className="mt-1 border-l-2 border-[var(--accent)] pl-4 text-[0.92em] leading-[1.85] text-[var(--text)]"
+                className="mt-1 text-[0.92em] leading-[1.85] text-[var(--text)]"
+                style={{ fontFamily: translationFont }}
               >
                 {translation}
               </div>

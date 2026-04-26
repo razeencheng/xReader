@@ -1,4 +1,4 @@
-import { ArrowLeft, Maximize2, Minimize2, Share2, Star } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Maximize2, Minimize2, Share2, Star } from 'lucide-react';
 import { estimateReadMinutes } from '@/lib/article-meta';
 import { useI18n } from '@/lib/i18n';
 import { getSourceColor } from '@/lib/source-meta';
@@ -17,6 +17,7 @@ interface Props {
   onBack?: () => void;
   onToggleStar?: () => void;
   onToggleFocus?: () => void;
+  onOpenOriginal?: () => void;
   onShare?: () => void;
   focusMode?: boolean;
   progress?: number;
@@ -31,6 +32,7 @@ export function ReaderHeader({
   onBack,
   onToggleStar,
   onToggleFocus,
+  onOpenOriginal,
   onShare,
   focusMode = false,
   progress = 0,
@@ -40,6 +42,7 @@ export function ReaderHeader({
   const sourceTitle = article.source_title?.trim() || t('common.source');
   const readMinutes = estimateReadMinutes(article);
   const showReadState = progress > 0.75 || article.is_read;
+  const openOriginal = onOpenOriginal ?? (() => window.open(article.link, '_blank', 'noopener,noreferrer'));
 
   return (
     <div className="flex shrink-0 items-center gap-3 border-b border-[var(--border-light)] bg-[var(--bg)] px-5 py-[9px]">
@@ -81,6 +84,10 @@ export function ReaderHeader({
           <Share2 size={15} strokeWidth={1.8} />
         </button>
       ) : null}
+
+      <button type="button" onClick={openOriginal} className={iconButtonClass} title={t('reader.readOriginal')} aria-label={t('reader.readOriginal')}>
+        <ExternalLink size={15} strokeWidth={1.8} />
+      </button>
 
       {onToggleFocus ? (
         <button

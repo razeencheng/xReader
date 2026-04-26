@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"context"
 	"log"
 	"os"
 
@@ -47,6 +48,8 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		Sessions:  sessions,
 	}
 	authH := auth.NewHandler(authSvc, sessions)
+	aiConfigPath := os.Getenv("XREADER_AI_CONFIG")
+	aiSettings := ai.NewSettingsService(aiConfigPath, ai.NewRedisSettingsRepository(deps.Redis))
 
 	// Public auth routes
 	r.GET("/api/auth/github", authH.BeginLogin)
@@ -95,14 +98,17 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		// Article AI
 		aiH := article.NewAIHandler(deps.Pool)
 		authed.GET("/articles/:id/ai", aiH.GetArticleAI)
+		aiSettingsH := ai.NewSettingsHandler(aiSettings)
+		authed.GET("/ai/settings", aiSettingsH.Get)
+		authed.PATCH("/ai/settings", aiSettingsH.Update)
 
 		// Article SSE + body retry
 		var aiClient ai.AIClient
-		if cfgPath := os.Getenv("XREADER_AI_CONFIG"); cfgPath != "" {
-			if cfg, err := ai.LoadConfig(cfgPath); err != nil {
+		if aiConfigPath != "" {
+			if _, err := aiSettings.LoadResolved(context.Background()); err != nil {
 				log.Printf("ai config not loaded: %v (body translation disabled)", err)
 			} else {
-				aiClient = ai.NewClient(cfg)
+				aiClient = ai.NewDynamicClient(aiSettings)
 			}
 		}
 		sseH := article.NewSSEHandler(deps.Pool, aiClient, 3)
