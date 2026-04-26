@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { createSSEClient } from '@/lib/sse-client';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createSSEClient, type SSEClient } from '@/lib/sse-client';
 import { fontForLang } from '@/lib/langFonts';
 import { isSameLanguage } from '@/lib/article-meta';
 import { useI18n } from '@/lib/i18n';
@@ -40,6 +40,7 @@ const BLOCK_TAGS = new Set([
 
 const WRAPPER_TAGS = new Set(['article', 'aside', 'div', 'footer', 'header', 'main', 'section']);
 const SKIP_EMPTY_TAGS = new Set(['br', 'ins']);
+const TRANSLATION_PREFETCH_COUNT = 5;
 
 function escapeHtml(text: string) {
   return text
@@ -109,53 +110,139 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
   const sameLanguage = isSameLanguage(language, nativeLanguage);
   const originalFont = fontForLang(language);
   const resetKey = `${articleId}:${language}:${nativeLanguage}:${contentHtml}`;
+  const paragraphRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const activeClientsRef = useRef<SSEClient[]>([]);
+  const requestedIndicesRef = useRef<Set<number>>(new Set());
+  const translationsRef = useRef<Map<number, string>>(new Map());
   const [translationState, setTranslationState] = useState<{
     key: string;
     translations: Map<number, string>;
-    isStreaming: boolean;
+    pending: Set<number>;
   }>({
     key: '',
     translations: new Map(),
-    isStreaming: false,
+    pending: new Set(),
   });
 
   const shouldTranslate = !sameLanguage && paragraphs.length > 0;
   const translations = translationState.key === resetKey ? translationState.translations : new Map<number, string>();
-  const isStreaming = shouldTranslate && (translationState.key !== resetKey || translationState.isStreaming);
-  const nextPendingIndex = isStreaming ? paragraphs.findIndex((_, index) => !translations.has(index)) : -1;
+  const pendingTranslations = translationState.key === resetKey ? translationState.pending : new Set<number>();
+
+  useEffect(() => {
+    translationsRef.current = translations;
+  }, [translations]);
+
+  useEffect(() => {
+    requestedIndicesRef.current.clear();
+    activeClientsRef.current.forEach((client) => client.close());
+    activeClientsRef.current = [];
+    return () => {
+      activeClientsRef.current.forEach((client) => client.close());
+      activeClientsRef.current = [];
+    };
+  }, [resetKey]);
+
+  const requestTranslationRange = useCallback((visibleIndex: number) => {
+    if (!shouldTranslate || visibleIndex < 0 || visibleIndex >= paragraphs.length) {
+      return;
+    }
+
+    const rangeEnd = Math.min(paragraphs.length, visibleIndex + TRANSLATION_PREFETCH_COUNT);
+    const rangeIndices = Array.from(
+      { length: rangeEnd - visibleIndex },
+      (_, offset) => visibleIndex + offset,
+    );
+    const firstMissingIndex = rangeIndices.find(
+      (index) => !translationsRef.current.has(index) && !requestedIndicesRef.current.has(index),
+    );
+    if (firstMissingIndex === undefined) {
+      return;
+    }
+
+    const requestIndices = Array.from(
+      { length: rangeEnd - firstMissingIndex },
+      (_, offset) => firstMissingIndex + offset,
+    );
+    requestIndices.forEach((index) => requestedIndicesRef.current.add(index));
+    setTranslationState((previous) => {
+      const nextTranslations = previous.key === resetKey ? previous.translations : new Map<number, string>();
+      const nextPending = previous.key === resetKey ? new Set(previous.pending) : new Set<number>();
+      requestIndices.forEach((index) => {
+        if (!nextTranslations.has(index)) {
+          nextPending.add(index);
+        }
+      });
+      return { key: resetKey, translations: nextTranslations, pending: nextPending };
+    });
+
+    const params = new URLSearchParams({
+      start: String(firstMissingIndex),
+      count: String(rangeEnd - firstMissingIndex),
+    });
+    const client = createSSEClient(`/api/articles/${articleId}/body-translation?${params.toString()}`);
+    activeClientsRef.current.push(client);
+
+    const removeClient = () => {
+      activeClientsRef.current = activeClientsRef.current.filter((item) => item !== client);
+    };
+    const clearPending = () => {
+      setTranslationState((previous) => {
+        if (previous.key !== resetKey) {
+          return previous;
+        }
+        const nextPending = new Set(previous.pending);
+        requestIndices.forEach((index) => nextPending.delete(index));
+        return { ...previous, pending: nextPending };
+      });
+    };
+
+    client.onParagraph((paragraph) => {
+      setTranslationState((previous) => {
+        const nextTranslations = previous.key === resetKey ? new Map(previous.translations) : new Map<number, string>();
+        const nextPending = previous.key === resetKey ? new Set(previous.pending) : new Set<number>();
+        nextTranslations.set(paragraph.index, paragraph.translation);
+        nextPending.delete(paragraph.index);
+        return { key: resetKey, translations: nextTranslations, pending: nextPending };
+      });
+    });
+    client.onDone(() => {
+      clearPending();
+      removeClient();
+    });
+    client.onError(() => {
+      requestIndices.forEach((index) => requestedIndicesRef.current.delete(index));
+      clearPending();
+      removeClient();
+    });
+  }, [articleId, paragraphs.length, resetKey, shouldTranslate]);
 
   useEffect(() => {
     if (!shouldTranslate) {
       return;
     }
 
-    const client = createSSEClient(`/api/articles/${articleId}/body-translation`);
-    client.onParagraph((paragraph) => {
-      setTranslationState((previous) => {
-        const next = previous.key === resetKey ? new Map(previous.translations) : new Map<number, string>();
-        next.set(paragraph.index, paragraph.translation);
-        return { key: resetKey, translations: next, isStreaming: true };
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) {
+          return;
+        }
+        const index = Number.parseInt((entry.target as HTMLElement).dataset.observeIndex ?? '', 10);
+        if (Number.isFinite(index)) {
+          requestTranslationRange(index);
+        }
       });
-    });
-    client.onDone(() => {
-      setTranslationState((previous) => ({
-        key: resetKey,
-        translations: previous.key === resetKey ? previous.translations : new Map(),
-        isStreaming: false,
-      }));
-    });
-    client.onError(() => {
-      setTranslationState((previous) => ({
-        key: resetKey,
-        translations: previous.key === resetKey ? previous.translations : new Map(),
-        isStreaming: false,
-      }));
+    }, { rootMargin: '320px 0px 520px 0px', threshold: 0.01 });
+
+    paragraphRefs.current.slice(0, paragraphs.length).forEach((node) => {
+      if (node) {
+        observer.observe(node);
+      }
     });
 
     return () => {
-      client.close();
+      observer.disconnect();
     };
-  }, [articleId, resetKey, shouldTranslate]);
+  }, [paragraphs.length, requestTranslationRange, shouldTranslate]);
 
   return (
     <div className="reader-content">
@@ -163,12 +250,16 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
         const isCode = /<pre|<code/i.test(paragraph);
         const blockTag = primaryTagFromHtml(paragraph);
         const translation = translations.get(index);
-        const isLoading = nextPendingIndex === index && !translation;
+        const isLoading = pendingTranslations.has(index) && !translation;
 
         if (isCode) {
           return (
             <div
               key={index}
+              ref={(node) => {
+                paragraphRefs.current[index] = node;
+              }}
+              data-observe-index={index}
               data-block-tag={blockTag}
               className="overflow-x-auto rounded-lg border border-[var(--border-light)] bg-[var(--bg-surface)] p-4 font-mono text-[13.5px] leading-[1.6] text-[var(--text-primary)]"
               dangerouslySetInnerHTML={{ __html: paragraph }}
@@ -179,6 +270,10 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
         return (
           <div
             key={index}
+            ref={(node) => {
+              paragraphRefs.current[index] = node;
+            }}
+            data-observe-index={index}
             data-block-tag={blockTag}
             className="paragraph-container"
           >
@@ -194,7 +289,7 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
               <div
                 data-layer="translation"
                 data-paragraph-index={index}
-                className="mt-2 mb-4 border-l-2 border-[var(--accent)] pl-4 text-[0.92em] leading-[1.8] text-[var(--text)]"
+                className="mt-1 border-l-2 border-[var(--accent)] pl-4 text-[0.92em] leading-[1.85] text-[var(--text)]"
               >
                 {translation}
               </div>
@@ -202,7 +297,7 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
               <div
                 data-testid="translation-loading"
                 aria-label={t('reader.translatingParagraph')}
-                className="mt-2 mb-4 flex h-5 items-center gap-1 pl-4"
+                className="mt-1 flex h-5 items-center gap-1 pl-4"
               >
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--text-3)]" />
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--text-3)] [animation-delay:120ms]" />

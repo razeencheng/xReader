@@ -3,6 +3,7 @@ package ai
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -13,12 +14,12 @@ type Config struct {
 }
 
 type ProviderConfig struct {
-	BaseURL   string        `yaml:"base_url"`
-	APIKeyEnv string        `yaml:"api_key_env"`
-	Model     string        `yaml:"model"`
-	MaxRetries int          `yaml:"max_retries"`
-	Timeout   time.Duration `yaml:"timeout"`
-	BatchSize int           `yaml:"batch_paragraphs_per_call"`
+	BaseURL    string        `yaml:"base_url"`
+	APIKeyEnv  string        `yaml:"api_key_env"`
+	Model      string        `yaml:"model"`
+	MaxRetries int           `yaml:"max_retries"`
+	Timeout    time.Duration `yaml:"timeout"`
+	BatchSize  int           `yaml:"batch_paragraphs_per_call"`
 }
 
 type ResolvedConfig struct {
@@ -41,6 +42,14 @@ func LoadConfig(path string) (ResolvedConfig, error) {
 	}
 
 	apiKey := os.Getenv(cfg.Provider.APIKeyEnv)
+	baseURL := cfg.Provider.BaseURL
+	if endpoint := strings.TrimSpace(os.Getenv("OPENAI_ENDPOINT")); endpoint != "" {
+		normalized := strings.TrimRight(endpoint, "/")
+		if !strings.HasSuffix(normalized, "/v1") {
+			normalized += "/v1"
+		}
+		baseURL = normalized
+	}
 
 	maxRetries := cfg.Provider.MaxRetries
 	if maxRetries <= 0 {
@@ -56,7 +65,7 @@ func LoadConfig(path string) (ResolvedConfig, error) {
 	}
 
 	return ResolvedConfig{
-		BaseURL:    cfg.Provider.BaseURL,
+		BaseURL:    baseURL,
 		APIKey:     apiKey,
 		Model:      cfg.Provider.Model,
 		MaxRetries: maxRetries,

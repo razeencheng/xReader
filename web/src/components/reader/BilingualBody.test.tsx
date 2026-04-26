@@ -1,29 +1,45 @@
 import { act, render, screen } from '@testing-library/react';
 
 const sse = vi.hoisted(() => {
-  let paragraphHandler: ((paragraph: { index: number; translation: string }) => void) | null = null;
-  let doneHandler: (() => void) | null = null;
-  const close = vi.fn();
-  const createSSEClient = vi.fn(() => ({
-    onParagraph: (callback: typeof paragraphHandler) => {
-      paragraphHandler = callback;
-    },
-    onDone: (callback: typeof doneHandler) => {
-      doneHandler = callback;
-    },
-    onError: vi.fn(),
-    close,
-  }));
+  type ClientRecord = {
+    url: string;
+    paragraphHandler: ((paragraph: { index: number; translation: string }) => void) | null;
+    doneHandler: (() => void) | null;
+    close: ReturnType<typeof vi.fn>;
+  };
+
+  const clients: ClientRecord[] = [];
+  const createSSEClient = vi.fn((url: string) => {
+    const client: ClientRecord = {
+      url,
+      paragraphHandler: null,
+      doneHandler: null,
+      close: vi.fn(),
+    };
+    clients.push(client);
+    return {
+      onParagraph: (callback: NonNullable<ClientRecord['paragraphHandler']>) => {
+        client.paragraphHandler = callback;
+      },
+      onDone: (callback: NonNullable<ClientRecord['doneHandler']>) => {
+        client.doneHandler = callback;
+      },
+      onError: vi.fn(),
+      close: client.close,
+    };
+  });
 
   return {
     createSSEClient,
-    close,
-    pushParagraph: (paragraph: { index: number; translation: string }) => paragraphHandler?.(paragraph),
-    pushDone: () => doneHandler?.(),
+    get clients() {
+      return clients;
+    },
+    pushParagraph: (clientIndex: number, paragraph: { index: number; translation: string }) => {
+      clients[clientIndex]?.paragraphHandler?.(paragraph);
+    },
+    pushDone: (clientIndex: number) => clients[clientIndex]?.doneHandler?.(),
     reset: () => {
-      paragraphHandler = null;
-      doneHandler = null;
-      close.mockReset();
+      clients.splice(0, clients.length);
       createSSEClient.mockClear();
     },
   };
@@ -37,11 +53,38 @@ import { BilingualBody } from './BilingualBody';
 import { useUIStore } from '@/stores/useUIStore';
 
 const contentHtml = '<p>First paragraph</p><p>Second paragraph</p>';
+let intersectionCallback:
+  | ((entries: Array<Pick<IntersectionObserverEntry, 'isIntersecting' | 'target'>>) => void)
+  | null = null;
+
+class FakeIntersectionObserver {
+  observe = vi.fn();
+  unobserve = vi.fn();
+  disconnect = vi.fn();
+
+  constructor(callback: typeof intersectionCallback) {
+    intersectionCallback = callback;
+  }
+}
 
 beforeEach(() => {
   sse.reset();
+  intersectionCallback = null;
+  vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver);
   useUIStore.setState({ nativeLanguage: 'zh-CN' });
 });
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+function enterParagraph(container: HTMLElement, index: number) {
+  const target = container.querySelector(`[data-observe-index="${index}"]`);
+  expect(target).toBeInTheDocument();
+  act(() => {
+    intersectionCallback?.([{ isIntersecting: true, target: target as Element }]);
+  });
+}
 
 test('renders original paragraphs without translation controls in same-language mode', () => {
   render(
@@ -54,28 +97,43 @@ test('renders original paragraphs without translation controls in same-language 
   expect(sse.createSSEClient).not.toHaveBeenCalled();
 });
 
-test('opens an SSE stream and renders translations automatically as paragraphs arrive', () => {
-  render(
+test('opens an SSE stream for the visible paragraph range and renders translations as they arrive', () => {
+  const { container } = render(
     <BilingualBody articleId={1} contentHtml={contentHtml} language="en" nativeLanguage="zh-CN" />,
   );
 
   expect(screen.getByText('First paragraph')).toBeInTheDocument();
   expect(screen.getByText('Second paragraph')).toBeInTheDocument();
-  expect(sse.createSSEClient).toHaveBeenCalledWith('/api/articles/1/body-translation');
+  expect(sse.createSSEClient).not.toHaveBeenCalled();
+
+  enterParagraph(container, 0);
+
+  expect(sse.createSSEClient).toHaveBeenCalledWith('/api/articles/1/body-translation?start=0&count=2');
   expect(screen.queryByRole('button', { name: /翻译段落/i })).not.toBeInTheDocument();
-  expect(screen.getByTestId('translation-loading')).toBeInTheDocument();
+  expect(screen.getAllByTestId('translation-loading')).toHaveLength(2);
 
   act(() => {
-    sse.pushParagraph({ index: 0, translation: '第一段翻译' });
+    sse.pushParagraph(0, { index: 0, translation: '第一段翻译' });
   });
   expect(screen.getByText('第一段翻译')).toBeInTheDocument();
-  expect(screen.getByTestId('translation-loading')).toBeInTheDocument();
+  expect(screen.getAllByTestId('translation-loading')).toHaveLength(1);
 
   act(() => {
-    sse.pushParagraph({ index: 1, translation: '第二段翻译' });
+    sse.pushParagraph(0, { index: 1, translation: '第二段翻译' });
   });
   expect(screen.getByText('第二段翻译')).toBeInTheDocument();
   expect(screen.queryByTestId('translation-loading')).not.toBeInTheDocument();
+});
+
+test('prefetches the current paragraph and the following four paragraphs', () => {
+  const longContent = Array.from({ length: 6 }, (_, index) => `<p>Paragraph ${index}</p>`).join('');
+  const { container } = render(
+    <BilingualBody articleId={1} contentHtml={longContent} language="en" nativeLanguage="zh-CN" />,
+  );
+
+  enterParagraph(container, 2);
+
+  expect(sse.createSSEClient).toHaveBeenCalledWith('/api/articles/1/body-translation?start=2&count=4');
 });
 
 test('marks semantic article blocks so the reader stylesheet can preserve hierarchy', () => {

@@ -55,10 +55,44 @@ func (h *SSEHandler) BodyTranslation(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
+	article, err := h.queries.GetArticleByID(ctx, articleID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
+		return
+	}
+	paragraphs := ai.SplitParagraphs(article.ContentHtml)
+	start, end, err := parseBodyTranslationRange(c, len(paragraphs))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	requestedParagraphs := paragraphs[start:end]
+
+	cached := make(map[int]ai.TranslatedParagraph)
 	aiRow, err := h.queries.GetArticleAI(ctx, gen.GetArticleAIParams{ArticleID: articleID, TargetLanguage: targetLang})
-	if err == nil && aiRow.BodyTranslationStatus == "done" {
+	if err == nil {
+		var stale bool
+		cached, stale = validCachedTranslations(aiRow.BodyTranslationContent, paragraphs)
+		if stale {
+			cached = make(map[int]ai.TranslatedParagraph)
+			if resetErr := h.queries.ResetBodyTranslation(ctx, gen.ResetBodyTranslationParams{
+				ArticleID: articleID, TargetLanguage: targetLang,
+			}); resetErr != nil {
+				log.Printf("sse: reset stale cached body translation for article %d: %v", articleID, resetErr)
+			}
+		}
+	}
+
+	if len(requestedParagraphs) == 0 {
 		setSSEHeaders(c)
-		writeCachedBodyTranslation(c.Writer, aiRow.BodyTranslationContent)
+		writeSSENamedEvent(c.Writer, "done", map[string]any{})
+		return
+	}
+
+	missing := missingCachedParagraphs(requestedParagraphs, cached)
+	if len(missing) == 0 {
+		setSSEHeaders(c)
+		writeCachedBodyTranslationRange(c.Writer, requestedParagraphs, cached)
 		return
 	}
 
@@ -67,24 +101,83 @@ func (h *SSEHandler) BodyTranslation(c *gin.Context) {
 		return
 	}
 
-	article, err := h.queries.GetArticleByID(ctx, articleID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
-		return
-	}
-
-	paragraphs := ai.SplitParagraphs(article.ContentHtml)
-	if len(paragraphs) == 0 {
-		setSSEHeaders(c)
-		writeSSENamedEvent(c.Writer, "done", map[string]any{})
-		return
-	}
-
 	setSSEHeaders(c)
-	h.streamTranslation(ctx, c.Writer, articleID, targetLang, paragraphs)
+	h.streamTranslation(ctx, c.Writer, articleID, targetLang, paragraphs, requestedParagraphs, cached)
 }
 
-func (h *SSEHandler) streamTranslation(ctx context.Context, w http.ResponseWriter, articleID int64, targetLang string, paragraphs []ai.Paragraph) {
+func parseBodyTranslationRange(c *gin.Context, total int) (int, int, error) {
+	start := 0
+	count := total
+
+	if rawStart := c.Query("start"); rawStart != "" {
+		parsed, err := strconv.Atoi(rawStart)
+		if err != nil || parsed < 0 {
+			return 0, 0, fmt.Errorf("invalid start")
+		}
+		start = parsed
+	}
+
+	if rawCount := c.Query("count"); rawCount != "" {
+		parsed, err := strconv.Atoi(rawCount)
+		if err != nil || parsed <= 0 {
+			return 0, 0, fmt.Errorf("invalid count")
+		}
+		count = parsed
+	}
+
+	if start > total {
+		start = total
+	}
+	end := start + count
+	if end > total {
+		end = total
+	}
+	return start, end, nil
+}
+
+func validCachedTranslations(payload []byte, paragraphs []ai.Paragraph) (map[int]ai.TranslatedParagraph, bool) {
+	cached := make(map[int]ai.TranslatedParagraph)
+	if len(payload) == 0 {
+		return cached, false
+	}
+
+	var content []ai.TranslatedParagraph
+	if err := json.Unmarshal(payload, &content); err != nil {
+		return cached, true
+	}
+
+	for _, item := range content {
+		if item.Index < 0 || item.Index >= len(paragraphs) {
+			return cached, true
+		}
+		if normalizeSSEText(item.Original) != paragraphs[item.Index].Original {
+			return cached, true
+		}
+		cached[item.Index] = item
+	}
+
+	return cached, false
+}
+
+func normalizeSSEText(raw string) string {
+	fields := strings.Fields(strings.TrimSpace(raw))
+	if len(fields) == 0 {
+		return ""
+	}
+	return strings.Join(fields, " ")
+}
+
+func missingCachedParagraphs(paragraphs []ai.Paragraph, cached map[int]ai.TranslatedParagraph) []ai.Paragraph {
+	missing := make([]ai.Paragraph, 0, len(paragraphs))
+	for _, paragraph := range paragraphs {
+		if _, ok := cached[paragraph.Index]; !ok {
+			missing = append(missing, paragraph)
+		}
+	}
+	return missing
+}
+
+func (h *SSEHandler) streamTranslation(ctx context.Context, w http.ResponseWriter, articleID int64, targetLang string, allParagraphs []ai.Paragraph, requestedParagraphs []ai.Paragraph, cached map[int]ai.TranslatedParagraph) {
 	_ = h.queries.EnsureArticleAI(ctx, gen.EnsureArticleAIParams{
 		ArticleID: articleID, TargetLanguage: targetLang,
 	})
@@ -92,15 +185,26 @@ func (h *SSEHandler) streamTranslation(ctx context.Context, w http.ResponseWrite
 		ArticleID: articleID, TargetLanguage: targetLang, BodyTranslationStatus: "processing",
 	})
 
-	allTranslated := make([]ai.TranslatedParagraph, 0, len(paragraphs))
+	for _, paragraph := range requestedParagraphs {
+		if tp, ok := cached[paragraph.Index]; ok {
+			writeSSENamedEvent(w, "paragraph", map[string]any{
+				"index":       tp.Index,
+				"original":    tp.Original,
+				"translation": tp.Translation,
+			})
+		}
+	}
 
-	for start := 0; start < len(paragraphs); start += h.batchSize {
+	missing := missingCachedParagraphs(requestedParagraphs, cached)
+	newlyTranslated := make(map[int]ai.TranslatedParagraph, len(missing))
+
+	for start := 0; start < len(missing); start += h.batchSize {
 		end := start + h.batchSize
-		if end > len(paragraphs) {
-			end = len(paragraphs)
+		if end > len(missing) {
+			end = len(missing)
 		}
 
-		batch := paragraphs[start:end]
+		batch := missing[start:end]
 		results, err := h.translateBatch(ctx, batch, targetLang)
 		if err != nil {
 			log.Printf("sse: translate batch for article %d: %v", articleID, err)
@@ -113,7 +217,7 @@ func (h *SSEHandler) streamTranslation(ctx context.Context, w http.ResponseWrite
 				"original":    tp.Original,
 				"translation": tp.Translation,
 			})
-			allTranslated = append(allTranslated, tp)
+			newlyTranslated[tp.Index] = tp
 		}
 	}
 
@@ -121,14 +225,56 @@ func (h *SSEHandler) streamTranslation(ctx context.Context, w http.ResponseWrite
 
 	go func() {
 		bgCtx := context.Background()
-		data, _ := json.Marshal(allTranslated)
-		if err := h.queries.SetBodyTranslation(bgCtx, gen.SetBodyTranslationParams{
-			ArticleID: articleID, TargetLanguage: targetLang,
-			BodyTranslationContent: data, BodyTranslationStatus: "done",
-		}); err != nil {
+		if err := h.persistMergedBodyTranslation(bgCtx, articleID, targetLang, allParagraphs, newlyTranslated); err != nil {
 			log.Printf("sse: persist body translation for article %d: %v", articleID, err)
 		}
 	}()
+}
+
+func (h *SSEHandler) persistMergedBodyTranslation(ctx context.Context, articleID int64, targetLang string, paragraphs []ai.Paragraph, translated map[int]ai.TranslatedParagraph) error {
+	if len(translated) == 0 {
+		return nil
+	}
+
+	merged := make(map[int]ai.TranslatedParagraph, len(translated))
+	aiRow, err := h.queries.GetArticleAI(ctx, gen.GetArticleAIParams{ArticleID: articleID, TargetLanguage: targetLang})
+	if err == nil {
+		cached, stale := validCachedTranslations(aiRow.BodyTranslationContent, paragraphs)
+		if !stale {
+			for index, item := range cached {
+				merged[index] = item
+			}
+		}
+	}
+	for index, item := range translated {
+		merged[index] = item
+	}
+
+	content := orderedCachedTranslations(paragraphs, merged)
+	status := "processing"
+	if len(content) == len(paragraphs) {
+		status = "done"
+	}
+
+	data, err := json.Marshal(content)
+	if err != nil {
+		return err
+	}
+
+	return h.queries.SetBodyTranslation(ctx, gen.SetBodyTranslationParams{
+		ArticleID: articleID, TargetLanguage: targetLang,
+		BodyTranslationContent: data, BodyTranslationStatus: status,
+	})
+}
+
+func orderedCachedTranslations(paragraphs []ai.Paragraph, cached map[int]ai.TranslatedParagraph) []ai.TranslatedParagraph {
+	content := make([]ai.TranslatedParagraph, 0, len(cached))
+	for _, paragraph := range paragraphs {
+		if item, ok := cached[paragraph.Index]; ok {
+			content = append(content, item)
+		}
+	}
+	return content
 }
 
 func (h *SSEHandler) translateBatch(ctx context.Context, batch []ai.Paragraph, targetLang string) ([]ai.TranslatedParagraph, error) {
@@ -166,30 +312,12 @@ func (h *SSEHandler) translateBatch(ctx context.Context, batch []ai.Paragraph, t
 	return results, nil
 }
 
-func loadCachedTranslations(ctx context.Context, q *gen.Queries, articleID int64, targetLang string) map[int]ai.TranslatedParagraph {
-	cached := make(map[int]ai.TranslatedParagraph)
-	aiRow, err := q.GetArticleAI(ctx, gen.GetArticleAIParams{ArticleID: articleID, TargetLanguage: targetLang})
-	if err != nil || len(aiRow.BodyTranslationContent) == 0 {
-		return cached
-	}
-	var paragraphs []ai.TranslatedParagraph
-	if err := json.Unmarshal(aiRow.BodyTranslationContent, &paragraphs); err != nil {
-		return cached
-	}
-	for _, p := range paragraphs {
-		cached[p.Index] = p
-	}
-	return cached
-}
-
-func writeCachedBodyTranslation(w http.ResponseWriter, payload []byte) {
-	var content []ai.TranslatedParagraph
-	if err := json.Unmarshal(payload, &content); err != nil {
-		writeSSENamedEvent(w, "done", map[string]any{})
-		return
-	}
-
-	for _, tp := range content {
+func writeCachedBodyTranslationRange(w http.ResponseWriter, paragraphs []ai.Paragraph, cached map[int]ai.TranslatedParagraph) {
+	for _, paragraph := range paragraphs {
+		tp, ok := cached[paragraph.Index]
+		if !ok {
+			continue
+		}
 		writeSSENamedEvent(w, "paragraph", map[string]any{
 			"index":       tp.Index,
 			"original":    tp.Original,

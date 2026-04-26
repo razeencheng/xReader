@@ -278,14 +278,14 @@ a {
   box-sizing: border-box;
 }
 
-.reader-content > [data-layer='original'],
+.reader-content > .paragraph-container,
 .reader-content > [data-block-tag='pre'] {
   max-width: 100%;
   min-width: 0;
   margin-top: 1.45em;
 }
 
-.reader-content > [data-layer='original']:first-child,
+.reader-content > .paragraph-container:first-child,
 .reader-content > [data-block-tag='pre']:first-child {
   margin-top: 0;
 }
@@ -455,8 +455,10 @@ a {
   border-bottom: 1px solid var(--border-light);
 }
 
-.paragraph-container > * {
-  margin: 0;
+.paragraph-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .paragraph-container [data-layer='original'] {

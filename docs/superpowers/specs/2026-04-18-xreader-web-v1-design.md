@@ -339,18 +339,16 @@ Title translation prompt:
 原标题：{title}
 ```
 
-#### 6.3.2 Lazy stage (runs on detail view)
+#### 6.3.2 Lazy stage (viewport-driven on detail view)
 
-When a user opens `/read/:article_id`, the server looks up `article_ai` for `(article_id, current_user.native_language)`:
+When a user opens `/read/:article_id`, the UI renders the full original article immediately, then uses `IntersectionObserver` to request translation only for the paragraph currently entering the reading viewport plus a small lookahead window.
 
-1. If `body_translation_status = 'done'`, serve the cached translation from DB.
-2. If `none`, the API endpoint starts a body-translation job **scoped to the caller's native language** and returns an SSE stream. The job:
-   - Splits `content_html` into paragraph-level units after sanitization
-   - Translates each paragraph (typically 3–10 at a time via single API call)
-   - Streams back paragraph-indexed translations as SSE events: `{"paragraph": 0, "translation": "..."}`
-3. UI renders: original paragraph appears first (full content); translation appears under it as each streams in. Progress indicator until the last paragraph resolves.
-4. On completion, persist full translation to `article_ai.body_translation_content`; next open is instant.
-5. If `processing` and another user opens the same article, second user tails the same pub/sub channel.
+1. The frontend calls `GET /api/articles/:id/body-translation?start={paragraph_index}&count={window_size}` as an SSE stream. Default window size is current paragraph + the next 4 paragraphs.
+2. The server looks up `article_ai` for `(article_id, current_user.native_language)` and splits `content_html` into paragraph-level units after sanitization.
+3. If requested paragraph indexes already exist in `body_translation_content`, stream those cached paragraph events immediately.
+4. For requested indexes missing from cache, translate only those paragraphs (typically 3-10 at a time via a single API call) and stream paragraph-indexed events: `{"index": 0, "original": "...", "translation": "..."}`.
+5. After each range completes, merge the new paragraph translations into `article_ai.body_translation_content`. `body_translation_status = 'processing'` means a partial cache exists or translation is in progress; `done` is set only once every paragraph has a valid cached translation.
+6. UI renders: original paragraph appears first (full content); translation appears under it as each requested paragraph streams in. A progress indicator appears only under requested-but-not-yet-translated paragraphs.
 
 Concurrency:
 
@@ -620,7 +618,7 @@ Base: `/api/`. All write endpoints require session cookie; admin endpoints also 
 | GET | `/api/articles` | Paginated list. Query: `tab=today\|stream\|starred`, `source_id=`, `q=` (search), `cursor=` |
 | GET | `/api/articles/:id` | Single article, includes `article_ai.summary` and `title_translated` for current user's `native_language`. |
 | POST | `/api/articles/:id/original` | Fetch and persist original page content for summary-only RSS items; returns sanitized reader-safe content. |
-| GET | `/api/articles/:id/body-translation` | **SSE**. If cached, single event with full translation then close. If pending, stream paragraphs as translated. |
+| GET | `/api/articles/:id/body-translation?start=&count=` | **SSE**. Streams cached and newly translated paragraph events for the requested range. Without range params, streams the full article for backward compatibility. |
 | POST | `/api/articles/:id/body-translation/retry` | Re-run translation (e.g. after a failure) |
 | PATCH | `/api/articles/:id/state` | Update `is_read` / `is_starred` |
 | PUT | `/api/articles/:id/progress` | Save `reading_progress` |

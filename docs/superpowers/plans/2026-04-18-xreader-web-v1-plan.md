@@ -721,12 +721,13 @@ func TestEagerJob_RecordsFailure_AllowsRetry(t *testing.T) { ... }
 
 **Implementation notes:**
 
-- `LazyJob`: splits `article.content_html` into post-sanitization paragraphs (preserves `<p>`, `<h2>`, `<li>`; others flattened), translates in batches of `batch_paragraphs_per_call` via a single API call (the prompt asks the model to translate each numbered paragraph in order; parse output).
+- `LazyJob`: splits `article.content_html` into post-sanitization paragraphs (preserves `<p>`, `<h2>`, `<li>`; others flattened), translates requested paragraph ranges in batches of `batch_paragraphs_per_call` via a single API call (the prompt asks the model to translate each numbered paragraph in order; parse output).
 - Job publishes each translated paragraph to Redis pub/sub channel `ai:body:<article_id>:<target_lang>` as JSON. When done, publishes a `done` marker and persists full result.
 - SSE endpoint `GET /api/articles/:id/body-translation`:
-  - If `article_ai.body_translation_status = 'done'` → send one SSE event with full content + close.
-  - If `status = 'processing'` → subscribe to the pub/sub channel and stream events as they arrive.
-  - If `status = 'none'` → start a `LazyJob` (single-flight locked via Redis `SETNX ai:lazy:lock:<article_id>:<lang>` with 5-min TTL) → subscribe → stream.
+  - Supports optional `start` and `count` query params. The frontend uses these for viewport-driven lazy translation: current paragraph + the next 4 paragraphs.
+  - If requested paragraphs are cached in `article_ai.body_translation_content` → stream cached paragraph events immediately.
+  - If requested paragraphs are missing → translate only the missing paragraphs, stream them, then merge them into the JSON cache.
+  - Keep `body_translation_status = 'processing'` while the cache is partial; set `done` only when every paragraph has a valid cached translation.
   - On client disconnect → unsubscribe; job continues regardless.
 - SSE event format: `data: {"type":"paragraph","index":3,"original":"...","translation":"..."}\n\n` then a final `data: {"type":"done"}\n\n`.
 
@@ -1016,13 +1017,14 @@ test('KeyPointsCallout renders bullet summary when multiple bullets provided', (
 
 **Implementation notes:**
 
-- Fetches `GET /api/articles/:id/body-translation` as SSE using `EventSource`.
+- Fetches `GET /api/articles/:id/body-translation?start={index}&count={window}` as SSE using `EventSource`.
 - Renders the article's post-sanitization paragraphs as HTML elements. For each paragraph:
   - First render: `[original paragraph, muted #6a6252]`.
   - When SSE delivers a `paragraph` event for this index → render `[translation paragraph, #1f1f1f]` directly below.
+- Uses `IntersectionObserver` to request translation when a paragraph approaches the viewport; default prefetch window is the current paragraph plus the next 4 paragraphs.
 - For native-language articles (article lang === target lang): show only the original, no translation.
 - Language-aware serif: pick font family by article language (map in `src/lib/langFonts.ts`: `ja → "Hiragino Mincho ProN", Georgia, serif`; `zh → "Source Han Serif", Georgia, serif`; default serif otherwise).
-- Loading affordance: while waiting for the next paragraph's translation, show a faint 3-dot pulse below that paragraph.
+- Loading affordance: while waiting for a requested paragraph's translation, show a faint 3-dot pulse below that paragraph.
 - On `done` event, close the EventSource.
 
 **Key tests:**

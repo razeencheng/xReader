@@ -18,3 +18,16 @@
 - `cd web && pnpm build` passed.
 - `cd server && go test ./...` passed.
 - `cd web && pnpm lint` still fails on pre-existing lint issues in `src/lib/api-client.test.ts`, `src/stores/useUIStore.test.ts`, and `src/test-setup.ts`.
+
+## Viewport-Driven Lazy Translation Update
+
+**Date:** 2026-04-26
+**Scope:** Reader body translation performance
+
+### Summary
+
+- Changed body translation from full-article streaming on open to viewport-driven range streaming.
+- `BilingualBody` now observes rendered paragraph blocks and requests the current paragraph plus the next four paragraphs with `start/count` query params.
+- The SSE endpoint now serves cached paragraphs for the requested range immediately, translates only missing paragraphs, and merges partial results back into `article_ai.body_translation_content`.
+- Partial caches keep `body_translation_status = 'processing'`; the status becomes `done` only when every paragraph is cached.
+- Updated the design spec and implementation plan to describe range SSE, partial cache semantics, and viewport-driven prefetch.

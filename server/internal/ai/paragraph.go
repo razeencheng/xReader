@@ -12,6 +12,20 @@ type Paragraph struct {
 	Original string `json:"original"`
 }
 
+var blockTags = map[string]struct{}{
+	"article": {}, "aside": {}, "blockquote": {}, "details": {}, "div": {},
+	"figure": {}, "footer": {}, "h1": {}, "h2": {}, "h3": {}, "h4": {}, "h5": {}, "h6": {},
+	"header": {}, "li": {}, "main": {}, "ol": {}, "p": {}, "pre": {}, "section": {}, "table": {}, "ul": {},
+}
+
+var wrapperTags = map[string]struct{}{
+	"article": {}, "aside": {}, "body": {}, "div": {}, "footer": {}, "header": {}, "main": {}, "section": {},
+}
+
+var skipEmptyTags = map[string]struct{}{
+	"br": {}, "ins": {},
+}
+
 func SplitParagraphs(source string) []Paragraph {
 	source = strings.TrimSpace(source)
 	if source == "" {
@@ -46,7 +60,33 @@ func collectParagraphs(node *html.Node, paragraphs *[]Paragraph) {
 		return
 	}
 
-	if node.Type == html.ElementNode && isParagraphBoundary(node.Data) {
+	if node.Type == html.TextNode {
+		if text := normalizeText(node.Data); text != "" {
+			*paragraphs = append(*paragraphs, Paragraph{Index: len(*paragraphs), Original: text})
+		}
+		return
+	}
+
+	if node.Type == html.ElementNode {
+		tag := strings.ToLower(node.Data)
+		if _, skipIfEmpty := skipEmptyTags[tag]; skipIfEmpty && normalizeText(nodeText(node)) == "" {
+			return
+		}
+
+		if _, isWrapper := wrapperTags[tag]; isWrapper {
+			for child := node.FirstChild; child != nil; child = child.NextSibling {
+				collectParagraphs(child, paragraphs)
+			}
+			return
+		}
+
+		if _, isBlock := blockTags[tag]; isBlock {
+			if text := normalizeText(nodeText(node)); text != "" {
+				*paragraphs = append(*paragraphs, Paragraph{Index: len(*paragraphs), Original: text})
+			}
+			return
+		}
+
 		if text := normalizeText(nodeText(node)); text != "" {
 			*paragraphs = append(*paragraphs, Paragraph{Index: len(*paragraphs), Original: text})
 		}
@@ -71,15 +111,6 @@ func findNode(root *html.Node, tag string) *html.Node {
 		}
 	}
 	return nil
-}
-
-func isParagraphBoundary(tag string) bool {
-	switch tag {
-	case "p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote":
-		return true
-	default:
-		return false
-	}
 }
 
 func nodeText(node *html.Node) string {

@@ -28,6 +28,7 @@ export function createSSEClient(url: string): SSEClient {
   let closed = false;
   let reconnectAttempted = false;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let openScheduled = false;
 
   const cleanupSource = () => {
     if (!source) {
@@ -50,6 +51,20 @@ export function createSSEClient(url: string): SSEClient {
     source.addEventListener('paragraph', handleParagraph);
     source.addEventListener('done', handleDone);
     source.addEventListener('error', handleError);
+  };
+
+  const scheduleOpen = () => {
+    if (openScheduled || source || closed) {
+      return;
+    }
+
+    openScheduled = true;
+    queueMicrotask(() => {
+      openScheduled = false;
+      if (!source && !closed) {
+        open();
+      }
+    });
   };
 
   const scheduleReconnect = () => {
@@ -109,17 +124,18 @@ export function createSSEClient(url: string): SSEClient {
     cleanupSource();
   }
 
-  open();
-
   return {
     onParagraph(callback) {
       paragraphListeners.add(callback);
+      scheduleOpen();
     },
     onDone(callback) {
       doneListeners.add(callback);
+      scheduleOpen();
     },
     onError(callback) {
       errorListeners.add(callback);
+      scheduleOpen();
     },
     close,
   };

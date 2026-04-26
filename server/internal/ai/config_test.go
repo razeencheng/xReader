@@ -65,3 +65,31 @@ provider:
 	require.Equal(t, 30*time.Second, cfg.Timeout)
 	require.Equal(t, 5, cfg.BatchSize)
 }
+
+func TestLoadConfig_OverridesBaseURLFromOpenAIEndpoint(t *testing.T) {
+	t.Setenv("K", "key")
+	t.Setenv("OPENAI_ENDPOINT", "https://proxy.example.com")
+	yaml := `
+provider:
+  base_url: "https://api.example.com/v1"
+  api_key_env: "K"
+  model: "m"
+`
+	cfg, err := LoadConfig(writeTempYAML(t, yaml))
+	require.NoError(t, err)
+	require.Equal(t, "https://proxy.example.com/v1", cfg.BaseURL)
+}
+
+func TestLoadConfig_UsesOpenAIEndpointWithExistingV1(t *testing.T) {
+	t.Setenv("K", "key")
+	t.Setenv("OPENAI_ENDPOINT", "https://proxy.example.com/v1/")
+	yaml := `
+provider:
+  base_url: "https://api.example.com/v1"
+  api_key_env: "K"
+  model: "m"
+`
+	cfg, err := LoadConfig(writeTempYAML(t, yaml))
+	require.NoError(t, err)
+	require.Equal(t, "https://proxy.example.com/v1", cfg.BaseURL)
+}
