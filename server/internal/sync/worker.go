@@ -17,7 +17,6 @@ type Worker struct {
 	queries    *gen.Queries
 	job        *FetchJob
 	aiClient   ai.AIClient
-	targetLang string
 	interval   time.Duration
 	maxWorkers int
 }
@@ -28,7 +27,6 @@ func NewWorker(pool *pgxpool.Pool, adapter source.SourceAdapter, aiClient ai.AIC
 		queries:    gen.New(pool),
 		job:        NewFetchJob(pool, adapter),
 		aiClient:   aiClient,
-		targetLang: "zh-CN",
 		interval:   60 * time.Second,
 		maxWorkers: 8,
 	}
@@ -63,6 +61,15 @@ func (w *Worker) tick(ctx context.Context) {
 
 	log.Printf("worker: fetching %d sources", len(sources))
 
+	var targetLanguages []string
+	if w.aiClient != nil {
+		targetLanguages, err = w.queries.ListDistinctNativeLanguages(ctx)
+		if err != nil {
+			log.Printf("worker: list native languages for eager AI: %v", err)
+			targetLanguages = nil
+		}
+	}
+
 	sem := make(chan struct{}, w.maxWorkers)
 	var wg sync.WaitGroup
 
@@ -82,11 +89,13 @@ func (w *Worker) tick(ctx context.Context) {
 				log.Printf("worker: source %d (%s): %d new articles", s.ID, s.Title, inserted)
 			}
 
-			if w.aiClient != nil {
+			if w.aiClient != nil && len(targetLanguages) > 0 {
 				for _, aid := range articleIDs {
-					job := ai.NewEagerJob(w.pool, w.aiClient, aid, w.targetLang)
-					if err := job.Run(ctx); err != nil {
-						log.Printf("worker: eager AI for article %d: %v", aid, err)
+					for _, targetLang := range targetLanguages {
+						job := ai.NewEagerJob(w.pool, w.aiClient, aid, targetLang)
+						if err := job.Run(ctx); err != nil {
+							log.Printf("worker: eager AI for article %d (%s): %v", aid, targetLang, err)
+						}
 					}
 				}
 			}

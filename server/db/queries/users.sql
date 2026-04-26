@@ -23,6 +23,12 @@ SET native_language = COALESCE(NULLIF($2, ''), native_language),
 WHERE id = $1
 RETURNING *;
 
+-- name: ListDistinctNativeLanguages :many
+SELECT DISTINCT native_language
+FROM users
+WHERE native_language <> ''
+ORDER BY native_language;
+
 -- name: UpdateUserRole :exec
 UPDATE users SET role = $2 WHERE id = $1;
 

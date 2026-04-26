@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jin/xreader-web/db/gen"
 	"github.com/jin/xreader-web/internal/ai"
 )
 
@@ -22,8 +23,18 @@ func main() {
 		log.Fatal(err)
 	}
 	client := ai.NewClient(cfg)
+	queries := gen.New(pool)
 
 	ctx := context.Background()
+	targetLanguages, err := queries.ListDistinctNativeLanguages(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(targetLanguages) == 0 {
+		log.Println("no native languages configured; nothing to backfill")
+		return
+	}
+
 	rows, err := pool.Query(ctx, "SELECT id, title FROM articles ORDER BY id")
 	if err != nil {
 		log.Fatal(err)
@@ -43,14 +54,16 @@ func main() {
 		articles = append(articles, a)
 	}
 
-	fmt.Printf("Processing %d articles...\n", len(articles))
+	fmt.Printf("Processing %d articles for %d target languages...\n", len(articles), len(targetLanguages))
 	for _, a := range articles {
-		job := ai.NewEagerJob(pool, client, a.ID, "zh-CN")
-		if err := job.Run(ctx); err != nil {
-			log.Printf("article %d (%s): %v", a.ID, a.Title, err)
-			continue
+		for _, targetLang := range targetLanguages {
+			job := ai.NewEagerJob(pool, client, a.ID, targetLang)
+			if err := job.Run(ctx); err != nil {
+				log.Printf("article %d (%s) target %s: %v", a.ID, a.Title, targetLang, err)
+				continue
+			}
+			fmt.Printf("article %d target %s: done\n", a.ID, targetLang)
 		}
-		fmt.Printf("article %d: done\n", a.ID)
 	}
 	fmt.Println("Backfill complete.")
 }

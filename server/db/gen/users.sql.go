@@ -125,6 +125,33 @@ func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
 	return i, err
 }
 
+const listDistinctNativeLanguages = `-- name: ListDistinctNativeLanguages :many
+SELECT DISTINCT native_language
+FROM users
+WHERE native_language <> ''
+ORDER BY native_language
+`
+
+func (q *Queries) ListDistinctNativeLanguages(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listDistinctNativeLanguages)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var native_language string
+		if err := rows.Scan(&native_language); err != nil {
+			return nil, err
+		}
+		items = append(items, native_language)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const touchSession = `-- name: TouchSession :exec
 UPDATE auth_sessions SET last_seen_at = now() WHERE id = $1
 `

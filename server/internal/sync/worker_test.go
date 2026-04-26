@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jin/xreader-web/db/gen"
+	"github.com/jin/xreader-web/internal/ai"
 	"github.com/jin/xreader-web/internal/source"
 	"github.com/jin/xreader-web/internal/testutil"
 	"github.com/stretchr/testify/require"
@@ -231,4 +232,57 @@ func TestFetchJob_DoesNotApplyInitialBacklogRuleAfterFirstSuccess(t *testing.T) 
 	`, src.ID, src.UserID).Scan(&unreadCount)
 	require.NoError(t, err)
 	require.Equal(t, 1, unreadCount)
+}
+
+func TestWorker_EagerAIFansOutToDistinctNativeLanguages(t *testing.T) {
+	ctx := context.Background()
+	pool, cleanup := testutil.SetupTestDB(t, ctx)
+	t.Cleanup(cleanup)
+
+	src := setupTestSource(t, pool, ctx)
+	_, err := pool.Exec(ctx,
+		"INSERT INTO users (github_id, github_username, role, native_language) VALUES ($1, $2, $3, $4)",
+		2, "japanese-reader", "user", "ja-JP",
+	)
+	require.NoError(t, err)
+
+	adapter := &mockAdapter{
+		items: []source.RawItem{
+			{
+				ExternalID:   "multilang-1",
+				Link:         "https://example.com/multilang-1",
+				Title:        "A tiny English update",
+				ContentHTML:  "<p>A tiny English update.</p>",
+				LanguageHint: "en",
+				PublishedAt:  time.Now(),
+			},
+		},
+	}
+	client := &ai.MockClient{Response: ai.ChatResponse{Content: "translated"}}
+	worker := NewWorker(pool, adapter, client)
+
+	worker.tick(ctx)
+
+	var articleID int64
+	err = pool.QueryRow(ctx, "SELECT id FROM articles WHERE source_id = $1", src.ID).Scan(&articleID)
+	require.NoError(t, err)
+
+	rows, err := pool.Query(ctx, `
+		SELECT target_language
+		FROM article_ai
+		WHERE article_id = $1
+		ORDER BY target_language
+	`, articleID)
+	require.NoError(t, err)
+	defer rows.Close()
+
+	var languages []string
+	for rows.Next() {
+		var lang string
+		require.NoError(t, rows.Scan(&lang))
+		languages = append(languages, lang)
+	}
+	require.NoError(t, rows.Err())
+
+	require.Equal(t, []string{"ja-JP", "zh-CN"}, languages)
 }

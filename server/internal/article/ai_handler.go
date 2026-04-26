@@ -38,7 +38,10 @@ func (h *AIHandler) GetArticleAI(c *gin.Context) {
 		return
 	}
 
-	lang := c.DefaultQuery("lang", "zh-CN")
+	lang := c.Query("lang")
+	if lang == "" {
+		lang = user.NativeLanguage
+	}
 
 	row, err := h.queries.GetArticleAI(c.Request.Context(), gen.GetArticleAIParams{
 		ArticleID:      articleID,
