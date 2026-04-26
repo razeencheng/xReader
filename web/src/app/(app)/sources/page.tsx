@@ -57,11 +57,19 @@ function truncateUrl(url: string, maxLength = 48) {
 }
 
 function healthState(source: Source) {
-  if (source.consecutive_fails <= 0) {
+  if (source.health === 'ok' || source.health === 'healthy') {
     return { label: 'healthy', dotClass: 'bg-emerald-500' };
   }
 
-  if (source.consecutive_fails < 4) {
+  if (source.health === 'warn' || source.health === 'degraded' || source.health === 'unknown') {
+    return { label: 'degraded', dotClass: 'bg-amber-500' };
+  }
+
+  if (!source.health && source.consecutive_fails <= 0) {
+    return { label: 'healthy', dotClass: 'bg-emerald-500' };
+  }
+
+  if (!source.health && source.consecutive_fails < 6) {
     return { label: 'degraded', dotClass: 'bg-amber-500' };
   }
 
@@ -265,8 +273,13 @@ export function SourcesPage() {
   }
 
   async function handleRefresh(sourceId: number) {
-    await refreshSource.mutateAsync(sourceId);
-    setMessage({ kind: 'success', text: t('sources.refreshTriggered') });
+    try {
+      await refreshSource.mutateAsync(sourceId);
+      setMessage({ kind: 'success', text: t('sources.refreshTriggered') });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : t('sources.refreshFailed');
+      setMessage({ kind: 'error', text: detail });
+    }
   }
 
   async function handleImport() {

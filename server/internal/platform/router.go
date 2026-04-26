@@ -81,6 +81,7 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		// Articles
 		articleSvc := article.NewArticleService(deps.Pool)
 		articleH := article.NewArticleHandler(articleSvc)
+		imageProxyH := article.NewImageProxyHandler()
 		authed.GET("/articles", articleH.List)
 		authed.GET("/articles/:id", articleH.GetByID)
 		authed.POST("/articles/:id/original", articleH.LoadOriginal)
@@ -89,6 +90,7 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		authed.POST("/articles/batch-state", articleH.BatchState)
 		authed.POST("/articles/batch/state", articleH.BatchState)
 		authed.GET("/articles/changes", articleH.Changes)
+		authed.GET("/images/proxy", imageProxyH.Proxy)
 
 		// Article AI
 		aiH := article.NewAIHandler(deps.Pool)

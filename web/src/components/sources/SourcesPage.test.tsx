@@ -3,12 +3,20 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useUIStore } from '@/stores/useUIStore';
 
+const queryState = vi.hoisted(() => ({
+  sources: [] as unknown[],
+  refreshSource: {
+    mutateAsync: vi.fn(),
+    isPending: false,
+  },
+}));
+
 vi.mock('@/lib/queries/sources', () => ({
-  useSources: () => ({ data: [], isLoading: false, isFetching: false }),
+  useSources: () => ({ data: queryState.sources, isLoading: false, isFetching: false }),
   useCreateSource: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useRenameSource: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteSource: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useRefreshSource: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useRefreshSource: () => queryState.refreshSource,
   useSourceImportJob: () => ({ data: null, isFetching: false }),
 }));
 
@@ -19,6 +27,10 @@ vi.mock('@/lib/api-client', () => ({
 import { SourcesPage } from '@/app/(app)/sources/page';
 
 beforeEach(() => {
+  queryState.sources = [];
+  queryState.refreshSource.mutateAsync.mockReset();
+  queryState.refreshSource.mutateAsync.mockResolvedValue(undefined);
+  queryState.refreshSource.isPending = false;
   useUIStore.setState({ nativeLanguage: 'zh-CN' });
 });
 
@@ -68,4 +80,51 @@ test('SourcesPage shows selected OPML file name after choosing a file', async ()
   await user.upload(input, file);
 
   expect(await screen.findByText('subscriptions.opml')).toBeInTheDocument();
+});
+
+test('SourcesPage renders backend health and last fetch metadata', () => {
+  queryState.sources = [
+    {
+      id: 1,
+      title: "Let's Encrypt",
+      url: 'https://letsencrypt.org/feed.xml',
+      category: 'General',
+      icon_url: null,
+      unread_count: 0,
+      last_fetched_at: new Date().toISOString(),
+      last_success_at: new Date(Date.now() - 60_000).toISOString(),
+      consecutive_fails: 4,
+      health: 'warn',
+    },
+  ];
+
+  render(<SourcesPage />, { wrapper });
+
+  expect(screen.getByText('不稳定')).toBeInTheDocument();
+  expect(screen.queryByText('错误')).not.toBeInTheDocument();
+  expect(screen.getByText(/上次抓取：刚刚/)).toBeInTheDocument();
+});
+
+test('SourcesPage shows refresh errors instead of failing silently', async () => {
+  queryState.sources = [
+    {
+      id: 1,
+      title: "Let's Encrypt",
+      url: 'https://letsencrypt.org/feed.xml',
+      category: 'General',
+      icon_url: null,
+      unread_count: 0,
+      last_fetched_at: null,
+      last_success_at: null,
+      consecutive_fails: 0,
+      health: 'unknown',
+    },
+  ];
+  queryState.refreshSource.mutateAsync.mockRejectedValue(new Error('network down'));
+  const user = userEvent.setup();
+
+  render(<SourcesPage />, { wrapper });
+  await user.click(screen.getByRole('button', { name: '刷新' }));
+
+  expect(await screen.findByText('network down')).toBeInTheDocument();
 });

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jin/xreader-web/internal/middleware"
@@ -100,6 +101,53 @@ func TestHandler_GET_ListsSources(t *testing.T) {
 	var sources []map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &sources))
 	require.Len(t, sources, 1)
+}
+
+func TestHandler_POST_RefreshFetchesSource(t *testing.T) {
+	r, handler, userID, cleanup := setupHandlerTest(t)
+	t.Cleanup(cleanup)
+
+	adapter := handler.Service.adapters["rss"].(*mockAdapter)
+	adapter.fetchItems = []RawItem{
+		{
+			ExternalID:  "refresh-1",
+			Link:        "https://example.com/refresh-1",
+			Title:       "Refresh Item",
+			ContentHTML: "<p>fresh</p>",
+			PublishedAt: time.Now(),
+		},
+	}
+
+	r.Use(withUser(userID))
+	r.POST("/api/sources", handler.Create)
+	r.POST("/api/sources/:id/refresh", handler.Refresh)
+	r.GET("/api/sources", handler.List)
+
+	body, _ := json.Marshal(createSourceRequest{URL: "https://example.com/feed.xml"})
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/sources", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusCreated, w.Code)
+
+	var created map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &created))
+
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/sources/"+formatID(created["id"])+"/refresh", nil)
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusAccepted, w.Code)
+
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/sources", nil)
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var sources []map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &sources))
+	require.Equal(t, "ok", sources[0]["health"])
+	require.EqualValues(t, 0, sources[0]["consecutive_fails"])
+	require.NotEmpty(t, sources[0]["last_fetched_at"])
 }
 
 func TestHandler_DELETE_OwnerOnly(t *testing.T) {

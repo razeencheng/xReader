@@ -123,7 +123,24 @@ func (h *SourceHandler) Delete(c *gin.Context) {
 }
 
 func (h *SourceHandler) Refresh(c *gin.Context) {
-	c.JSON(http.StatusAccepted, gin.H{"status": "refresh queued"})
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	user := middleware.GetUser(c)
+	inserted, err := h.Service.Refresh(c.Request.Context(), user.ID, id)
+	if err != nil {
+		if err.Error() == "source not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "source not found"})
+			return
+		}
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{"status": "refresh completed", "inserted": inserted})
 }
 
 func (h *SourceHandler) ImportOPML(c *gin.Context) {
@@ -181,4 +198,3 @@ func (h *SourceHandler) ExportOPML(c *gin.Context) {
 
 	c.Data(http.StatusOK, "text/x-opml", data)
 }
-

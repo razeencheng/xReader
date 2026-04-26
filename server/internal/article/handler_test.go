@@ -139,6 +139,52 @@ func TestArticleHandler_LoadOriginalUsesArticleLink(t *testing.T) {
 	require.Equal(t, "<p>Full original paragraph with enough readable text.</p>", resp["content_html"])
 }
 
+func TestImageProxyHandler_ProxiesImage(t *testing.T) {
+	r, _, _, _, userID, _, cleanup := setupArticleHandlerTest(t)
+	t.Cleanup(cleanup)
+
+	handler := NewImageProxyHandler()
+	handler.fetchImage = func(_ context.Context, rawURL string) (ProxiedImage, error) {
+		require.Equal(t, "https://example.com/image.jpg", rawURL)
+		return ProxiedImage{
+			ContentType: "image/jpeg",
+			Body:        []byte("image-bytes"),
+		}, nil
+	}
+
+	r.Use(withArticleUser(userID))
+	r.GET("/api/images/proxy", handler.Proxy)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/images/proxy?url=https%3A%2F%2Fexample.com%2Fimage.jpg", nil)
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "image/jpeg", w.Header().Get("Content-Type"))
+	require.Equal(t, "public, max-age=86400", w.Header().Get("Cache-Control"))
+	require.Equal(t, "image-bytes", w.Body.String())
+}
+
+func TestImageProxyHandler_RejectsMissingURL(t *testing.T) {
+	r, _, _, _, userID, _, cleanup := setupArticleHandlerTest(t)
+	t.Cleanup(cleanup)
+
+	handler := NewImageProxyHandler()
+	handler.fetchImage = func(context.Context, string) (ProxiedImage, error) {
+		t.Fatal("fetchImage should not be called without a url")
+		return ProxiedImage{}, nil
+	}
+
+	r.Use(withArticleUser(userID))
+	r.GET("/api/images/proxy", handler.Proxy)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/images/proxy", nil)
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusBadRequest, w.Code)
+}
+
 func TestArticleService_LoadOriginalPersistsContent(t *testing.T) {
 	_, handler, queries, _, userID, sourceID, cleanup := setupArticleHandlerTest(t)
 	t.Cleanup(cleanup)

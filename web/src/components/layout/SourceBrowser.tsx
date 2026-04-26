@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
+import { SlidersHorizontal } from 'lucide-react';
 import { useUIStore } from '@/stores/useUIStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useQuery } from '@tanstack/react-query';
@@ -110,8 +110,8 @@ export function SourceBrowser() {
             href="/sources"
             className="ui-btn-primary h-8 shrink-0 rounded-[10px] px-2.5 py-1.5 text-[11.5px] font-medium"
           >
-            <Plus size={13} strokeWidth={1.9} />
-            {t('sources.add')}
+            <SlidersHorizontal size={13} strokeWidth={1.9} />
+            {t('sources.manageButton')}
           </Link>
         </div>
       </header>

@@ -89,6 +89,7 @@ const en: MessageMap = {
 
   'sources.title': 'Sources',
   'sources.add': 'Add',
+  'sources.manageButton': 'Manage',
   'sources.unreadFeeds': ({ unread, feeds }) => `${unread} unread · ${feeds} feeds`,
   'sources.allSources': 'All Sources',
   'sources.backHome': 'Back home',
@@ -113,6 +114,7 @@ const en: MessageMap = {
   'sources.hoursAgo': ({ count }) => `${count} hours ago`,
   'sources.daysAgo': ({ count }) => `${count} days ago`,
   'sources.refresh': 'Refresh',
+  'sources.refreshFailed': 'Refresh failed.',
   'sources.delete': 'Delete',
   'sources.opmlTitle': 'OPML Import / Export',
   'sources.opmlDescription': 'Upload OPML and xReader will poll the import job until it finishes.',
@@ -319,6 +321,7 @@ const zh: MessageMap = {
 
   'sources.title': '订阅源',
   'sources.add': '添加',
+  'sources.manageButton': '管理',
   'sources.unreadFeeds': ({ unread, feeds }) => `${unread} 未读 · ${feeds} 个订阅源`,
   'sources.allSources': '所有订阅源',
   'sources.backHome': '返回首页',
@@ -343,6 +346,7 @@ const zh: MessageMap = {
   'sources.hoursAgo': ({ count }) => `${count} 小时前`,
   'sources.daysAgo': ({ count }) => `${count} 天前`,
   'sources.refresh': '刷新',
+  'sources.refreshFailed': '刷新失败。',
   'sources.delete': '删除',
   'sources.opmlTitle': 'OPML 导入 / 导出',
   'sources.opmlDescription': '上传 OPML 后会自动轮询任务状态直到完成。',

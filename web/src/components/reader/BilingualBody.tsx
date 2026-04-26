@@ -58,9 +58,31 @@ function primaryTagFromHtml(html: string) {
   return firstElement?.tagName.toLowerCase() ?? 'p';
 }
 
+function normalizeReaderImages(root: HTMLElement) {
+  root.querySelectorAll('img').forEach((image) => {
+    const src = image.getAttribute('src')?.trim();
+    if (src && /^https?:\/\//i.test(src) && !src.startsWith('/api/images/proxy')) {
+      image.setAttribute('data-original-src', src);
+      image.setAttribute('src', `/api/images/proxy?url=${encodeURIComponent(src)}`);
+    }
+
+    image.setAttribute('loading', 'lazy');
+    image.setAttribute('decoding', 'async');
+
+    const width = Number.parseInt(image.getAttribute('width') ?? '', 10);
+    const height = Number.parseInt(image.getAttribute('height') ?? '', 10);
+    if (width > 0 && height > 0) {
+      const existingStyle = image.getAttribute('style')?.trim();
+      const stableStyle = `aspect-ratio: ${width} / ${height}; max-width: ${width}px !important;`;
+      image.setAttribute('style', existingStyle ? `${existingStyle}; ${stableStyle}` : stableStyle);
+    }
+  });
+}
+
 function splitContentHtml(contentHtml: string) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(`<body>${contentHtml}</body>`, 'text/html');
+  normalizeReaderImages(doc.body);
   const paragraphs: string[] = [];
 
   const pushText = (text: string) => {
@@ -163,15 +185,14 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
       { length: rangeEnd - firstMissingIndex },
       (_, offset) => firstMissingIndex + offset,
     );
+    const loadingIndex = firstMissingIndex === visibleIndex ? visibleIndex : null;
     requestIndices.forEach((index) => requestedIndicesRef.current.add(index));
     setTranslationState((previous) => {
       const nextTranslations = previous.key === resetKey ? previous.translations : new Map<number, string>();
       const nextPending = previous.key === resetKey ? new Set(previous.pending) : new Set<number>();
-      requestIndices.forEach((index) => {
-        if (!nextTranslations.has(index)) {
-          nextPending.add(index);
-        }
-      });
+      if (loadingIndex !== null && !nextTranslations.has(loadingIndex)) {
+        nextPending.add(loadingIndex);
+      }
       return { key: resetKey, translations: nextTranslations, pending: nextPending };
     });
 
@@ -191,7 +212,9 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
           return previous;
         }
         const nextPending = new Set(previous.pending);
-        requestIndices.forEach((index) => nextPending.delete(index));
+        if (loadingIndex !== null) {
+          nextPending.delete(loadingIndex);
+        }
         return { ...previous, pending: nextPending };
       });
     };

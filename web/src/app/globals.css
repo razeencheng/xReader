@@ -423,10 +423,11 @@ a {
 
 .reader-content img {
   display: block;
-  width: auto !important;
+  width: 100% !important;
   height: auto;
   max-width: 100% !important;
   margin-inline: auto;
+  object-fit: contain;
 }
 
 .reader-content :is(video, canvas, svg, iframe) {

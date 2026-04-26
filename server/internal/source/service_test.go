@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/jin/xreader-web/internal/testutil"
 	"github.com/stretchr/testify/require"
@@ -12,11 +13,16 @@ import (
 type mockAdapter struct {
 	validateErr  error
 	validateMeta SourceMetadata
+	fetchErr     error
+	fetchItems   []RawItem
 }
 
 func (m *mockAdapter) Kind() string { return "rss" }
 func (m *mockAdapter) Fetch(ctx context.Context, src Source) ([]RawItem, error) {
-	return nil, nil
+	if m.fetchErr != nil {
+		return nil, m.fetchErr
+	}
+	return m.fetchItems, nil
 }
 func (m *mockAdapter) Validate(ctx context.Context, url string) (SourceMetadata, error) {
 	if m.validateErr != nil {
@@ -96,6 +102,79 @@ func TestSourceService_List_TracksUnreadCounts(t *testing.T) {
 	require.Len(t, sources, 1)
 	require.EqualValues(t, 1, sources[0].UnreadCount)
 	require.Equal(t, "Technology", sources[0].Category)
+}
+
+func TestSourceService_List_IncludesFetchHealthMetadata(t *testing.T) {
+	svc, userID, cleanup := setupService(t)
+	t.Cleanup(cleanup)
+	ctx := context.Background()
+
+	src, err := svc.Create(ctx, userID, "https://example.com/feed.xml", "Technology")
+	require.NoError(t, err)
+
+	fetchedAt := time.Now().Add(-2 * time.Hour).UTC().Truncate(time.Microsecond)
+	successAt := time.Now().Add(-3 * time.Hour).UTC().Truncate(time.Microsecond)
+	_, err = svc.pool.Exec(ctx, `
+		UPDATE sources
+		SET last_fetched_at = $2,
+		    last_success_at = $3,
+		    consecutive_fails = 4,
+		    health = 'warn'
+		WHERE id = $1
+	`, src.ID, fetchedAt, successAt)
+	require.NoError(t, err)
+
+	sources, err := svc.List(ctx, userID)
+	require.NoError(t, err)
+	require.Len(t, sources, 1)
+	require.NotNil(t, sources[0].LastFetchedAt)
+	require.NotNil(t, sources[0].LastSuccessAt)
+	require.WithinDuration(t, fetchedAt, *sources[0].LastFetchedAt, time.Second)
+	require.WithinDuration(t, successAt, *sources[0].LastSuccessAt, time.Second)
+	require.EqualValues(t, 4, sources[0].ConsecutiveFails)
+	require.Equal(t, "warn", sources[0].Health)
+}
+
+func TestSourceService_Refresh_FetchesNowAndResetsHealth(t *testing.T) {
+	ctx := context.Background()
+	pool, cleanup := testutil.SetupTestDB(t, ctx)
+	t.Cleanup(cleanup)
+
+	var userID int64
+	err := pool.QueryRow(ctx,
+		"INSERT INTO users (github_id, github_username, role) VALUES ($1, $2, $3) RETURNING id",
+		1, "testuser", "user",
+	).Scan(&userID)
+	require.NoError(t, err)
+
+	adapter := &mockAdapter{
+		validateMeta: SourceMetadata{Title: "Test Feed", LanguageHint: "en"},
+		fetchItems: []RawItem{
+			{
+				ExternalID:   "manual-1",
+				Link:         "https://example.com/manual-1",
+				Title:        "Manual Refresh",
+				ContentHTML:  "<p>fresh</p>",
+				LanguageHint: "en",
+				PublishedAt:  time.Now(),
+			},
+		},
+	}
+	svc := NewSourceService(pool, adapter)
+	src, err := svc.Create(ctx, userID, "https://example.com/feed.xml", "")
+	require.NoError(t, err)
+
+	inserted, err := svc.Refresh(ctx, userID, src.ID)
+	require.NoError(t, err)
+	require.Equal(t, 1, inserted)
+
+	sources, err := svc.List(ctx, userID)
+	require.NoError(t, err)
+	require.Len(t, sources, 1)
+	require.NotNil(t, sources[0].LastFetchedAt)
+	require.NotNil(t, sources[0].LastSuccessAt)
+	require.EqualValues(t, 0, sources[0].ConsecutiveFails)
+	require.Equal(t, "ok", sources[0].Health)
 }
 
 func TestSourceService_Create_DuplicateURL_ReturnsError(t *testing.T) {

@@ -2,9 +2,12 @@ package source
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jin/xreader-web/db/gen"
@@ -17,12 +20,16 @@ type SourceService struct {
 }
 
 type SourceListItem struct {
-	ID          int64   `json:"id"`
-	Title       string  `json:"title"`
-	Url         string  `json:"url"`
-	Category    string  `json:"category"`
-	IconURL     *string `json:"icon_url,omitempty"`
-	UnreadCount int64   `json:"unread_count"`
+	ID               int64      `json:"id"`
+	Title            string     `json:"title"`
+	Url              string     `json:"url"`
+	Category         string     `json:"category"`
+	IconURL          *string    `json:"icon_url,omitempty"`
+	LastFetchedAt    *time.Time `json:"last_fetched_at"`
+	LastSuccessAt    *time.Time `json:"last_success_at"`
+	ConsecutiveFails int32      `json:"consecutive_fails"`
+	Health           string     `json:"health"`
+	UnreadCount      int64      `json:"unread_count"`
 }
 
 func NewSourceService(pool *pgxpool.Pool, adapters ...SourceAdapter) *SourceService {
@@ -47,12 +54,16 @@ func (s *SourceService) List(ctx context.Context, userID int64) ([]SourceListIte
 	items := make([]SourceListItem, 0, len(sources))
 	for _, source := range sources {
 		items = append(items, SourceListItem{
-			ID:          source.ID,
-			Title:       source.Title,
-			Url:         source.Url,
-			Category:    defaultCategory(source.Category),
-			IconURL:     textPtr(source.IconUrl),
-			UnreadCount: counts[source.ID],
+			ID:               source.ID,
+			Title:            source.Title,
+			Url:              source.Url,
+			Category:         defaultCategory(source.Category),
+			IconURL:          textPtr(source.IconUrl),
+			LastFetchedAt:    timestamptzPtr(source.LastFetchedAt),
+			LastSuccessAt:    timestamptzPtr(source.LastSuccessAt),
+			ConsecutiveFails: source.ConsecutiveFails,
+			Health:           source.Health,
+			UnreadCount:      counts[source.ID],
 		})
 	}
 
@@ -123,6 +134,20 @@ func (s *SourceService) Delete(ctx context.Context, userID int64, sourceID int64
 	return s.queries.SoftDeleteSource(ctx, sourceID)
 }
 
+func (s *SourceService) Refresh(ctx context.Context, userID int64, sourceID int64) (int, error) {
+	src, err := s.queries.GetSourceByID(ctx, sourceID)
+	if err != nil || src.UserID != userID {
+		return 0, fmt.Errorf("source not found")
+	}
+
+	adapter, ok := s.adapters[src.Kind]
+	if !ok {
+		return 0, fmt.Errorf("no adapter for kind %s", src.Kind)
+	}
+
+	return runFetch(ctx, s.queries, adapter, src)
+}
+
 func (s *SourceService) listUnreadCounts(ctx context.Context, userID int64) (map[int64]int64, error) {
 	const query = `
 		SELECT s.id, COUNT(a.id) FILTER (WHERE st.is_read IS NULL OR st.is_read = false) AS unread_count
@@ -176,10 +201,119 @@ func textPtr(value pgtype.Text) *string {
 	return &trimmed
 }
 
+func timestamptzPtr(value pgtype.Timestamptz) *time.Time {
+	if !value.Valid {
+		return nil
+	}
+
+	t := value.Time
+	return &t
+}
+
 func defaultCategory(category string) string {
 	trimmed := strings.TrimSpace(category)
 	if trimmed == "" {
 		return "General"
 	}
 	return trimmed
+}
+
+func runFetch(ctx context.Context, queries *gen.Queries, adapter SourceAdapter, src gen.Source) (inserted int, err error) {
+	isInitialFetch := !src.LastSuccessAt.Valid
+	adapterSrc := Source{
+		ID:            src.ID,
+		URL:           src.Url,
+		NormalizedURL: src.NormalizedUrl,
+		Title:         src.Title,
+		Kind:          src.Kind,
+	}
+
+	items, fetchErr := adapter.Fetch(ctx, adapterSrc)
+	now := pgtype.Timestamptz{Time: time.Now(), Valid: true}
+
+	if fetchErr != nil {
+		fails := src.ConsecutiveFails + 1
+		health := "warn"
+		if fails >= 6 {
+			health = "fail"
+		}
+		_ = queries.UpdateSourceFetchStatus(ctx, gen.UpdateSourceFetchStatusParams{
+			ID:               src.ID,
+			LastFetchedAt:    now,
+			LastSuccessAt:    src.LastSuccessAt,
+			ConsecutiveFails: fails,
+			Health:           health,
+		})
+		return 0, fmt.Errorf("fetch source %d: %w", src.ID, fetchErr)
+	}
+
+	for _, item := range items {
+		normalizedLink, normErr := Normalize(item.Link)
+		if normErr != nil {
+			continue
+		}
+
+		lang := item.LanguageHint
+		if lang == "" {
+			lang = "unknown"
+		}
+
+		_, upsertErr := queries.UpsertArticle(ctx, gen.UpsertArticleParams{
+			SourceID:       src.ID,
+			ExternalID:     item.ExternalID,
+			Link:           item.Link,
+			NormalizedLink: normalizedLink,
+			Title:          item.Title,
+			Language:       lang,
+			ContentHtml:    item.ContentHTML,
+			ContentText:    stripHTMLText(item.ContentHTML),
+			Author:         pgtype.Text{},
+			PublishedAt:    pgtype.Timestamptz{Time: item.PublishedAt, Valid: true},
+			FetchedAt:      now,
+		})
+		if upsertErr != nil {
+			if errors.Is(upsertErr, pgx.ErrNoRows) {
+				continue
+			}
+			continue
+		}
+		inserted++
+	}
+
+	if isInitialFetch {
+		if _, markErr := queries.MarkInitialSourceBacklogRead(ctx, src.ID); markErr != nil {
+			return inserted, fmt.Errorf("mark initial backlog read for source %d: %w", src.ID, markErr)
+		}
+	}
+
+	if updateErr := queries.UpdateSourceFetchStatus(ctx, gen.UpdateSourceFetchStatusParams{
+		ID:               src.ID,
+		LastFetchedAt:    now,
+		LastSuccessAt:    now,
+		ConsecutiveFails: 0,
+		Health:           "ok",
+	}); updateErr != nil {
+		return inserted, fmt.Errorf("update source %d fetch status: %w", src.ID, updateErr)
+	}
+
+	return inserted, nil
+}
+
+func stripHTMLText(html string) string {
+	var b strings.Builder
+	inTag := false
+	for _, r := range html {
+		if r == '<' {
+			inTag = true
+			continue
+		}
+		if r == '>' {
+			inTag = false
+			continue
+		}
+		if !inTag {
+			b.WriteRune(r)
+		}
+	}
+	return strings.TrimSpace(b.String())
 }

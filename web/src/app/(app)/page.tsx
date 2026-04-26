@@ -169,31 +169,15 @@ function FeedPageContent() {
           selectedId ? 'hidden lg:flex' : 'flex w-full lg:w-auto'
         }`}
       >
-        <AnimatePresence mode="popLayout" initial={false}>
-          {showSourceBrowser ? (
-            <motion.div
-              key="source-browser"
-              initial={{ x: -8, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: -8, opacity: 0 }}
-              transition={{ duration: 0.18 }}
-              className="h-full w-full"
-            >
-              <SourceBrowser />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="article-list"
-              initial={{ x: 8, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 8, opacity: 0 }}
-              transition={{ duration: 0.18 }}
-              className="flex h-full w-full flex-col"
-            >
-              <FeedList onOpenArticle={handleOpenArticle} selectedArticleId={selectedArticleIdForList} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {showSourceBrowser ? (
+          <div className="h-full w-full">
+            <SourceBrowser />
+          </div>
+        ) : (
+          <div className="flex h-full w-full flex-col">
+            <FeedList onOpenArticle={handleOpenArticle} selectedArticleId={selectedArticleIdForList} />
+          </div>
+        )}
       </motion.div>
 
       <main className={`relative h-full min-w-0 flex-1 overflow-hidden bg-[var(--bg)] ${selectedId ? 'block' : 'hidden lg:block'}`}>

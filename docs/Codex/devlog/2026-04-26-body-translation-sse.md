@@ -31,3 +31,25 @@
 - The SSE endpoint now serves cached paragraphs for the requested range immediately, translates only missing paragraphs, and merges partial results back into `article_ai.body_translation_content`.
 - Partial caches keep `body_translation_status = 'processing'`; the status becomes `done` only when every paragraph is cached.
 - Updated the design spec and implementation plan to describe range SSE, partial cache semantics, and viewport-driven prefetch.
+
+## Source Management UI Fixes
+
+**Date:** 2026-04-26
+**Scope:** Source browser and source management page
+
+### Summary
+
+- Fixed `/api/sources` list items to include `last_fetched_at`, `last_success_at`, `consecutive_fails`, and `health`, so the management page no longer renders successful sources as `错误 / 从未`.
+- Implemented manual `POST /api/sources/:id/refresh` fetch logic instead of returning a placeholder queued response.
+- Changed the source browser `/sources` action from `添加` to `管理` and switched the icon to match the management destination.
+- Removed the article-list/source-browser crossfade that could keep the old feed filter UI mounted for one frame while entering the source view.
+- Added refresh failure feedback on the source management page.
+
+### Verification
+
+- `cd server && go test ./internal/source -count=1` passed.
+- `cd server && go test ./internal/source/... ./internal/sync/... ./internal/platform/... -count=1` passed.
+- `cd web && pnpm vitest run src/components/sources/SourcesPage.test.tsx src/components/layout/SourceBrowser.test.tsx src/app/'(app)'/page.test.tsx src/lib/i18n.test.ts` passed.
+- `cd web && pnpm build` passed.
+- `docker compose up -d --build api web` succeeded.
+- Browser verified `/sources` shows `健康` and `上次抓取：刚刚`; source browser action now shows `管理`.

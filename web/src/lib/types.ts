@@ -22,6 +22,7 @@ export interface Source {
   url: string;
   icon_url?: string | null;
   last_fetched_at: string | null;
+  last_success_at?: string | null;
   consecutive_fails: number;
   health: string;
   category: string;

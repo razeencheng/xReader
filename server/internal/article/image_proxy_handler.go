@@ -1,0 +1,118 @@
+package article
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/gin-gonic/gin"
+)
+
+const (
+	imageProxyTimeout = 8 * time.Second
+	imageProxyMaxBody = 8 * 1024 * 1024
+)
+
+type ProxiedImage struct {
+	ContentType string
+	Body        []byte
+}
+
+type ImageProxyHandler struct {
+	fetchImage func(context.Context, string) (ProxiedImage, error)
+}
+
+func NewImageProxyHandler() *ImageProxyHandler {
+	return &ImageProxyHandler{fetchImage: fetchProxiedImage}
+}
+
+func (h *ImageProxyHandler) Proxy(c *gin.Context) {
+	rawURL := strings.TrimSpace(c.Query("url"))
+	if rawURL == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing url"})
+		return
+	}
+
+	image, err := h.fetchImage(c.Request.Context(), rawURL)
+	if err != nil {
+		status := http.StatusBadGateway
+		if errors.Is(err, errOriginalUnsupportedURL) || errors.Is(err, errOriginalUnsafeURL) {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{"error": "failed to proxy image"})
+		return
+	}
+
+	contentType := image.ContentType
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	c.Header("Content-Type", contentType)
+	c.Header("Cache-Control", "public, max-age=86400")
+	c.Writer.WriteHeader(http.StatusOK)
+	_, _ = c.Writer.Write(image.Body)
+}
+
+func fetchProxiedImage(ctx context.Context, rawURL string) (ProxiedImage, error) {
+	u, err := parseSafeOriginalURL(rawURL)
+	if err != nil {
+		return ProxiedImage{}, err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, imageProxyTimeout)
+	defer cancel()
+
+	client := &http.Client{
+		Timeout: imageProxyTimeout,
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&safeDialer{
+				resolver: net.DefaultResolver,
+				dialer:   &net.Dialer{Timeout: 3 * time.Second},
+			}).DialContext,
+		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 5 {
+				return errors.New("too many redirects")
+			}
+			_, err := parseSafeOriginalURL(req.URL.String())
+			return err
+		},
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return ProxiedImage{}, err
+	}
+	req.Header.Set("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8")
+	req.Header.Set("User-Agent", "xReader image proxy")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return ProxiedImage{}, fmt.Errorf("fetch image: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return ProxiedImage{}, fmt.Errorf("fetch image: status %d", resp.StatusCode)
+	}
+
+	contentType := strings.ToLower(resp.Header.Get("Content-Type"))
+	if contentType != "" && !strings.HasPrefix(contentType, "image/") {
+		return ProxiedImage{}, fmt.Errorf("fetch image: unsupported content type %s", contentType)
+	}
+	if strings.HasPrefix(contentType, "image/svg") {
+		return ProxiedImage{}, fmt.Errorf("fetch image: unsupported content type %s", contentType)
+	}
+
+	body, err := readLimited(resp.Body, imageProxyMaxBody)
+	if err != nil {
+		return ProxiedImage{}, err
+	}
+
+	return ProxiedImage{ContentType: resp.Header.Get("Content-Type"), Body: body}, nil
+}
