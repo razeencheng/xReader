@@ -105,7 +105,6 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		}
 		sseH := article.NewSSEHandler(deps.Pool, aiClient, 3)
 		authed.GET("/articles/:id/body-translation", sseH.BodyTranslation)
-		authed.POST("/articles/:id/body-translation", sseH.BatchTranslate)
 		bodyRetryH := article.NewBodyRetryHandler(deps.Pool)
 		authed.POST("/articles/:id/body-translation/retry", bodyRetryH.Retry)
 

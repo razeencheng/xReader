@@ -1,10 +1,36 @@
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { act, render, screen } from '@testing-library/react';
 
-const useLazyTranslation = vi.fn();
+const sse = vi.hoisted(() => {
+  let paragraphHandler: ((paragraph: { index: number; translation: string }) => void) | null = null;
+  let doneHandler: (() => void) | null = null;
+  const close = vi.fn();
+  const createSSEClient = vi.fn(() => ({
+    onParagraph: (callback: typeof paragraphHandler) => {
+      paragraphHandler = callback;
+    },
+    onDone: (callback: typeof doneHandler) => {
+      doneHandler = callback;
+    },
+    onError: vi.fn(),
+    close,
+  }));
 
-vi.mock('@/hooks/useLazyTranslation', () => ({
-  useLazyTranslation: (...args: unknown[]) => useLazyTranslation(...args),
+  return {
+    createSSEClient,
+    close,
+    pushParagraph: (paragraph: { index: number; translation: string }) => paragraphHandler?.(paragraph),
+    pushDone: () => doneHandler?.(),
+    reset: () => {
+      paragraphHandler = null;
+      doneHandler = null;
+      close.mockReset();
+      createSSEClient.mockClear();
+    },
+  };
+});
+
+vi.mock('@/lib/sse-client', () => ({
+  createSSEClient: sse.createSSEClient,
 }));
 
 import { BilingualBody } from './BilingualBody';
@@ -13,16 +39,11 @@ import { useUIStore } from '@/stores/useUIStore';
 const contentHtml = '<p>First paragraph</p><p>Second paragraph</p>';
 
 beforeEach(() => {
-  useLazyTranslation.mockReset();
+  sse.reset();
   useUIStore.setState({ nativeLanguage: 'zh-CN' });
 });
 
 test('renders original paragraphs without translation controls in same-language mode', () => {
-  useLazyTranslation.mockReturnValue({
-    translations: new Map(),
-    observeRef: () => () => undefined,
-  });
-
   render(
     <BilingualBody articleId={1} contentHtml={contentHtml} language="zh-CN" nativeLanguage="zh" />,
   );
@@ -30,36 +51,34 @@ test('renders original paragraphs without translation controls in same-language 
   expect(screen.getByText('First paragraph')).toBeInTheDocument();
   expect(screen.getByText('Second paragraph')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /翻译段落/i })).not.toBeInTheDocument();
+  expect(sse.createSSEClient).not.toHaveBeenCalled();
 });
 
-test('toggles paragraph translation from a dedicated button', async () => {
-  useLazyTranslation.mockReturnValue({
-    translations: new Map([[0, '第一段翻译']]),
-    observeRef: () => () => undefined,
-  });
-
-  const user = userEvent.setup();
+test('opens an SSE stream and renders translations automatically as paragraphs arrive', () => {
   render(
     <BilingualBody articleId={1} contentHtml={contentHtml} language="en" nativeLanguage="zh-CN" />,
   );
 
-  const buttons = screen.getAllByRole('button', { name: /翻译段落/i });
-  expect(buttons).toHaveLength(2);
+  expect(screen.getByText('First paragraph')).toBeInTheDocument();
+  expect(screen.getByText('Second paragraph')).toBeInTheDocument();
+  expect(sse.createSSEClient).toHaveBeenCalledWith('/api/articles/1/body-translation');
+  expect(screen.queryByRole('button', { name: /翻译段落/i })).not.toBeInTheDocument();
+  expect(screen.getByTestId('translation-loading')).toBeInTheDocument();
 
-  await user.click(buttons[0]);
+  act(() => {
+    sse.pushParagraph({ index: 0, translation: '第一段翻译' });
+  });
   expect(screen.getByText('第一段翻译')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /隐藏翻译/i })).toBeInTheDocument();
+  expect(screen.getByTestId('translation-loading')).toBeInTheDocument();
 
-  await user.click(screen.getByRole('button', { name: /隐藏翻译/i }));
-  expect(screen.queryByText('第一段翻译')).not.toBeInTheDocument();
+  act(() => {
+    sse.pushParagraph({ index: 1, translation: '第二段翻译' });
+  });
+  expect(screen.getByText('第二段翻译')).toBeInTheDocument();
+  expect(screen.queryByTestId('translation-loading')).not.toBeInTheDocument();
 });
 
 test('marks semantic article blocks so the reader stylesheet can preserve hierarchy', () => {
-  useLazyTranslation.mockReturnValue({
-    translations: new Map(),
-    observeRef: () => () => undefined,
-  });
-
   const { container } = render(
     <BilingualBody
       articleId={1}

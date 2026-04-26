@@ -1,8 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Languages } from 'lucide-react';
-import { useLazyTranslation } from '@/hooks/useLazyTranslation';
+import { useEffect, useMemo, useState } from 'react';
+import { createSSEClient } from '@/lib/sse-client';
 import { fontForLang } from '@/lib/langFonts';
 import { isSameLanguage } from '@/lib/article-meta';
 import { useI18n } from '@/lib/i18n';
@@ -110,31 +109,53 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
   const sameLanguage = isSameLanguage(language, nativeLanguage);
   const originalFont = fontForLang(language);
   const resetKey = `${articleId}:${language}:${nativeLanguage}:${contentHtml}`;
-  const [translationState, setTranslationState] = useState<{ key: string; open: Set<number> }>({
-    key: resetKey,
-    open: new Set(),
+  const [translationState, setTranslationState] = useState<{
+    key: string;
+    translations: Map<number, string>;
+    isStreaming: boolean;
+  }>({
+    key: '',
+    translations: new Map(),
+    isStreaming: false,
   });
 
-  const openTranslations = translationState.key === resetKey ? translationState.open : new Set<number>();
+  const shouldTranslate = !sameLanguage && paragraphs.length > 0;
+  const translations = translationState.key === resetKey ? translationState.translations : new Map<number, string>();
+  const isStreaming = shouldTranslate && (translationState.key !== resetKey || translationState.isStreaming);
+  const nextPendingIndex = isStreaming ? paragraphs.findIndex((_, index) => !translations.has(index)) : -1;
 
-  const { translations, observeRef } = useLazyTranslation({
-    articleId,
-    paragraphTexts: paragraphs,
-    enabled: !sameLanguage,
-  });
+  useEffect(() => {
+    if (!shouldTranslate) {
+      return;
+    }
 
-  const toggleTranslation = (index: number) => {
-    setTranslationState((previous) => {
-      const next = previous.key === resetKey ? new Set(previous.open) : new Set<number>();
-      if (next.has(index)) {
-        next.delete(index);
-      } else {
-        next.add(index);
-      }
-
-      return { key: resetKey, open: next };
+    const client = createSSEClient(`/api/articles/${articleId}/body-translation`);
+    client.onParagraph((paragraph) => {
+      setTranslationState((previous) => {
+        const next = previous.key === resetKey ? new Map(previous.translations) : new Map<number, string>();
+        next.set(paragraph.index, paragraph.translation);
+        return { key: resetKey, translations: next, isStreaming: true };
+      });
     });
-  };
+    client.onDone(() => {
+      setTranslationState((previous) => ({
+        key: resetKey,
+        translations: previous.key === resetKey ? previous.translations : new Map(),
+        isStreaming: false,
+      }));
+    });
+    client.onError(() => {
+      setTranslationState((previous) => ({
+        key: resetKey,
+        translations: previous.key === resetKey ? previous.translations : new Map(),
+        isStreaming: false,
+      }));
+    });
+
+    return () => {
+      client.close();
+    };
+  }, [articleId, resetKey, shouldTranslate]);
 
   return (
     <div className="reader-content">
@@ -142,8 +163,7 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
         const isCode = /<pre|<code/i.test(paragraph);
         const blockTag = primaryTagFromHtml(paragraph);
         const translation = translations.get(index);
-        const isOpen = openTranslations.has(index);
-        const isLoading = isOpen && !translation;
+        const isLoading = nextPendingIndex === index && !translation;
 
         if (isCode) {
           return (
@@ -159,39 +179,34 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
         return (
           <div
             key={index}
-            ref={observeRef(index)}
             data-block-tag={blockTag}
-            data-layer="original"
-            data-paragraph-index={index}
-            style={{ fontFamily: originalFont }}
+            className="paragraph-container"
           >
-            <div dangerouslySetInnerHTML={{ __html: paragraph }} />
+            <div
+              data-layer="original"
+              data-paragraph-index={index}
+              style={{ fontFamily: originalFont }}
+            >
+              <div dangerouslySetInnerHTML={{ __html: paragraph }} />
+            </div>
 
-            {!sameLanguage ? (
-              <div className="mt-2">
-                {isOpen ? (
-                  <div className="mb-2 border-l-2 border-[var(--accent)] pl-4 text-[0.92em] italic leading-[1.8] text-[var(--text-2)]">
-                    {translation ? (
-                      translation
-                    ) : (
-                      <span className="inline-flex items-center gap-2 text-[11.5px] not-italic text-[var(--text-3)]">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--accent)]" />
-                        {t('reader.translatingParagraph')}
-                      </span>
-                    )}
-                  </div>
-                ) : null}
-
-                <button
-                  type="button"
-                  onClick={() => toggleTranslation(index)}
-                  className={`inline-flex items-center gap-1.5 border-none bg-transparent p-0 text-[11.5px] transition-colors ${
-                    isOpen ? 'text-[var(--accent)]' : 'text-[var(--text-3)] hover:text-[var(--text-2)]'
-                  }`}
-                >
-                  <Languages size={12} />
-                  {isLoading ? t('reader.translatingParagraph') : isOpen ? t('reader.hideTranslation') : t('reader.translateParagraph')}
-                </button>
+            {translation ? (
+              <div
+                data-layer="translation"
+                data-paragraph-index={index}
+                className="mt-2 mb-4 border-l-2 border-[var(--accent)] pl-4 text-[0.92em] leading-[1.8] text-[var(--text)]"
+              >
+                {translation}
+              </div>
+            ) : isLoading ? (
+              <div
+                data-testid="translation-loading"
+                aria-label={t('reader.translatingParagraph')}
+                className="mt-2 mb-4 flex h-5 items-center gap-1 pl-4"
+              >
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--text-3)]" />
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--text-3)] [animation-delay:120ms]" />
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--text-3)] [animation-delay:240ms]" />
               </div>
             ) : null}
           </div>
