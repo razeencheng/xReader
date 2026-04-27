@@ -1,6 +1,9 @@
 package ai
 
-import "time"
+import (
+	"errors"
+	"time"
+)
 
 type Config struct {
 	Provider ProviderConfig `yaml:"provider"`
@@ -25,5 +28,5 @@ type ResolvedConfig struct {
 }
 
 func LoadConfig(path string) (ResolvedConfig, error) {
-	return NewSettingsService(path, nil).LoadResolved(nil)
+	return ResolvedConfig{}, errors.New("AI config files are no longer supported; configure the provider in Settings")
 }

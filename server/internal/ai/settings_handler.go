@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jin/xreader-web/internal/middleware"
 )
 
 type SettingsHandler struct {
@@ -30,6 +31,16 @@ type settingsUpdateRequest struct {
 }
 
 func (h *SettingsHandler) Update(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+	if user.Role != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "admin required"})
+		return
+	}
+
 	var req settingsUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
@@ -37,9 +48,10 @@ func (h *SettingsHandler) Update(c *gin.Context) {
 	}
 
 	settings, err := h.service.Update(c.Request.Context(), SettingsUpdate{
-		Endpoint: req.Endpoint,
-		Model:    req.Model,
-		APIKey:   req.APIKey,
+		Endpoint:        req.Endpoint,
+		Model:           req.Model,
+		APIKey:          req.APIKey,
+		UpdatedByUserID: user.ID,
 	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

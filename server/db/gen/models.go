@@ -8,6 +8,18 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AiProviderSetting struct {
+	ID               int16              `json:"id"`
+	Endpoint         string             `json:"endpoint"`
+	Model            string             `json:"model"`
+	ApiKeyCiphertext []byte             `json:"api_key_ciphertext"`
+	ApiKeyNonce      []byte             `json:"api_key_nonce"`
+	ApiKeyHint       string             `json:"api_key_hint"`
+	UpdatedByUserID  pgtype.Int8        `json:"updated_by_user_id"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Article struct {
 	ID             int64              `json:"id"`
 	SourceID       int64              `json:"source_id"`

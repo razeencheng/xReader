@@ -120,3 +120,29 @@
 - `cd web && pnpm build` passed.
 - `docker compose up -d --build web` succeeded.
 - Browser verified article `16799` shows `阅读原文` inline in the title metadata area and `/highlights` opens from the top navigation, lists saved highlights, and links back to `/read/<id>#highlight-<id>`.
+
+## Database Backed AI Provider Settings
+
+**Date:** 2026-04-26
+**Scope:** Model integration settings persistence and access control
+
+### Summary
+
+- Replaced Redis-backed AI provider overrides with a Postgres `ai_provider_settings` table.
+- Encrypted API Key storage at rest with AES-GCM and persisted only a masked key hint for Settings-page display.
+- Removed the AI YAML/env runtime path from API, worker, docker compose, and `.env.example`; the Settings page is now the canonical configuration surface.
+- Restricted `PATCH /api/ai/settings` to admin users while keeping masked settings readable by authenticated users.
+- Updated the design spec and implementation plan to document database-backed provider settings instead of file/env AI configuration.
+
+### Verification
+
+- `cd server && go test ./internal/ai -run 'TestSettings|TestPostgresSettings|TestLoadConfig' -count=1` passed.
+- `cd server && go test ./...` passed.
+- `cd web && pnpm vitest run` passed: 35 files, 106 tests.
+- `cd server && go build ./...` passed.
+- `cd web && pnpm build` passed.
+- `cd server && go vet ./...` passed.
+- `cd web && pnpm exec eslint src/app/'(app)'/settings/page.tsx src/components/settings/SettingsPage.test.tsx src/lib/i18n.ts` passed.
+- `DATABASE_URL='postgres://xreader:xreader@localhost:5432/xreader?sslmode=disable' make migrate-up` applied migration `007_ai_provider_settings`.
+- `docker compose up -d --build api worker web` succeeded.
+- Browser verified `/settings` shows the database-backed model integration section, no configured API Key, and the non-admin read-only notice.

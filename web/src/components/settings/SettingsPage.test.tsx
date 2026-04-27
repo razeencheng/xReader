@@ -153,3 +153,20 @@ test('renders and saves model integration settings', async () => {
     });
   });
 });
+
+test('renders model integration settings as read-only for non-admin users', async () => {
+  authState = {
+    ...authState,
+    user: {
+      ...authState.user,
+      role: 'user',
+    },
+  };
+  renderPage();
+
+  expect(await screen.findByDisplayValue('https://newapi.razeen.cn/v1')).toBeDisabled();
+  expect(screen.getByLabelText('模型')).toBeDisabled();
+  expect(screen.getByLabelText('API Key')).toBeDisabled();
+  expect(screen.getByText('仅管理员可以修改模型接入设置。')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '保存模型接入设置' })).not.toBeInTheDocument();
+});

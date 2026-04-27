@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
 import { useI18n } from '@/lib/i18n';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 interface AISettings {
   endpoint: string;
@@ -16,6 +17,7 @@ interface AISettings {
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { t } = useI18n();
+  const isAdmin = useAuthStore((state) => state.user?.role === 'admin');
   const [endpoint, setEndpoint] = useState('');
   const [model, setModel] = useState('');
   const [apiKey, setAPIKey] = useState('');
@@ -28,8 +30,15 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!aiSettings) return;
-    setEndpoint(aiSettings.endpoint);
-    setModel(aiSettings.model);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setEndpoint(aiSettings.endpoint);
+      setModel(aiSettings.model);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [aiSettings]);
 
   const saveAISettings = useMutation({
@@ -83,6 +92,7 @@ export default function SettingsPage() {
               <input
                 className="mt-2 w-full rounded-[7px] border border-[var(--border-light)] bg-[var(--bg-body)] px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--accent)]"
                 value={endpoint}
+                disabled={!isAdmin}
                 onChange={(event) => setEndpoint(event.target.value)}
               />
             </label>
@@ -93,6 +103,7 @@ export default function SettingsPage() {
                 list="ai-model-options"
                 className="mt-2 w-full rounded-[7px] border border-[var(--border-light)] bg-[var(--bg-body)] px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--accent)]"
                 value={model}
+                disabled={!isAdmin}
                 onChange={(event) => setModel(event.target.value)}
               />
               <datalist id="ai-model-options">
@@ -111,6 +122,7 @@ export default function SettingsPage() {
                 placeholder={t('settings.aiApiKeyPlaceholder')}
                 className="mt-2 w-full rounded-[7px] border border-[var(--border-light)] bg-[var(--bg-body)] px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--accent)]"
                 value={apiKey}
+                disabled={!isAdmin}
                 onChange={(event) => setAPIKey(event.target.value)}
               />
             </label>
@@ -120,16 +132,19 @@ export default function SettingsPage() {
                 ? t('settings.aiCurrentKey', { hint: aiSettings.api_key_hint || '***' })
                 : t('settings.aiNoKey')}
             </p>
+            {!isAdmin ? <p className="text-xs text-[var(--text-muted)]">{t('settings.aiAdminOnly')}</p> : null}
 
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => saveAISettings.mutate()}
-                disabled={saveAISettings.isPending}
-                className="rounded-[7px] bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-60"
-              >
-                {saveAISettings.isPending ? t('settings.saving') : t('settings.aiSave')}
-              </button>
+              {isAdmin ? (
+                <button
+                  type="button"
+                  onClick={() => saveAISettings.mutate()}
+                  disabled={saveAISettings.isPending}
+                  className="rounded-[7px] bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-60"
+                >
+                  {saveAISettings.isPending ? t('settings.saving') : t('settings.aiSave')}
+                </button>
+              ) : null}
               {message ? <span className="text-sm text-[var(--text-muted)]">{message}</span> : null}
             </div>
           </div>

@@ -1,8 +1,6 @@
 package platform
 
 import (
-	"context"
-	"log"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -48,8 +46,7 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		Sessions:  sessions,
 	}
 	authH := auth.NewHandler(authSvc, sessions)
-	aiConfigPath := os.Getenv("XREADER_AI_CONFIG")
-	aiSettings := ai.NewSettingsService(aiConfigPath, ai.NewRedisSettingsRepository(deps.Redis))
+	aiSettings := ai.NewSettingsService(ai.NewPostgresSettingsRepository(deps.Pool))
 
 	// Public auth routes
 	r.GET("/api/auth/github", authH.BeginLogin)
@@ -103,15 +100,7 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		authed.PATCH("/ai/settings", aiSettingsH.Update)
 
 		// Article SSE + body retry
-		var aiClient ai.AIClient
-		if aiConfigPath != "" {
-			if _, err := aiSettings.LoadResolved(context.Background()); err != nil {
-				log.Printf("ai config not loaded: %v (body translation disabled)", err)
-			} else {
-				aiClient = ai.NewDynamicClient(aiSettings)
-			}
-		}
-		sseH := article.NewSSEHandler(deps.Pool, aiClient, 3)
+		sseH := article.NewSSEHandler(deps.Pool, ai.NewDynamicClient(aiSettings), 3)
 		authed.GET("/articles/:id/body-translation", sseH.BodyTranslation)
 		bodyRetryH := article.NewBodyRetryHandler(deps.Pool)
 		authed.POST("/articles/:id/body-translation/retry", bodyRetryH.Retry)

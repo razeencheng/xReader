@@ -2,19 +2,26 @@ package ai
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/redis/go-redis/v9"
-	"gopkg.in/yaml.v3"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jin/xreader-web/db/gen"
 )
 
-const redisAISettingsKey = "settings:ai"
+// TODO: move this local passphrase to deployment-managed secret storage before production use.
+const aiSettingsEncryptionPassphrase = "xreader-local-ai-settings-v1"
 
 type SettingsSnapshot struct {
 	Endpoint   string `json:"endpoint"`
@@ -24,15 +31,17 @@ type SettingsSnapshot struct {
 }
 
 type SettingsUpdate struct {
-	Endpoint string
-	Model    string
-	APIKey   string
+	Endpoint        string
+	Model           string
+	APIKey          string
+	UpdatedByUserID int64
 }
 
 type settingsOverrides struct {
-	Endpoint string
-	Model    string
-	APIKey   string
+	Endpoint        string
+	Model           string
+	APIKey          string
+	UpdatedByUserID int64
 }
 
 type SettingsRepository interface {
@@ -62,59 +71,80 @@ func (r *MemorySettingsRepository) SaveAISettings(_ context.Context, settings se
 	return nil
 }
 
-type RedisSettingsRepository struct {
-	client redis.Cmdable
+type PostgresSettingsRepository struct {
+	queries *gen.Queries
 }
 
-func NewRedisSettingsRepository(client redis.Cmdable) *RedisSettingsRepository {
-	return &RedisSettingsRepository{client: client}
+func NewPostgresSettingsRepository(pool *pgxpool.Pool) *PostgresSettingsRepository {
+	return &PostgresSettingsRepository{queries: gen.New(pool)}
 }
 
-func (r *RedisSettingsRepository) LoadAISettings(ctx context.Context) (settingsOverrides, error) {
-	if r == nil || r.client == nil {
+func (r *PostgresSettingsRepository) LoadAISettings(ctx context.Context) (settingsOverrides, error) {
+	if r == nil || r.queries == nil {
 		return settingsOverrides{}, nil
 	}
-	values, err := r.client.HGetAll(ctx, redisAISettingsKey).Result()
+	row, err := r.queries.GetAIProviderSettings(ctx)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return settingsOverrides{}, nil
+	}
 	if err != nil {
 		return settingsOverrides{}, err
 	}
+	apiKey := ""
+	if len(row.ApiKeyCiphertext) > 0 && len(row.ApiKeyNonce) > 0 {
+		apiKey, err = decryptAPIKey(row.ApiKeyCiphertext, row.ApiKeyNonce)
+		if err != nil {
+			return settingsOverrides{}, fmt.Errorf("decrypt api key: %w", err)
+		}
+	}
 	return settingsOverrides{
-		Endpoint: values["endpoint"],
-		Model:    values["model"],
-		APIKey:   values["api_key"],
+		Endpoint: row.Endpoint,
+		Model:    row.Model,
+		APIKey:   apiKey,
 	}, nil
 }
 
-func (r *RedisSettingsRepository) SaveAISettings(ctx context.Context, settings settingsOverrides) error {
-	if r == nil || r.client == nil {
+func (r *PostgresSettingsRepository) SaveAISettings(ctx context.Context, settings settingsOverrides) error {
+	if r == nil || r.queries == nil {
 		return nil
 	}
-	return r.client.HSet(ctx, redisAISettingsKey, map[string]any{
-		"endpoint": settings.Endpoint,
-		"model":    settings.Model,
-		"api_key":  settings.APIKey,
-	}).Err()
+	ciphertext, nonce, err := encryptAPIKey(settings.APIKey)
+	if err != nil {
+		return fmt.Errorf("encrypt api key: %w", err)
+	}
+	updatedBy := pgtype.Int8{}
+	if settings.UpdatedByUserID > 0 {
+		updatedBy = pgtype.Int8{Int64: settings.UpdatedByUserID, Valid: true}
+	}
+	_, err = r.queries.UpsertAIProviderSettings(ctx, gen.UpsertAIProviderSettingsParams{
+		Endpoint:         settings.Endpoint,
+		Model:            settings.Model,
+		ApiKeyCiphertext: ciphertext,
+		ApiKeyNonce:      nonce,
+		ApiKeyHint:       maskAPIKey(settings.APIKey),
+		UpdatedByUserID:  updatedBy,
+	})
+	return err
 }
 
 type SettingsService struct {
-	configPath string
-	repo       SettingsRepository
+	repo SettingsRepository
 }
 
-func NewSettingsService(configPath string, repo SettingsRepository) *SettingsService {
-	return &SettingsService{configPath: configPath, repo: repo}
+func NewSettingsService(repo SettingsRepository) *SettingsService {
+	return &SettingsService{repo: repo}
 }
 
 func (s *SettingsService) Current(ctx context.Context) (SettingsSnapshot, error) {
-	resolved, err := s.LoadResolved(ctx)
+	settings, err := s.loadSettings(ctx)
 	if err != nil {
 		return SettingsSnapshot{}, err
 	}
 	return SettingsSnapshot{
-		Endpoint:   resolved.BaseURL,
-		Model:      resolved.Model,
-		APIKeySet:  strings.TrimSpace(resolved.APIKey) != "",
-		APIKeyHint: maskAPIKey(resolved.APIKey),
+		Endpoint:   settings.Endpoint,
+		Model:      settings.Model,
+		APIKeySet:  strings.TrimSpace(settings.APIKey) != "",
+		APIKeyHint: maskAPIKey(settings.APIKey),
 	}, nil
 }
 
@@ -141,17 +171,12 @@ func (s *SettingsService) Update(ctx context.Context, update SettingsUpdate) (Se
 	if strings.TrimSpace(update.APIKey) != "" {
 		current.APIKey = strings.TrimSpace(update.APIKey)
 	}
-	if current.Endpoint == "" || current.Model == "" {
-		resolved, err := s.LoadResolved(ctx)
-		if err != nil {
-			return SettingsSnapshot{}, err
-		}
-		if current.Endpoint == "" {
-			current.Endpoint = resolved.BaseURL
-		}
-		if current.Model == "" {
-			current.Model = resolved.Model
-		}
+	current.UpdatedByUserID = update.UpdatedByUserID
+	if current.Endpoint == "" {
+		return SettingsSnapshot{}, errors.New("endpoint is required")
+	}
+	if current.Model == "" {
+		return SettingsSnapshot{}, errors.New("model is required")
 	}
 
 	if err := s.repo.SaveAISettings(ctx, current); err != nil {
@@ -161,76 +186,41 @@ func (s *SettingsService) Update(ctx context.Context, update SettingsUpdate) (Se
 }
 
 func (s *SettingsService) LoadResolved(ctx context.Context) (ResolvedConfig, error) {
-	cfg, err := readConfigFile(s.configPath)
+	settings, err := s.loadSettings(ctx)
 	if err != nil {
 		return ResolvedConfig{}, err
 	}
-
-	overrides := settingsOverrides{}
-	if s.repo != nil {
-		overrides, err = s.repo.LoadAISettings(ctx)
-		if err != nil {
-			return ResolvedConfig{}, fmt.Errorf("load settings: %w", err)
-		}
+	if settings.Endpoint == "" || settings.Model == "" || settings.APIKey == "" {
+		return ResolvedConfig{}, errors.New("AI settings are not configured")
 	}
-
-	baseURL := cfg.Provider.BaseURL
-	if endpoint := strings.TrimSpace(os.Getenv("OPENAI_ENDPOINT")); endpoint != "" {
-		baseURL = endpoint
-	}
-	if overrides.Endpoint != "" {
-		baseURL = overrides.Endpoint
-	}
+	baseURL := settings.Endpoint
 	baseURL, err = normalizeEndpoint(baseURL)
 	if err != nil {
 		return ResolvedConfig{}, err
 	}
 
-	apiKey := os.Getenv(cfg.Provider.APIKeyEnv)
-	if overrides.APIKey != "" {
-		apiKey = overrides.APIKey
-	}
-	model := cfg.Provider.Model
-	if overrides.Model != "" {
-		model = overrides.Model
-	}
-
-	maxRetries := cfg.Provider.MaxRetries
-	if maxRetries <= 0 {
-		maxRetries = 3
-	}
-	timeout := cfg.Provider.Timeout
-	if timeout <= 0 {
-		timeout = 30 * time.Second
-	}
-	batchSize := cfg.Provider.BatchSize
-	if batchSize <= 0 {
-		batchSize = 5
-	}
-
 	return ResolvedConfig{
 		BaseURL:    baseURL,
-		APIKey:     apiKey,
-		Model:      model,
-		MaxRetries: maxRetries,
-		Timeout:    timeout,
-		BatchSize:  batchSize,
+		APIKey:     settings.APIKey,
+		Model:      settings.Model,
+		MaxRetries: 3,
+		Timeout:    30 * time.Second,
+		BatchSize:  5,
 	}, nil
 }
 
-func readConfigFile(path string) (Config, error) {
-	if path == "" {
-		return Config{}, errors.New("AI config path not set")
+func (s *SettingsService) loadSettings(ctx context.Context) (settingsOverrides, error) {
+	if s.repo == nil {
+		return settingsOverrides{}, errors.New("AI settings repository not configured")
 	}
-	data, err := os.ReadFile(path)
+	settings, err := s.repo.LoadAISettings(ctx)
 	if err != nil {
-		return Config{}, fmt.Errorf("read config: %w", err)
+		return settingsOverrides{}, fmt.Errorf("load settings: %w", err)
 	}
-	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return Config{}, fmt.Errorf("parse config: %w", err)
-	}
-	return cfg, nil
+	settings.Endpoint = strings.TrimSpace(settings.Endpoint)
+	settings.Model = strings.TrimSpace(settings.Model)
+	settings.APIKey = strings.TrimSpace(settings.APIKey)
+	return settings, nil
 }
 
 func normalizeEndpoint(raw string) (string, error) {
@@ -257,4 +247,41 @@ func maskAPIKey(key string) string {
 		return "***"
 	}
 	return trimmed[:3] + "..." + trimmed[len(trimmed)-4:]
+}
+
+func encryptAPIKey(apiKey string) ([]byte, []byte, error) {
+	trimmed := strings.TrimSpace(apiKey)
+	if trimmed == "" {
+		return nil, nil, nil
+	}
+	gcm, err := apiKeyCipher()
+	if err != nil {
+		return nil, nil, err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, nil, err
+	}
+	return gcm.Seal(nil, nonce, []byte(trimmed), nil), nonce, nil
+}
+
+func decryptAPIKey(ciphertext, nonce []byte) (string, error) {
+	gcm, err := apiKeyCipher()
+	if err != nil {
+		return "", err
+	}
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return "", err
+	}
+	return string(plaintext), nil
+}
+
+func apiKeyCipher() (cipher.AEAD, error) {
+	key := sha256.Sum256([]byte(aiSettingsEncryptionPassphrase))
+	block, err := aes.NewCipher(key[:])
+	if err != nil {
+		return nil, err
+	}
+	return cipher.NewGCM(block)
 }

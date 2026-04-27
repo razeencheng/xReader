@@ -614,12 +614,12 @@ Schema exactly per spec §7.1 (`article_ai` with composite PK `(article_id, targ
 ### Task 4.2 — AI config loader + OpenAI-compatible HTTP client
 
 **Files:**
-- Create: `server/internal/ai/config.go`, `server/internal/ai/config_test.go`, `server/internal/ai/client.go`, `server/internal/ai/client_test.go`, `server/internal/ai/mock.go`, `config/ai.example.yaml`
+- Create: `server/internal/ai/config.go`, `server/internal/ai/config_test.go`, `server/internal/ai/client.go`, `server/internal/ai/client_test.go`, `server/internal/ai/mock.go`
 
 **Implementation notes:**
 
-- `LoadConfig(path string) (Config, error)`: reads YAML from path (env `XREADER_AI_CONFIG`, default `./config/ai.yaml`). Struct mirrors spec §6.3.3 exactly.
-- API key read from env var named in config (`api_key_env`), NOT from the YAML itself. This keeps the YAML safe to commit in a private ops repo.
+- Provider settings are now stored in Postgres via the Settings page, not in YAML or AI environment variables.
+- API Key is encrypted at rest and only exposed to the frontend as a masked hint.
 - `Client` implements `ChatCompletion(ctx, ChatRequest) (ChatResponse, error)` by `POST {base_url}/chat/completions` with `Authorization: Bearer <key>`. JSON shape matches OpenAI's `/v1/chat/completions`.
 - Retries: exponential backoff (`1s, 2s, 4s`) on `429/5xx/network`, up to `max_retries`.
 - Timeout from config.
@@ -628,14 +628,9 @@ Schema exactly per spec §7.1 (`article_ai` with composite PK `(article_id, targ
 **Key tests:**
 
 ```go
-func TestLoadConfig_ReadsYAML(t *testing.T) {
-    // Write a temp yaml, load, assert all fields.
-}
-
-func TestLoadConfig_ResolvesAPIKeyFromEnv(t *testing.T) {
-    t.Setenv("MY_KEY_VAR", "sk-test-123")
-    cfg, _ := LoadConfig(writeTempYAML(t, `provider:\n  api_key_env: MY_KEY_VAR\n`))
-    require.Equal(t, "sk-test-123", cfg.APIKey())
+func TestPostgresSettingsRepositoryEncryptsAPIKeyAtRest(t *testing.T) {
+    // Save provider settings, assert DB ciphertext does not contain plaintext,
+    // then load resolved config and assert decrypted key is usable by the client.
 }
 
 func TestClient_SendsCorrectOpenAIShape(t *testing.T) {
@@ -655,8 +650,8 @@ func TestClient_RetriesOn429(t *testing.T) { /* first call 429, second call 200 
 ```
 
 **Steps:**
-- [ ] Step 1: `go get gopkg.in/yaml.v3`
-- [ ] Step 2: Write `config/ai.example.yaml` per spec §6.3.3.
+- [ ] Step 1: Store provider settings in Postgres and expose them through the Settings page.
+- [ ] Step 2: Encrypt API Key at rest and return only masked hints to the browser.
 - [ ] Step 3: Tests. FAIL.
 - [ ] Step 4: Implement `Config`, `Client`, `MockClient` (configurable responses for tests).
 - [ ] Step 5: Tests PASS.

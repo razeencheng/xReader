@@ -358,34 +358,16 @@ Concurrency:
 
 #### 6.3.3 AI provider abstraction
 
-**All AI calls go through an OpenAI-compatible client**: `POST /v1/chat/completions` shape. The integration has file/env defaults and a Settings page `模型接入设置` surface so the owner can point it at a relay station, OpenRouter, DeepSeek, Moonshot, or a local `one-api` instance without touching code.
+**All AI calls go through an OpenAI-compatible client**: `POST /v1/chat/completions` shape. The integration is configured from the Settings page `模型接入设置`, so the owner can point it at a relay station, OpenRouter, DeepSeek, Moonshot, or a local `one-api` instance without touching environment variables or mounted config files.
 
-Configuration file (path from `XREADER_AI_CONFIG` env var, default `./config/ai.yaml`) provides defaults:
+The canonical provider configuration lives in Postgres table `ai_provider_settings`:
 
-```yaml
-provider:
-  base_url: "https://relay.example.com/v1"   # OpenAI-compatible endpoint
-  api_key_env: "XREADER_AI_API_KEY"          # which env var holds the key
-  timeout_seconds: 60
-  max_retries: 2
+- `endpoint`: OpenAI-compatible endpoint, normalized to `/v1`.
+- `model`: single model used by title translation, summary, and body translation in v1.
+- `api_key_ciphertext` + `api_key_nonce`: encrypted API Key at rest.
+- `api_key_hint`: masked display value such as `sk-...ROXL`.
 
-models:
-  # Single model for everything in v1; split by job if you want later.
-  summary: "deepseek-chat"
-  title_translation: "deepseek-chat"
-  body_translation: "deepseek-chat"
-
-limits:
-  max_tokens_summary: 400
-  max_tokens_title: 60
-  max_tokens_body_paragraph: 600
-  temperature: 0.2
-
-concurrency:
-  eager_workers: 4
-  lazy_workers: 6
-  batch_paragraphs_per_call: 8
-```
+Regular users can read the masked status; only admins can update the provider settings. Runtime defaults remain in code for retries, timeout, and body paragraph batch size.
 
 Client interface (Go):
 
@@ -802,11 +784,7 @@ services:
       REDIS_URL: ${REDIS_URL}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
-      XREADER_AI_CONFIG: /etc/xreader/ai.yaml
-      XREADER_AI_API_KEY: ${XREADER_AI_API_KEY}
       SESSION_SECRET: ${SESSION_SECRET}
-    volumes:
-      - ./config/ai.yaml:/etc/xreader/ai.yaml:ro
   worker:
     build: ./server
     command: ["/app/worker"]
@@ -829,7 +807,7 @@ Homelab setup (owner's existing): Caddy or Cloudflare Tunnel. Public hostname ro
 
 ### 11.3 Secrets
 
-All secrets via env file `.env` (never committed). `config/ai.yaml` holds only the base URL and model names; the key is read from an env var named in the config. This way the same config can be checked into a private repo without leaking the key.
+OAuth, session, database, and Redis secrets still come from `.env` / deployment environment. AI provider settings are managed in the Settings page and stored in Postgres; the API Key is encrypted at rest and never committed or returned to the browser in plaintext.
 
 ### 11.4 Bootstrapping the first admin
 
@@ -924,18 +902,14 @@ GITHUB_OAUTH_CALLBACK=https://xreader.example.com/api/auth/callback/github
 # Sessions
 SESSION_SECRET=<64-random-bytes-base64>
 
-# AI (OpenAI-compatible)
-XREADER_AI_CONFIG=/etc/xreader/ai.yaml
-XREADER_AI_API_KEY=sk-...
-
 # Misc
 LOG_LEVEL=info
 TZ=Asia/Shanghai
 ```
 
-## Appendix C — `config/ai.yaml` template
+## Appendix C — AI provider settings
 
-See §6.3.3.
+See §6.3.3. AI provider settings no longer use a committed YAML template.
 
 ---
 

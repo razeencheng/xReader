@@ -18,7 +18,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	cfg, err := ai.LoadConfig(os.Getenv("XREADER_AI_CONFIG"))
+	cfg, err := ai.NewSettingsService(ai.NewPostgresSettingsRepository(pool)).LoadResolved(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}

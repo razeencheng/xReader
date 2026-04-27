@@ -8,16 +8,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSettingsServiceCurrentMasksAPIKey(t *testing.T) {
-	t.Setenv("OPENAI_API_KEY", "sk-test-secret")
-	path := writeTempYAML(t, `
-provider:
-  base_url: "https://api.example.com/v1"
-  api_key_env: "OPENAI_API_KEY"
-  model: "qwen-turbo"
-`)
+func TestSettingsServiceCurrentMasksAPIKeyFromRepository(t *testing.T) {
+	repo := NewMemorySettingsRepository()
+	require.NoError(t, repo.SaveAISettings(context.Background(), settingsOverrides{
+		Endpoint: "https://api.example.com/v1",
+		Model:    "qwen-turbo",
+		APIKey:   "sk-test-secret",
+	}))
 
-	service := NewSettingsService(path, NewMemorySettingsRepository())
+	service := NewSettingsService(repo)
 	current, err := service.Current(context.Background())
 	require.NoError(t, err)
 
@@ -28,18 +27,7 @@ provider:
 }
 
 func TestSettingsServiceUpdateOverridesResolvedConfig(t *testing.T) {
-	t.Setenv("OPENAI_API_KEY", "sk-old")
-	path := writeTempYAML(t, `
-provider:
-  base_url: "https://api.example.com/v1"
-  api_key_env: "OPENAI_API_KEY"
-  model: "qwen-turbo"
-  max_retries: 2
-  timeout: 45s
-  batch_paragraphs_per_call: 6
-`)
-
-	service := NewSettingsService(path, NewMemorySettingsRepository())
+	service := NewSettingsService(NewMemorySettingsRepository())
 	updated, err := service.Update(context.Background(), SettingsUpdate{
 		Endpoint: "https://relay.example.com",
 		Model:    "deepseek-chat",
@@ -55,7 +43,16 @@ provider:
 	require.Equal(t, "https://relay.example.com/v1", resolved.BaseURL)
 	require.Equal(t, "deepseek-chat", resolved.Model)
 	require.Equal(t, "sk-new-secret", resolved.APIKey)
-	require.Equal(t, 2, resolved.MaxRetries)
-	require.Equal(t, 45*time.Second, resolved.Timeout)
-	require.Equal(t, 6, resolved.BatchSize)
+	require.Equal(t, 3, resolved.MaxRetries)
+	require.Equal(t, 30*time.Second, resolved.Timeout)
+	require.Equal(t, 5, resolved.BatchSize)
+}
+
+func TestSettingsServiceRequiresStoredEndpointAndModel(t *testing.T) {
+	service := NewSettingsService(NewMemorySettingsRepository())
+
+	_, err := service.LoadResolved(context.Background())
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "AI settings are not configured")
 }

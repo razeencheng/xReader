@@ -43,12 +43,7 @@ services:
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
       GITHUB_CALLBACK_URL: ${GITHUB_CALLBACK_URL:-http://localhost:3000/api/auth/callback}
-      XREADER_AI_CONFIG: /etc/xreader/ai.yaml
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_ENDPOINT: ${OPENAI_ENDPOINT}
       SESSION_SECRET: ${SESSION_SECRET}
-    volumes:
-      - ./config/ai.yaml:/etc/xreader/ai.yaml:ro
 
   worker:
     build: ./server
@@ -64,12 +59,7 @@ services:
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
       GITHUB_CALLBACK_URL: ${GITHUB_CALLBACK_URL:-http://localhost:3000/api/auth/callback}
-      XREADER_AI_CONFIG: /etc/xreader/ai.yaml
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_ENDPOINT: ${OPENAI_ENDPOINT}
       SESSION_SECRET: ${SESSION_SECRET}
-    volumes:
-      - ./config/ai.yaml:/etc/xreader/ai.yaml:ro
 
   web:
     build:
