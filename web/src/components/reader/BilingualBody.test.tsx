@@ -221,6 +221,30 @@ test('keeps paragraphs with inline code in normal text flow', () => {
   expect(container.querySelector('[data-block-tag="pre"]')).toHaveClass('font-mono');
 });
 
+test('keeps translations attached to their original text after empty article blocks', () => {
+  const { container } = render(
+    <BilingualBody
+      articleId={1}
+      contentHtml="<h2>How it works</h2><p> </p><p>Install the Stripe CLI</p><pre><code>stripe projects init</code></pre>"
+      language="en"
+      nativeLanguage="zh-CN"
+    />,
+  );
+
+  enterParagraph(container, 0);
+
+  act(() => {
+    sse.pushParagraph(0, { index: 0, translation: '工作原理' });
+    sse.pushParagraph(0, { index: 1, translation: '安装 Stripe CLI' });
+    sse.pushParagraph(0, { index: 2, translation: '条纹项目初始化' });
+  });
+
+  const text = container.textContent ?? '';
+  expect(text.indexOf('Install the Stripe CLI')).toBeLessThan(text.indexOf('安装 Stripe CLI'));
+  expect(text.indexOf('安装 Stripe CLI')).toBeLessThan(text.indexOf('stripe projects init'));
+  expect(text.indexOf('条纹项目初始化')).toBe(-1);
+});
+
 test('removes hidden heading anchors from sanitized article html', () => {
   render(
     <BilingualBody

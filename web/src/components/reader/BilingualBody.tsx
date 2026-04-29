@@ -43,6 +43,11 @@ const WRAPPER_TAGS = new Set(['article', 'aside', 'div', 'footer', 'header', 'ma
 const SKIP_EMPTY_TAGS = new Set(['br', 'ins']);
 const TRANSLATION_PREFETCH_COUNT = 5;
 
+type ReaderBlock = {
+  html: string;
+  translationIndex: number | null;
+};
+
 function escapeHtml(text: string) {
   return text
     .replaceAll('&', '&amp;')
@@ -112,6 +117,14 @@ function normalizeReaderImages(root: HTMLElement) {
   });
 }
 
+function normalizeBlockText(text: string) {
+  return text.trim().split(/\s+/).filter(Boolean).join(' ');
+}
+
+function hasStandaloneMedia(element: HTMLElement) {
+  return element.querySelector('img, picture, video, audio, canvas, svg, table') !== null;
+}
+
 function sanitizeHtml(html: string): string {
   return DOMPurify.sanitize(html, {
     USE_PROFILES: { html: true },
@@ -126,12 +139,20 @@ function splitContentHtml(contentHtml: string) {
   const doc = parser.parseFromString(`<body>${sanitized}</body>`, 'text/html');
   removeHiddenHeadingAnchors(doc.body);
   normalizeReaderImages(doc.body);
-  const paragraphs: string[] = [];
+  const blocks: ReaderBlock[] = [];
+  let translationIndex = 0;
+
+  const pushBlock = (html: string, translatable: boolean) => {
+    blocks.push({ html, translationIndex: translatable ? translationIndex : null });
+    if (translatable) {
+      translationIndex += 1;
+    }
+  };
 
   const pushText = (text: string) => {
-    const trimmed = text.trim();
+    const trimmed = normalizeBlockText(text);
     if (trimmed) {
-      paragraphs.push(`<p>${escapeHtml(trimmed)}</p>`);
+      pushBlock(`<p>${escapeHtml(trimmed)}</p>`, true);
     }
   };
 
@@ -158,20 +179,30 @@ function splitContentHtml(contentHtml: string) {
     }
 
     if (BLOCK_TAGS.has(tag)) {
-      paragraphs.push(element.outerHTML);
+      const hasText = normalizeBlockText(element.textContent ?? '') !== '';
+      if (hasText || hasStandaloneMedia(element)) {
+        pushBlock(element.outerHTML, hasText);
+      }
       return;
     }
 
-    paragraphs.push(`<p>${element.outerHTML}</p>`);
+    const hasText = normalizeBlockText(element.textContent ?? '') !== '';
+    if (hasText || hasStandaloneMedia(element)) {
+      pushBlock(`<p>${element.outerHTML}</p>`, hasText);
+    }
   };
 
   Array.from(doc.body.childNodes).forEach(traverseNodes);
-  return paragraphs;
+  return blocks;
 }
 
 export function BilingualBody({ articleId, contentHtml, language, nativeLanguage }: Props) {
   const { t } = useI18n();
-  const paragraphs = useMemo(() => splitContentHtml(contentHtml), [contentHtml]);
+  const blocks = useMemo(() => splitContentHtml(contentHtml), [contentHtml]);
+  const translatableCount = useMemo(
+    () => blocks.reduce((count, block) => (block.translationIndex === null ? count : count + 1), 0),
+    [blocks],
+  );
   const sameLanguage = isSameLanguage(language, nativeLanguage);
   const originalFont = fontForLang(language);
   const translationFont = fontForLang(nativeLanguage);
@@ -190,9 +221,15 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
     pending: new Set(),
   });
 
-  const shouldTranslate = !sameLanguage && paragraphs.length > 0;
-  const translations = translationState.key === resetKey ? translationState.translations : new Map<number, string>();
-  const pendingTranslations = translationState.key === resetKey ? translationState.pending : new Set<number>();
+  const shouldTranslate = !sameLanguage && translatableCount > 0;
+  const translations = useMemo(
+    () => (translationState.key === resetKey ? translationState.translations : new Map<number, string>()),
+    [resetKey, translationState.key, translationState.translations],
+  );
+  const pendingTranslations = useMemo(
+    () => (translationState.key === resetKey ? translationState.pending : new Set<number>()),
+    [resetKey, translationState.key, translationState.pending],
+  );
 
   useEffect(() => {
     translationsRef.current = translations;
@@ -209,11 +246,11 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
   }, [resetKey]);
 
   const requestTranslationRange = useCallback((visibleIndex: number) => {
-    if (!shouldTranslate || visibleIndex < 0 || visibleIndex >= paragraphs.length) {
+    if (!shouldTranslate || visibleIndex < 0 || visibleIndex >= translatableCount) {
       return;
     }
 
-    const rangeEnd = Math.min(paragraphs.length, visibleIndex + TRANSLATION_PREFETCH_COUNT);
+    const rangeEnd = Math.min(translatableCount, visibleIndex + TRANSLATION_PREFETCH_COUNT);
     const rangeIndices = Array.from(
       { length: rangeEnd - visibleIndex },
       (_, offset) => visibleIndex + offset,
@@ -281,7 +318,7 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
       clearPending();
       removeClient();
     });
-  }, [articleId, paragraphs.length, resetKey, shouldTranslate]);
+  }, [articleId, resetKey, shouldTranslate, translatableCount]);
 
   useEffect(() => {
     if (!shouldTranslate) {
@@ -300,7 +337,7 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
       });
     }, { rootMargin: '320px 0px 520px 0px', threshold: 0.01 });
 
-    paragraphRefs.current.slice(0, paragraphs.length).forEach((node) => {
+    paragraphRefs.current.slice(0, translatableCount).forEach((node) => {
       if (node) {
         observer.observe(node);
       }
@@ -309,27 +346,30 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
     return () => {
       observer.disconnect();
     };
-  }, [paragraphs.length, requestTranslationRange, shouldTranslate]);
+  }, [requestTranslationRange, shouldTranslate, translatableCount]);
 
   return (
     <div className="reader-content">
-      {paragraphs.map((paragraph, index) => {
-        const blockTag = primaryTagFromHtml(paragraph);
+      {blocks.map((block, index) => {
+        const blockTag = primaryTagFromHtml(block.html);
         const isCode = blockTag === 'pre';
-        const translation = translations.get(index);
-        const isLoading = pendingTranslations.has(index) && !translation;
+        const translationIndex = block.translationIndex;
+        const translation = translationIndex === null ? undefined : translations.get(translationIndex);
+        const isLoading = translationIndex !== null && pendingTranslations.has(translationIndex) && !translation;
 
         if (isCode) {
           return (
             <div
               key={index}
               ref={(node) => {
-                paragraphRefs.current[index] = node;
+                if (translationIndex !== null) {
+                  paragraphRefs.current[translationIndex] = node;
+                }
               }}
-              data-observe-index={index}
+              data-observe-index={translationIndex ?? undefined}
               data-block-tag={blockTag}
               className="overflow-x-auto rounded-lg border border-[var(--border-light)] bg-[var(--bg-surface)] p-4 font-mono text-[13.5px] leading-[1.6] text-[var(--text-primary)]"
-              dangerouslySetInnerHTML={{ __html: paragraph }}
+              dangerouslySetInnerHTML={{ __html: block.html }}
             />
           );
         }
@@ -338,24 +378,26 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
           <div
             key={index}
             ref={(node) => {
-              paragraphRefs.current[index] = node;
+              if (translationIndex !== null) {
+                paragraphRefs.current[translationIndex] = node;
+              }
             }}
-            data-observe-index={index}
+            data-observe-index={translationIndex ?? undefined}
             data-block-tag={blockTag}
             className="paragraph-container"
           >
             <div
               data-layer="original"
-              data-paragraph-index={index}
+              data-paragraph-index={translationIndex ?? undefined}
               style={{ fontFamily: originalFont }}
             >
-              <div dangerouslySetInnerHTML={{ __html: paragraph }} />
+              <div dangerouslySetInnerHTML={{ __html: block.html }} />
             </div>
 
             {translation ? (
               <div
                 data-layer="translation"
-                data-paragraph-index={index}
+                data-paragraph-index={translationIndex ?? undefined}
                 className="mt-1 text-[0.92em] leading-[1.85] text-[var(--text)]"
                 style={{ fontFamily: translationFont }}
               >
