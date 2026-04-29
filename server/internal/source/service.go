@@ -104,7 +104,7 @@ func (s *SourceService) Create(ctx context.Context, userID int64, rawURL string,
 		title = discovered.URL
 	}
 
-	return s.queries.CreateSource(ctx, gen.CreateSourceParams{
+	params := gen.CreateSourceParams{
 		UserID:        userID,
 		Kind:          "rss",
 		Url:           discovered.URL,
@@ -114,7 +114,31 @@ func (s *SourceService) Create(ctx context.Context, userID int64, rawURL string,
 		LanguageHint:  textOrNull(discovered.Metadata.LanguageHint),
 		Health:        "unknown",
 		Category:      category,
+	}
+	src, err := s.queries.CreateSource(ctx, params)
+	if err == nil {
+		return src, nil
+	}
+	if !isUniqueViolation(err) {
+		return gen.Source{}, err
+	}
+
+	restored, restoreErr := s.queries.RestoreSourceByUserAndNormalizedURL(ctx, gen.RestoreSourceByUserAndNormalizedURLParams{
+		UserID:        userID,
+		NormalizedUrl: normalized,
+		Url:           discovered.URL,
+		Title:         title,
+		IconUrl:       params.IconUrl,
+		LanguageHint:  params.LanguageHint,
+		Category:      category,
 	})
+	if restoreErr != nil {
+		if errors.Is(restoreErr, pgx.ErrNoRows) {
+			return gen.Source{}, err
+		}
+		return gen.Source{}, fmt.Errorf("restore source: %w", restoreErr)
+	}
+	return restored, nil
 }
 
 func (s *SourceService) Rename(ctx context.Context, userID int64, sourceID int64, title string) error {

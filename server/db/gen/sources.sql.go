@@ -206,6 +206,65 @@ func (q *Queries) ListSourcesDueForFetch(ctx context.Context) ([]Source, error) 
 	return items, nil
 }
 
+const restoreSourceByUserAndNormalizedURL = `-- name: RestoreSourceByUserAndNormalizedURL :one
+UPDATE sources
+SET url = $3,
+    title = $4,
+    icon_url = $5,
+    language_hint = $6,
+    category = $7,
+    last_fetched_at = NULL,
+    last_success_at = NULL,
+    consecutive_fails = 0,
+    health = 'unknown',
+    deleted_at = NULL
+WHERE user_id = $1
+  AND normalized_url = $2
+  AND deleted_at IS NOT NULL
+RETURNING id, user_id, kind, url, normalized_url, title, icon_url, language_hint, last_fetched_at, last_success_at, consecutive_fails, health, created_at, deleted_at, category
+`
+
+type RestoreSourceByUserAndNormalizedURLParams struct {
+	UserID        int64       `json:"user_id"`
+	NormalizedUrl string      `json:"normalized_url"`
+	Url           string      `json:"url"`
+	Title         string      `json:"title"`
+	IconUrl       pgtype.Text `json:"icon_url"`
+	LanguageHint  pgtype.Text `json:"language_hint"`
+	Category      string      `json:"category"`
+}
+
+func (q *Queries) RestoreSourceByUserAndNormalizedURL(ctx context.Context, arg RestoreSourceByUserAndNormalizedURLParams) (Source, error) {
+	row := q.db.QueryRow(ctx, restoreSourceByUserAndNormalizedURL,
+		arg.UserID,
+		arg.NormalizedUrl,
+		arg.Url,
+		arg.Title,
+		arg.IconUrl,
+		arg.LanguageHint,
+		arg.Category,
+	)
+	var i Source
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Kind,
+		&i.Url,
+		&i.NormalizedUrl,
+		&i.Title,
+		&i.IconUrl,
+		&i.LanguageHint,
+		&i.LastFetchedAt,
+		&i.LastSuccessAt,
+		&i.ConsecutiveFails,
+		&i.Health,
+		&i.CreatedAt,
+		&i.DeletedAt,
+		&i.Category,
+	)
+	return i, err
+}
+
 const softDeleteSource = `-- name: SoftDeleteSource :exec
 UPDATE sources
 SET deleted_at = now()

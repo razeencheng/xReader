@@ -9,6 +9,23 @@ VALUES (
 )
 RETURNING *;
 
+-- name: RestoreSourceByUserAndNormalizedURL :one
+UPDATE sources
+SET url = $3,
+    title = $4,
+    icon_url = $5,
+    language_hint = $6,
+    category = $7,
+    last_fetched_at = NULL,
+    last_success_at = NULL,
+    consecutive_fails = 0,
+    health = 'unknown',
+    deleted_at = NULL
+WHERE user_id = $1
+  AND normalized_url = $2
+  AND deleted_at IS NOT NULL
+RETURNING *;
+
 -- name: GetSourceByID :one
 SELECT * FROM sources
 WHERE id = $1 AND deleted_at IS NULL;

@@ -261,6 +261,29 @@ func TestSourceService_Create_DuplicateURL_ReturnsError(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestSourceService_Create_RestoresSoftDeletedURL(t *testing.T) {
+	svc, userID, cleanup := setupService(t)
+	t.Cleanup(cleanup)
+	ctx := context.Background()
+
+	src, err := svc.Create(ctx, userID, "https://example.com/feed.xml", "")
+	require.NoError(t, err)
+
+	err = svc.Delete(ctx, userID, src.ID)
+	require.NoError(t, err)
+
+	restored, err := svc.Create(ctx, userID, "https://example.com/feed.xml", "Technology")
+	require.NoError(t, err)
+	require.Equal(t, src.ID, restored.ID)
+	require.False(t, restored.DeletedAt.Valid)
+	require.Equal(t, "Technology", restored.Category)
+
+	sources, err := svc.List(ctx, userID)
+	require.NoError(t, err)
+	require.Len(t, sources, 1)
+	require.Equal(t, src.ID, sources[0].ID)
+}
+
 func TestSourceService_Create_InvalidURL_ReturnsError(t *testing.T) {
 	svc, userID, cleanup := setupService(t)
 	t.Cleanup(cleanup)
