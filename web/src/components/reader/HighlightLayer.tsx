@@ -2,8 +2,73 @@
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { useI18n } from '@/lib/i18n';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { deleteHighlight, fetchHighlights, updateHighlightNote, type Highlight } from '@/lib/queries/highlights';
 import { HighlightToolbar } from './HighlightToolbar';
+
+interface HighlightEditorDialogProps {
+  editor: { highlight: Highlight; top: number; left: number };
+  noteDraft: string;
+  setNoteDraft: (value: string) => void;
+  onClose: () => void;
+  onSaveNote: () => void;
+  onRemoveHighlight: () => void;
+  onCopyQuote: () => void;
+}
+
+function HighlightEditorDialog({
+  editor,
+  noteDraft,
+  setNoteDraft,
+  onClose,
+  onSaveNote,
+  onRemoveHighlight,
+  onCopyQuote,
+}: HighlightEditorDialogProps) {
+  const { t } = useI18n();
+  const trapRef = useFocusTrap<HTMLDivElement>({ onEscape: onClose });
+
+  return (
+    <div
+      ref={trapRef}
+      role="dialog"
+      aria-label={t('reader.highlightNoteTitle')}
+      className="fixed z-[120] w-[min(360px,calc(100vw-32px))] rounded-[14px] border border-[var(--border)] bg-[var(--bg-panel)] p-3 shadow-[0_18px_54px_rgba(0,0,0,0.18)]"
+      style={{ top: editor.top, left: editor.left, transform: 'translateX(-50%)' }}
+    >
+      <div className="mb-2 line-clamp-3 rounded-[9px] bg-[var(--bg-hover)] px-3 py-2 text-[12px] leading-relaxed text-[var(--text-2)]">
+        {editor.highlight.quoted_text}
+      </div>
+      <label className="block">
+        <span className="mb-1 block text-[11px] font-medium text-[var(--text-3)]">{t('reader.noteLabel')}</span>
+        <textarea
+          aria-label={t('reader.noteLabel')}
+          value={noteDraft}
+          onChange={(event) => setNoteDraft(event.target.value)}
+          className="min-h-[84px] w-full resize-y rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm leading-relaxed text-[var(--text)] outline-none focus:border-[var(--accent)]"
+        />
+      </label>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={onCopyQuote} className="rounded-[9px] px-3 py-1.5 text-xs font-medium text-[var(--text-3)] hover:bg-[var(--bg-hover)]">
+            {t('reader.copyQuote')}
+          </button>
+          <button type="button" onClick={onRemoveHighlight} className="rounded-[9px] px-3 py-1.5 text-xs font-medium text-[var(--text-error)] hover:bg-[var(--bg-hover)]">
+            {t('reader.deleteHighlight')}
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={onClose} className="rounded-[9px] px-3 py-1.5 text-xs font-medium text-[var(--text-3)] hover:bg-[var(--bg-hover)]">
+            {t('reader.cancelNote')}
+          </button>
+          <button type="button" onClick={onSaveNote} className="rounded-[9px] bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">
+            {t('reader.saveNote')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface Props {
   articleId: number;
@@ -12,7 +77,6 @@ interface Props {
 }
 
 export function HighlightLayer({ articleId, refreshKey, children }: Props) {
-  const { t } = useI18n();
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [editor, setEditor] = useState<{ highlight: Highlight; top: number; left: number } | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
@@ -177,43 +241,15 @@ export function HighlightLayer({ articleId, refreshKey, children }: Props) {
       <HighlightToolbar articleId={articleId} onHighlightCreated={reload} />
       {children}
       {editor ? (
-        <div
-          role="dialog"
-          aria-label={t('reader.highlightNoteTitle')}
-          className="fixed z-[120] w-[min(360px,calc(100vw-32px))] rounded-[14px] border border-[var(--border)] bg-[var(--bg-panel)] p-3 shadow-[0_18px_54px_rgba(0,0,0,0.18)]"
-          style={{ top: editor.top, left: editor.left, transform: 'translateX(-50%)' }}
-        >
-          <div className="mb-2 line-clamp-3 rounded-[9px] bg-[var(--bg-hover)] px-3 py-2 text-[12px] leading-relaxed text-[var(--text-2)]">
-            {editor.highlight.quoted_text}
-          </div>
-          <label className="block">
-            <span className="mb-1 block text-[11px] font-medium text-[var(--text-3)]">{t('reader.noteLabel')}</span>
-            <textarea
-              aria-label={t('reader.noteLabel')}
-              value={noteDraft}
-              onChange={(event) => setNoteDraft(event.target.value)}
-              className="min-h-[84px] w-full resize-y rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm leading-relaxed text-[var(--text)] outline-none focus:border-[var(--accent)]"
-            />
-          </label>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={copyQuote} className="rounded-[9px] px-3 py-1.5 text-xs font-medium text-[var(--text-3)] hover:bg-[var(--bg-hover)]">
-                {t('reader.copyQuote')}
-              </button>
-              <button type="button" onClick={removeHighlight} className="rounded-[9px] px-3 py-1.5 text-xs font-medium text-[var(--text-error)] hover:bg-[var(--bg-hover)]">
-                {t('reader.deleteHighlight')}
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setEditor(null)} className="rounded-[9px] px-3 py-1.5 text-xs font-medium text-[var(--text-3)] hover:bg-[var(--bg-hover)]">
-                {t('reader.cancelNote')}
-              </button>
-              <button type="button" onClick={saveNote} className="rounded-[9px] bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">
-                {t('reader.saveNote')}
-              </button>
-            </div>
-          </div>
-        </div>
+        <HighlightEditorDialog
+          editor={editor}
+          noteDraft={noteDraft}
+          setNoteDraft={setNoteDraft}
+          onClose={() => setEditor(null)}
+          onSaveNote={saveNote}
+          onRemoveHighlight={removeHighlight}
+          onCopyQuote={copyQuote}
+        />
       ) : null}
     </div>
   );

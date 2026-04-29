@@ -7,7 +7,7 @@ import { getSourceColor } from '@/lib/source-meta';
 import type { ArticleItem } from '@/lib/types';
 
 interface Props {
-  current: ArticleItem;
+  current: ArticleItem | null;
   prev: ArticleItem | null;
   next: ArticleItem | null;
   position?: number;
@@ -75,10 +75,12 @@ export function PrevNextBar({ current, prev, next, position, total, markRead }: 
   const searchParams = useSearchParams();
 
   const navigate = async (article: ArticleItem) => {
-    try {
-      await markRead(current.id);
-    } catch {
-      // Keep navigation responsive even if the background mark-read call fails.
+    if (current) {
+      try {
+        await markRead(current.id);
+      } catch {
+        // Keep navigation responsive even if the background mark-read call fails.
+      }
     }
 
     router.push(buildHref(article.id, searchParams));

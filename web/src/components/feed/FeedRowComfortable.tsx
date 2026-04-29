@@ -36,7 +36,7 @@ export function FeedRowComfortable({
   const dimmed = (item.is_read || pendingRead) && !selected;
 
   return (
-    <article
+    <div
       role="button"
       aria-current={selected ? 'true' : undefined}
       tabIndex={0}
@@ -58,68 +58,70 @@ export function FeedRowComfortable({
         />
       ) : null}
 
-      <div className="mb-[5px] flex items-center gap-[5px]">
-        <span className="inline-block h-[10px] w-[10px] shrink-0 rounded-[2px]" style={{ backgroundColor: sourceColor }} />
-        <span className="flex-1 truncate text-[10.5px] font-medium uppercase tracking-[0.03em] text-[var(--text-3)]">
-          {sourceName}
-        </span>
-        {relativeTime ? <span className="text-[11px] text-[var(--text-3)]">{relativeTime}</span> : null}
-      </div>
+      <article>
+        <div className="mb-[5px] flex items-center gap-[5px]">
+          <span className="inline-block h-[10px] w-[10px] shrink-0 rounded-[2px]" style={{ backgroundColor: sourceColor }} />
+          <span className="flex-1 truncate text-[10.5px] font-medium uppercase tracking-[0.03em] text-[var(--text-3)]">
+            {sourceName}
+          </span>
+          {relativeTime ? <span className="text-[11px] text-[var(--text-3)]">{relativeTime}</span> : null}
+        </div>
 
-      <h3 className="text-[14px] font-semibold leading-[1.38] text-[var(--text)]">{displayTitle}</h3>
+        <h3 className="text-[14px] font-semibold leading-[1.38] text-[var(--text)]">{displayTitle}</h3>
 
-      {originalTitle ? (
-        <p className="mt-[3px] text-[11.5px] italic leading-[1.35] text-[var(--text-3)]">{originalTitle}</p>
-      ) : null}
-
-      <div className="mt-1 flex items-center">
-        {readMinutes ? <span className="text-[11px] text-[var(--text-3)]">{t('article.minRead', { count: readMinutes })}</span> : <span />}
-        <div className="flex-1" />
-        {pendingRead ? (
-          <button
-            type="button"
-            aria-label={t('feed.undoReadAria')}
-            onClick={(event) => {
-              event.stopPropagation();
-              onUndoRead?.();
-            }}
-            className="mr-1 rounded-full bg-[var(--bg-elevated)] px-2 py-[3px] text-[10.5px] font-medium text-[var(--text-3)] shadow-[inset_0_0_0_1px_var(--border)] transition-colors hover:text-[var(--accent)]"
-          >
-            {t('feed.readUndo')}
-          </button>
-        ) : onMarkRead && !item.is_read ? (
-          <button
-            type="button"
-            aria-label={t('feed.markRead')}
-            onClick={(event) => {
-              event.stopPropagation();
-              onMarkRead();
-            }}
-            className="mr-1 rounded-full px-2 py-[3px] text-[10.5px] font-medium text-[var(--text-3)] opacity-0 transition-[background,color,opacity] hover:bg-[var(--accent-bg)] hover:text-[var(--accent)] group-hover:opacity-100 focus:opacity-100"
-          >
-            {t('feed.markRead')}
-          </button>
+        {originalTitle ? (
+          <p className="mt-[3px] text-[11.5px] italic leading-[1.35] text-[var(--text-3)]">{originalTitle}</p>
         ) : null}
-        {onStar ? (
-          <button
-            type="button"
-            aria-label={item.is_starred ? 'Unstar article' : 'Star article'}
-            onClick={(event) => {
-              event.stopPropagation();
-              onStar(item.id);
-            }}
-            className={`rounded p-[3px] transition-[opacity,color] duration-150 ${
-              item.is_starred
-                ? 'text-[var(--star)] opacity-100'
-                : 'text-[var(--text-3)] opacity-0 hover:text-[var(--star)] group-hover:opacity-100'
-            }`}
-          >
-            <Star size={13} fill={item.is_starred ? 'currentColor' : 'none'} strokeWidth={item.is_starred ? 0 : 1.8} />
-          </button>
-        ) : item.is_starred ? (
-          <Star size={13} className="text-[var(--star)]" fill="currentColor" strokeWidth={0} />
-        ) : null}
-      </div>
-    </article>
+
+        <div className="mt-1 flex items-center">
+          {readMinutes ? <span className="text-[11px] text-[var(--text-3)]">{t('article.minRead', { count: readMinutes })}</span> : <span />}
+          <div className="flex-1" />
+          {pendingRead ? (
+            <button
+              type="button"
+              aria-label={t('feed.undoReadAria')}
+              onClick={(event) => {
+                event.stopPropagation();
+                onUndoRead?.();
+              }}
+              className="mr-1 rounded-full bg-[var(--bg-elevated)] px-2 py-[3px] text-[10.5px] font-medium text-[var(--text-3)] shadow-[inset_0_0_0_1px_var(--border)] transition-colors hover:text-[var(--accent)]"
+            >
+              {t('feed.readUndo')}
+            </button>
+          ) : onMarkRead && !item.is_read ? (
+            <button
+              type="button"
+              aria-label={t('feed.markRead')}
+              onClick={(event) => {
+                event.stopPropagation();
+                onMarkRead();
+              }}
+              className="mr-1 rounded-full px-2 py-[3px] text-[10.5px] font-medium text-[var(--text-3)] opacity-0 transition-[background,color,opacity] hover:bg-[var(--accent-bg)] hover:text-[var(--accent)] group-hover:opacity-100 focus:opacity-100"
+            >
+              {t('feed.markRead')}
+            </button>
+          ) : null}
+          {onStar ? (
+            <button
+              type="button"
+              aria-label={item.is_starred ? 'Unstar article' : 'Star article'}
+              onClick={(event) => {
+                event.stopPropagation();
+                onStar(item.id);
+              }}
+              className={`rounded p-[3px] transition-[opacity,color] duration-150 ${
+                item.is_starred
+                  ? 'text-[var(--star)] opacity-100'
+                  : 'text-[var(--text-3)] opacity-0 hover:text-[var(--star)] group-hover:opacity-100'
+              }`}
+            >
+              <Star size={13} fill={item.is_starred ? 'currentColor' : 'none'} strokeWidth={item.is_starred ? 0 : 1.8} />
+            </button>
+          ) : item.is_starred ? (
+            <Star size={13} className="text-[var(--star)]" fill="currentColor" strokeWidth={0} />
+          ) : null}
+        </div>
+      </article>
+    </div>
   );
 }

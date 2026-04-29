@@ -14,11 +14,6 @@ import {
 } from '@/lib/queries/sources';
 import type { Source } from '@/lib/types';
 
-type PendingDelete = {
-  source: Source;
-  timeoutId: number;
-};
-
 type MessageState = {
   kind: 'idle' | 'loading' | 'success' | 'error';
   text: string;
@@ -159,7 +154,7 @@ export function SourcesPage() {
   const [sourceUrl, setSourceUrl] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
-  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [deletedSourceIds, setDeletedSourceIds] = useState<Set<number>>(new Set());
   const [message, setMessage] = useState<MessageState>({ kind: 'idle', text: '' });
   const [addSourceStatus, setAddSourceStatus] = useState<AddSourceStatus>({ kind: 'idle', title: '' });
   const [importJobId, setImportJobId] = useState<string | null>(null);
@@ -170,17 +165,8 @@ export function SourcesPage() {
 
   const visibleSources = useMemo(() => {
     if (!sources) return [];
-    if (!pendingDelete) return sources;
-    return sources.filter((source) => source.id !== pendingDelete.source.id);
-  }, [pendingDelete, sources]);
-
-  useEffect(() => {
-    return () => {
-      if (pendingDelete) {
-        window.clearTimeout(pendingDelete.timeoutId);
-      }
-    };
-  }, [pendingDelete]);
+    return sources.filter((source) => !deletedSourceIds.has(source.id));
+  }, [deletedSourceIds, sources]);
 
   useEffect(() => {
     if (!importJobId || !importJob.data) return;
@@ -251,25 +237,15 @@ export function SourcesPage() {
     setMessage({ kind: 'success', text: t('sources.nameUpdated') });
   }
 
-  function queueDelete(source: Source) {
-    if (pendingDelete) {
-      window.clearTimeout(pendingDelete.timeoutId);
+  async function handleDelete(source: Source) {
+    try {
+      await deleteSource.mutateAsync(source.id);
+      setDeletedSourceIds((previous) => new Set(previous).add(source.id));
+      setMessage({ kind: 'success', text: t('sources.deleted', { title: source.title }) });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : t('sources.delete');
+      setMessage({ kind: 'error', text: detail });
     }
-
-    const timeoutId = window.setTimeout(() => {
-      void deleteSource.mutateAsync(source.id);
-      setPendingDelete(null);
-    }, 5000);
-
-    setPendingDelete({ source, timeoutId });
-  }
-
-  function undoDelete() {
-    if (!pendingDelete) return;
-
-    window.clearTimeout(pendingDelete.timeoutId);
-    setPendingDelete(null);
-    setMessage({ kind: 'idle', text: '' });
   }
 
   async function handleRefresh(sourceId: number) {
@@ -459,7 +435,8 @@ export function SourcesPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => queueDelete(source)}
+                        onClick={() => void handleDelete(source)}
+                        disabled={deleteSource.isPending}
                         className="ui-btn-secondary rounded-xl px-3 py-1.5 font-[system-ui] text-xs"
                       >
                         {t('sources.delete')}
@@ -538,19 +515,6 @@ export function SourcesPage() {
           </div>
         ) : null}
       </div>
-
-      {pendingDelete ? (
-        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl bg-[var(--bg-nav)] px-4 py-3 font-[system-ui] text-sm text-[var(--text-inverse)] shadow-lg shadow-black/20">
-          <span>{t('sources.deleted', { title: pendingDelete.source.title })}</span>
-          <button
-            type="button"
-            onClick={undoDelete}
-            className="rounded-full border border-[var(--border-default)]/20 px-3 py-1 text-xs font-medium text-[var(--text-accent)] transition-colors hover:bg-[var(--bg-input)]/10"
-          >
-            {t('feed.undo')}
-          </button>
-        </div>
-      ) : null}
     </main>
   );
 }

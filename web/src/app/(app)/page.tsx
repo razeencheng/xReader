@@ -61,10 +61,8 @@ function FeedPageContent() {
     const query = params.toString();
     const nextUrl = query ? `/?${query}` : '/';
 
-    // For same-page reader state, native history updates useSearchParams
-    // immediately and reliably strips stale query params after a hard refresh.
-    window.history.pushState(null, '', nextUrl);
-  }, [searchParams]);
+    router.replace(nextUrl, { scroll: false });
+  }, [router, searchParams]);
 
   const showSourceBrowser = currentView === 'sources' && selectedSourceId === null;
   const { data } = useArticles(tab, currentView === 'sources' ? selectedSourceId : null, undefined, {
@@ -149,11 +147,6 @@ function FeedPageContent() {
     onToggleStar: () => handleToggleStar(currentArticle),
     onMarkRead: () => handleMarkRead(currentArticle),
     onToggleFocus: handleToggleFocus,
-    onEscape: () => {
-      if (focusMode) {
-        setFocusMode(false);
-      }
-    },
   });
 
   return (

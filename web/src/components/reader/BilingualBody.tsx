@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import DOMPurify from 'dompurify';
 import { createSSEClient, type SSEClient } from '@/lib/sse-client';
 import { fontForLang } from '@/lib/langFonts';
 import { isSameLanguage } from '@/lib/article-meta';
@@ -111,9 +112,18 @@ function normalizeReaderImages(root: HTMLElement) {
   });
 }
 
+function sanitizeHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true },
+    FORBID_TAGS: ['style', 'script', 'iframe', 'form', 'object', 'embed'],
+    FORBID_ATTR: ['onerror', 'onclick', 'onload', 'onmouseover'],
+  });
+}
+
 function splitContentHtml(contentHtml: string) {
+  const sanitized = sanitizeHtml(contentHtml);
   const parser = new DOMParser();
-  const doc = parser.parseFromString(`<body>${contentHtml}</body>`, 'text/html');
+  const doc = parser.parseFromString(`<body>${sanitized}</body>`, 'text/html');
   removeHiddenHeadingAnchors(doc.body);
   normalizeReaderImages(doc.body);
   const paragraphs: string[] = [];

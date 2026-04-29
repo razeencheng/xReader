@@ -20,6 +20,6 @@ func (h *Handler) Logout(c *gin.Context) {
 	if err == nil && cookie != "" {
 		_ = h.SessionStore.Delete(c.Request.Context(), cookie)
 	}
-	c.SetCookie("xreader_session", "", -1, "/", "", false, true)
+	c.SetCookie("xreader_session", "", -1, "/", "", h.isSecureCookie(c), true)
 	c.JSON(http.StatusOK, gin.H{"status": "logged out"})
 }

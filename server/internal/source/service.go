@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -11,12 +12,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jin/xreader-web/db/gen"
+	"github.com/jin/xreader-web/internal/ai"
 )
+
+// ErrSourceNotFound is returned when a source does not exist or does not belong to the user.
+var ErrSourceNotFound = errors.New("source not found")
 
 type SourceService struct {
 	pool     *pgxpool.Pool
 	queries  *gen.Queries
 	adapters map[string]SourceAdapter
+	aiClient ai.AIClient
 }
 
 type SourceListItem struct {
@@ -38,6 +44,10 @@ func NewSourceService(pool *pgxpool.Pool, adapters ...SourceAdapter) *SourceServ
 		m[a.Kind()] = a
 	}
 	return &SourceService{pool: pool, queries: gen.New(pool), adapters: m}
+}
+
+func (s *SourceService) SetAIClient(client ai.AIClient) {
+	s.aiClient = client
 }
 
 func (s *SourceService) List(ctx context.Context, userID int64) ([]SourceListItem, error) {
@@ -110,7 +120,7 @@ func (s *SourceService) Create(ctx context.Context, userID int64, rawURL string,
 func (s *SourceService) Rename(ctx context.Context, userID int64, sourceID int64, title string) error {
 	src, err := s.queries.GetSourceByID(ctx, sourceID)
 	if err != nil || src.UserID != userID {
-		return fmt.Errorf("source not found")
+		return ErrSourceNotFound
 	}
 	return s.queries.UpdateSourceTitle(ctx, gen.UpdateSourceTitleParams{ID: sourceID, Title: title})
 }
@@ -118,7 +128,7 @@ func (s *SourceService) Rename(ctx context.Context, userID int64, sourceID int64
 func (s *SourceService) UpdateCategory(ctx context.Context, userID int64, sourceID int64, category string) error {
 	src, err := s.queries.GetSourceByID(ctx, sourceID)
 	if err != nil || src.UserID != userID {
-		return fmt.Errorf("source not found")
+		return ErrSourceNotFound
 	}
 	if category == "" {
 		category = "General"
@@ -129,7 +139,7 @@ func (s *SourceService) UpdateCategory(ctx context.Context, userID int64, source
 func (s *SourceService) Delete(ctx context.Context, userID int64, sourceID int64) error {
 	src, err := s.queries.GetSourceByID(ctx, sourceID)
 	if err != nil || src.UserID != userID {
-		return fmt.Errorf("source not found")
+		return ErrSourceNotFound
 	}
 	return s.queries.SoftDeleteSource(ctx, sourceID)
 }
@@ -137,7 +147,7 @@ func (s *SourceService) Delete(ctx context.Context, userID int64, sourceID int64
 func (s *SourceService) Refresh(ctx context.Context, userID int64, sourceID int64) (int, error) {
 	src, err := s.queries.GetSourceByID(ctx, sourceID)
 	if err != nil || src.UserID != userID {
-		return 0, fmt.Errorf("source not found")
+		return 0, ErrSourceNotFound
 	}
 
 	adapter, ok := s.adapters[src.Kind]
@@ -145,7 +155,33 @@ func (s *SourceService) Refresh(ctx context.Context, userID int64, sourceID int6
 		return 0, fmt.Errorf("no adapter for kind %s", src.Kind)
 	}
 
-	return runFetch(ctx, s.queries, adapter, src)
+	inserted, articleIDs, err := runFetch(ctx, s.queries, adapter, src)
+	if err != nil {
+		return inserted, err
+	}
+	s.runEagerAI(ctx, articleIDs)
+	return inserted, nil
+}
+
+func (s *SourceService) runEagerAI(ctx context.Context, articleIDs []int64) {
+	if s.aiClient == nil || len(articleIDs) == 0 {
+		return
+	}
+
+	targetLanguages, err := s.queries.ListDistinctNativeLanguages(ctx)
+	if err != nil {
+		log.Printf("source: list native languages for eager AI: %v", err)
+		return
+	}
+
+	for _, articleID := range articleIDs {
+		for _, targetLang := range targetLanguages {
+			job := ai.NewEagerJob(s.pool, s.aiClient, articleID, targetLang)
+			if err := job.Run(ctx); err != nil {
+				log.Printf("source: eager AI for article %d (%s): %v", articleID, targetLang, err)
+			}
+		}
+	}
 }
 
 func (s *SourceService) listUnreadCounts(ctx context.Context, userID int64) (map[int64]int64, error) {
@@ -218,7 +254,7 @@ func defaultCategory(category string) string {
 	return trimmed
 }
 
-func runFetch(ctx context.Context, queries *gen.Queries, adapter SourceAdapter, src gen.Source) (inserted int, err error) {
+func runFetch(ctx context.Context, queries *gen.Queries, adapter SourceAdapter, src gen.Source) (inserted int, articleIDs []int64, err error) {
 	isInitialFetch := !src.LastSuccessAt.Valid
 	adapterSrc := Source{
 		ID:            src.ID,
@@ -244,7 +280,7 @@ func runFetch(ctx context.Context, queries *gen.Queries, adapter SourceAdapter, 
 			ConsecutiveFails: fails,
 			Health:           health,
 		})
-		return 0, fmt.Errorf("fetch source %d: %w", src.ID, fetchErr)
+		return 0, nil, fmt.Errorf("fetch source %d: %w", src.ID, fetchErr)
 	}
 
 	for _, item := range items {
@@ -258,7 +294,7 @@ func runFetch(ctx context.Context, queries *gen.Queries, adapter SourceAdapter, 
 			lang = "unknown"
 		}
 
-		_, upsertErr := queries.UpsertArticle(ctx, gen.UpsertArticleParams{
+		article, upsertErr := queries.UpsertArticle(ctx, gen.UpsertArticleParams{
 			SourceID:       src.ID,
 			ExternalID:     item.ExternalID,
 			Link:           item.Link,
@@ -277,12 +313,13 @@ func runFetch(ctx context.Context, queries *gen.Queries, adapter SourceAdapter, 
 			}
 			continue
 		}
+		articleIDs = append(articleIDs, article.ID)
 		inserted++
 	}
 
 	if isInitialFetch {
 		if _, markErr := queries.MarkInitialSourceBacklogRead(ctx, src.ID); markErr != nil {
-			return inserted, fmt.Errorf("mark initial backlog read for source %d: %w", src.ID, markErr)
+			return inserted, articleIDs, fmt.Errorf("mark initial backlog read for source %d: %w", src.ID, markErr)
 		}
 	}
 
@@ -293,10 +330,10 @@ func runFetch(ctx context.Context, queries *gen.Queries, adapter SourceAdapter, 
 		ConsecutiveFails: 0,
 		Health:           "ok",
 	}); updateErr != nil {
-		return inserted, fmt.Errorf("update source %d fetch status: %w", src.ID, updateErr)
+		return inserted, articleIDs, fmt.Errorf("update source %d fetch status: %w", src.ID, updateErr)
 	}
 
-	return inserted, nil
+	return inserted, articleIDs, nil
 }
 
 func stripHTMLText(html string) string {

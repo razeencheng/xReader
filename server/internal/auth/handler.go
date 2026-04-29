@@ -2,6 +2,7 @@ package auth
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 )
@@ -9,10 +10,19 @@ import (
 type Handler struct {
 	Service      *Service
 	SessionStore SessionStore
+	secureCookie bool
 }
 
 func NewHandler(svc *Service, sessions SessionStore) *Handler {
-	return &Handler{Service: svc, SessionStore: sessions}
+	secure := os.Getenv("COOKIE_SECURE") == "true"
+	return &Handler{Service: svc, SessionStore: sessions, secureCookie: secure}
+}
+
+func (h *Handler) isSecureCookie(c *gin.Context) bool {
+	if h.secureCookie {
+		return true
+	}
+	return c.Request.TLS != nil
 }
 
 func (h *Handler) BeginLogin(c *gin.Context) {
@@ -45,6 +55,6 @@ func (h *Handler) HandleCallback(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("xreader_session", result.SessionID, 30*24*3600, "/", "", false, true)
+	c.SetCookie("xreader_session", result.SessionID, 30*24*3600, "/", "", h.isSecureCookie(c), true)
 	c.Redirect(http.StatusTemporaryRedirect, "/")
 }

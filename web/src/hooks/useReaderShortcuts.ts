@@ -10,7 +10,6 @@ interface ReaderShortcutHandlers {
   onToggleStar?: () => void;
   onMarkRead?: () => void;
   onToggleFocus?: () => void;
-  onEscape?: () => void;
 }
 
 export function useReaderShortcuts({

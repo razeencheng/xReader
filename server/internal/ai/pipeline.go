@@ -80,10 +80,15 @@ func (j *EagerJob) Run(ctx context.Context) error {
 			return fmt.Errorf("upsert summary skip: %w", err)
 		}
 	} else {
+		contentForSummary := article.ContentText
+		const maxSummaryChars = 8000
+		if len(contentForSummary) > maxSummaryChars {
+			contentForSummary = contentForSummary[:maxSummaryChars]
+		}
 		resp, err := j.client.ChatCompletion(ctx, ChatRequest{
 			Messages: []ChatMessage{
 				{Role: "system", Content: SummaryPrompt(j.targetLang)},
-				{Role: "user", Content: article.ContentText},
+				{Role: "user", Content: contentForSummary},
 			},
 		})
 		if err != nil {

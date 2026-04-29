@@ -62,6 +62,28 @@ func TestLazyJob_TranslatesAndPersists(t *testing.T) {
 	require.Equal(t, "第二段", content[1].Translation)
 }
 
+func TestParseParagraphTranslations_PreservesYearPrefixesInUnnumberedLines(t *testing.T) {
+	results := ParseParagraphTranslations(
+		[]Paragraph{{Index: 0, Original: "First"}, {Index: 1, Original: "Second"}},
+		"2026. 年度互联网中断回顾\n第二段翻译",
+	)
+
+	require.Len(t, results, 2)
+	require.Equal(t, "2026. 年度互联网中断回顾", results[0].Translation)
+	require.Equal(t, "第二段翻译", results[1].Translation)
+}
+
+func TestParseParagraphTranslations_AcceptsOrdinalLabelsForRequestedRange(t *testing.T) {
+	results := ParseParagraphTranslations(
+		[]Paragraph{{Index: 5, Original: "First"}, {Index: 6, Original: "Second"}},
+		"1. 第一段翻译\n2. 第二段翻译",
+	)
+
+	require.Len(t, results, 2)
+	require.Equal(t, "第一段翻译", results[0].Translation)
+	require.Equal(t, "第二段翻译", results[1].Translation)
+}
+
 func insertAIJobUser(t *testing.T, ctx context.Context, pool *pgxpool.Pool) int64 {
 	t.Helper()
 	var userID int64

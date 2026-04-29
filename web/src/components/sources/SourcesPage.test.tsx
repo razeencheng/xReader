@@ -9,13 +9,17 @@ const queryState = vi.hoisted(() => ({
     mutateAsync: vi.fn(),
     isPending: false,
   },
+  deleteSource: {
+    mutateAsync: vi.fn(),
+    isPending: false,
+  },
 }));
 
 vi.mock('@/lib/queries/sources', () => ({
   useSources: () => ({ data: queryState.sources, isLoading: false, isFetching: false }),
   useCreateSource: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useRenameSource: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useDeleteSource: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteSource: () => queryState.deleteSource,
   useRefreshSource: () => queryState.refreshSource,
   useSourceImportJob: () => ({ data: null, isFetching: false }),
 }));
@@ -31,6 +35,9 @@ beforeEach(() => {
   queryState.refreshSource.mutateAsync.mockReset();
   queryState.refreshSource.mutateAsync.mockResolvedValue(undefined);
   queryState.refreshSource.isPending = false;
+  queryState.deleteSource.mutateAsync.mockReset();
+  queryState.deleteSource.mutateAsync.mockResolvedValue(undefined);
+  queryState.deleteSource.isPending = false;
   useUIStore.setState({ nativeLanguage: 'zh-CN' });
 });
 
@@ -127,4 +134,28 @@ test('SourcesPage shows refresh errors instead of failing silently', async () =>
   await user.click(screen.getByRole('button', { name: '刷新' }));
 
   expect(await screen.findByText('network down')).toBeInTheDocument();
+});
+
+test('SourcesPage deletes a source immediately instead of waiting for unloadable undo timer', async () => {
+  queryState.sources = [
+    {
+      id: 1,
+      title: "Let's Encrypt",
+      url: 'https://letsencrypt.org/feed.xml',
+      category: 'General',
+      icon_url: null,
+      unread_count: 0,
+      last_fetched_at: null,
+      last_success_at: null,
+      consecutive_fails: 0,
+      health: 'unknown',
+    },
+  ];
+  const user = userEvent.setup();
+
+  render(<SourcesPage />, { wrapper });
+  await user.click(screen.getByRole('button', { name: '删除' }));
+
+  expect(queryState.deleteSource.mutateAsync).toHaveBeenCalledWith(1);
+  expect(await screen.findByText("已删除 Let's Encrypt")).toBeInTheDocument();
 });

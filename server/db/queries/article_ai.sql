@@ -6,12 +6,13 @@ ON CONFLICT (article_id, target_language) DO UPDATE SET
   updated_at = now();
 
 -- name: UpsertSummary :exec
-UPDATE article_ai
-SET summary = $3,
-    summary_status = $4,
-    summary_skip_reason = $5,
-    updated_at = now()
-WHERE article_id = $1 AND target_language = $2;
+INSERT INTO article_ai (article_id, target_language, summary, summary_status, summary_skip_reason, updated_at)
+VALUES ($1, $2, $3, $4, $5, now())
+ON CONFLICT (article_id, target_language) DO UPDATE SET
+  summary = EXCLUDED.summary,
+  summary_status = EXCLUDED.summary_status,
+  summary_skip_reason = EXCLUDED.summary_skip_reason,
+  updated_at = now();
 
 -- name: GetArticleAI :one
 SELECT * FROM article_ai

@@ -55,6 +55,7 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 	// Auth-protected routes
 	authed := r.Group("/api")
 	authed.Use(middleware.RequireAuth(sessions, deps.Pool))
+	authed.Use(middleware.RequireCSRF())
 	{
 		// Auth
 		authed.GET("/auth/me", authH.GetMe)
@@ -67,6 +68,7 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 
 		// Sources
 		sourceSvc := source.NewSourceService(deps.Pool, source.NewRSSAdapter())
+		sourceSvc.SetAIClient(ai.NewDynamicClient(aiSettings))
 		sourceH := source.NewSourceHandler(sourceSvc, nil)
 		authed.GET("/sources", sourceH.List)
 		authed.POST("/sources", sourceH.Create)
@@ -87,7 +89,6 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		authed.POST("/articles/:id/original", articleH.LoadOriginal)
 		authed.PATCH("/articles/:id/state", articleH.UpdateState)
 		authed.PUT("/articles/:id/progress", articleH.UpdateProgress)
-		authed.POST("/articles/batch-state", articleH.BatchState)
 		authed.POST("/articles/batch/state", articleH.BatchState)
 		authed.GET("/articles/changes", articleH.Changes)
 		authed.GET("/images/proxy", imageProxyH.Proxy)
@@ -95,10 +96,6 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		// Article AI
 		aiH := article.NewAIHandler(deps.Pool)
 		authed.GET("/articles/:id/ai", aiH.GetArticleAI)
-		aiSettingsH := ai.NewSettingsHandler(aiSettings)
-		authed.GET("/ai/settings", aiSettingsH.Get)
-		authed.PATCH("/ai/settings", aiSettingsH.Update)
-
 		// Article SSE + body retry
 		sseH := article.NewSSEHandler(deps.Pool, ai.NewDynamicClient(aiSettings), 3)
 		authed.GET("/articles/:id/body-translation", sseH.BodyTranslation)
@@ -122,6 +119,10 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 			adminGroup.GET("/admin/allowlist", allowH.List)
 			adminGroup.POST("/admin/allowlist", allowH.Add)
 			adminGroup.DELETE("/admin/allowlist/:username", allowH.Remove)
+
+			aiSettingsH := ai.NewSettingsHandler(aiSettings)
+			adminGroup.GET("/ai/settings", aiSettingsH.Get)
+			adminGroup.PATCH("/ai/settings", aiSettingsH.Update)
 		}
 	}
 

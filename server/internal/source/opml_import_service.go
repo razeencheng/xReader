@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 )
 
 func (s *SourceService) ImportOPML(ctx context.Context, userID int64, feeds []FlatFeed, jobID string, store JobStore) {
@@ -15,19 +16,29 @@ func (s *SourceService) ImportOPML(ctx context.Context, userID int64, feeds []Fl
 	store.Set(jobID, status)
 
 	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
 		defer func() {
 			status.Status = "done"
 			store.Set(jobID, status)
 		}()
 
 		for _, feed := range feeds {
+			if ctx.Err() != nil {
+				status.Failed += len(feeds) - status.Succeeded - status.Failed - status.Skipped
+				if status.Error == "" {
+					status.Error = "import timed out"
+				}
+				break
+			}
+
 			if strings.TrimSpace(feed.XMLURL) == "" {
 				status.Failed++
 				store.Set(jobID, status)
 				continue
 			}
 
-			_, err := s.Create(context.Background(), userID, feed.XMLURL, feed.Folder)
+			_, err := s.Create(ctx, userID, feed.XMLURL, feed.Folder)
 			if err != nil {
 				if isUniqueViolation(err) {
 					status.Skipped++

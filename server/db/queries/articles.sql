@@ -131,10 +131,10 @@ SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at,
        COALESCE(st.is_read, false) AS is_read,
        COALESCE(st.is_starred, false) AS is_starred
 FROM articles a
-JOIN sources s ON a.source_id = s.id
-LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
-LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
-WHERE a.source_id = $3
+JOIN sources s ON a.source_id = s.id AND s.user_id = @user_id
+LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = @target_language
+LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = @user_id
+WHERE a.source_id = @source_id
 ORDER BY a.published_at DESC;
 
 -- name: ListUnreadArticlesEnriched :many

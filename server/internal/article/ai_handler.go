@@ -38,6 +38,18 @@ func (h *AIHandler) GetArticleAI(c *gin.Context) {
 		return
 	}
 
+	// Verify article ownership via its source
+	article, err := h.queries.GetArticleByID(c.Request.Context(), articleID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
+		return
+	}
+	source, err := h.queries.GetSourceByID(c.Request.Context(), article.SourceID)
+	if err != nil || source.UserID != user.ID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
+		return
+	}
+
 	lang := c.Query("lang")
 	if lang == "" {
 		lang = user.NativeLanguage

@@ -155,6 +155,62 @@ func TestSSE_UsesPartialCacheAndTranslatesOnlyMissingParagraphs(t *testing.T) {
 	require.NotContains(t, job.Calls[0].Messages[1].Content, "[1] Two")
 }
 
+func TestSSE_MapsUnnumberedTranslationLinesByRequestedOrder(t *testing.T) {
+	r, _, queries, pool, userID, sourceID, cleanup := setupArticleHandlerTest(t)
+	t.Cleanup(cleanup)
+
+	ctx := context.Background()
+	article := insertHandlerArticle(t, queries, ctx, sourceID, "unnumbered", time.Now())
+	article, err := queries.UpdateArticleContent(ctx, gen.UpdateArticleContentParams{
+		ID:          article.ID,
+		ContentHtml: "<p>One</p><p>Two</p>",
+		ContentText: "One Two",
+	})
+	require.NoError(t, err)
+
+	job := &ai.MockClient{Response: ai.ChatResponse{Content: "第一段\n第二段"}}
+	h := NewSSEHandler(pool, job, 10)
+	r.Use(withArticleUser(userID))
+	r.GET("/api/articles/:id/body-translation", h.BodyTranslation)
+
+	w := httptest.NewRecorder()
+	req, err := http.NewRequest("GET", fmt.Sprintf("/api/articles/%d/body-translation?start=0&count=2", article.ID), nil)
+	require.NoError(t, err)
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), `data: {"index":0,"original":"One","translation":"第一段"}`)
+	require.Contains(t, w.Body.String(), `data: {"index":1,"original":"Two","translation":"第二段"}`)
+}
+
+func TestSSE_KeepsWrappedNumberedParagraphTranslationsTogether(t *testing.T) {
+	r, _, queries, pool, userID, sourceID, cleanup := setupArticleHandlerTest(t)
+	t.Cleanup(cleanup)
+
+	ctx := context.Background()
+	article := insertHandlerArticle(t, queries, ctx, sourceID, "wrapped", time.Now())
+	article, err := queries.UpdateArticleContent(ctx, gen.UpdateArticleContentParams{
+		ID:          article.ID,
+		ContentHtml: "<p>One</p><p>Two</p>",
+		ContentText: "One Two",
+	})
+	require.NoError(t, err)
+
+	job := &ai.MockClient{Response: ai.ChatResponse{Content: "[0] 第一段第一行\n继续第一段\n[1] 第二段"}}
+	h := NewSSEHandler(pool, job, 10)
+	r.Use(withArticleUser(userID))
+	r.GET("/api/articles/:id/body-translation", h.BodyTranslation)
+
+	w := httptest.NewRecorder()
+	req, err := http.NewRequest("GET", fmt.Sprintf("/api/articles/%d/body-translation?start=0&count=2", article.ID), nil)
+	require.NoError(t, err)
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), `"index":0,"original":"One","translation":"第一段第一行\n继续第一段"`)
+	require.Contains(t, w.Body.String(), `data: {"index":1,"original":"Two","translation":"第二段"}`)
+}
+
 func TestSSE_PersistsPartialTranslationWithoutMarkingDone(t *testing.T) {
 	r, _, queries, pool, userID, sourceID, cleanup := setupArticleHandlerTest(t)
 	t.Cleanup(cleanup)

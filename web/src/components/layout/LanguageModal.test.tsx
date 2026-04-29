@@ -12,7 +12,9 @@ test('closes when pressing Escape', () => {
 
   expect(screen.getByText('母语')).toBeInTheDocument();
 
-  fireEvent.keyDown(document, { key: 'Escape' });
+  // Focus trap captures Escape on the dialog container
+  const dialog = screen.getByRole('dialog');
+  fireEvent.keyDown(dialog, { key: 'Escape' });
 
   expect(onClose).toHaveBeenCalledTimes(1);
 });

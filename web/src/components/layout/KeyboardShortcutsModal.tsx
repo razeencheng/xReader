@@ -2,6 +2,7 @@
 
 import { Keyboard, X } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 const SHORTCUT_GROUPS = [
   {
@@ -68,6 +69,7 @@ export function KeyboardShortcutsModal({
   onClose: () => void;
 }) {
   const { t } = useI18n();
+  const trapRef = useFocusTrap<HTMLDivElement>({ onEscape: onClose });
 
   if (!open) {
     return null;
@@ -79,6 +81,7 @@ export function KeyboardShortcutsModal({
       onClick={onClose}
     >
       <div
+        ref={trapRef}
         role="dialog"
         aria-modal="true"
         aria-label={t('shortcuts.title')}

@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
 import { isLanguageOptionActive, LANGUAGE_OPTIONS } from '@/components/layout/navigationConfig';
 import { useI18n } from '@/lib/i18n';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 export function LanguageModal({
   currentLanguage,
@@ -14,19 +14,7 @@ export function LanguageModal({
   onClose: () => void;
 }) {
   const { t } = useI18n();
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape' || event.key === 'Esc') {
-        onClose();
-      }
-    }
-
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [onClose]);
+  const trapRef = useFocusTrap<HTMLDivElement>({ onEscape: onClose });
 
   return (
     <div
@@ -34,6 +22,7 @@ export function LanguageModal({
       onClick={onClose}
     >
       <div
+        ref={trapRef}
         role="dialog"
         aria-modal="true"
         aria-label={t('language.title')}

@@ -136,6 +136,17 @@ func (h *ArticleHandler) GetByID(c *gin.Context) {
 	}
 
 	resp := articleDetailResponse{articleResponse: toArticleResponse(articleRow, true), IsRead: state.IsRead, IsStarred: state.IsStarred}
+	targetLang := user.NativeLanguage
+	if targetLang == "" {
+		targetLang = "zh-CN"
+	}
+	if aiRow, err := h.Service.queries.GetArticleAI(ctx, gen.GetArticleAIParams{
+		ArticleID:      id,
+		TargetLanguage: targetLang,
+	}); err == nil {
+		resp.TitleTranslated = aiRow.TitleTranslated
+		resp.Summary = aiRow.Summary
+	}
 	if len(state.ReadingProgress) > 0 {
 		resp.ReadingProgress = json.RawMessage(state.ReadingProgress)
 	}

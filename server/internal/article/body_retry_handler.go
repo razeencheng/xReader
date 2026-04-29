@@ -21,9 +21,26 @@ func NewBodyRetryHandler(pool *pgxpool.Pool) *BodyRetryHandler {
 
 func (h *BodyRetryHandler) Retry(c *gin.Context) {
     user := middleware.GetUser(c)
+    if user == nil {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+        return
+    }
+
     articleID, err := strconv.ParseInt(c.Param("id"), 10, 64)
     if err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+        return
+    }
+
+    // Verify article ownership via its source
+    article, err := h.queries.GetArticleByID(c.Request.Context(), articleID)
+    if err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
+        return
+    }
+    source, err := h.queries.GetSourceByID(c.Request.Context(), article.SourceID)
+    if err != nil || source.UserID != user.ID {
+        c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
         return
     }
 

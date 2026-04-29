@@ -1,4 +1,5 @@
 .superpowers/
+.codex/
 .env
 .env.local
 node_modules/

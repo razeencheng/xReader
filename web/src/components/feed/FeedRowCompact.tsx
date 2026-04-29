@@ -25,7 +25,7 @@ export function FeedRowCompact({ item, selected = false, pendingRead = false, on
   const dimmed = (item.is_read || pendingRead) && !selected;
 
   return (
-    <article
+    <div
       role="button"
       aria-current={selected ? 'true' : undefined}
       tabIndex={0}
@@ -47,41 +47,43 @@ export function FeedRowCompact({ item, selected = false, pendingRead = false, on
         />
       ) : null}
 
-      <div className="mb-1 flex items-center gap-[5px]">
-        <span className="inline-block h-[10px] w-[10px] shrink-0 rounded-[2px]" style={{ backgroundColor: sourceColor }} />
-        <span className="flex-1 truncate text-[10.5px] font-medium uppercase tracking-[0.03em] text-[var(--text-3)]">
-          {sourceName}
-        </span>
-        {relativeTime ? <span className="text-[11px] text-[var(--text-3)]">{relativeTime}</span> : null}
-      </div>
+      <article>
+        <div className="mb-1 flex items-center gap-[5px]">
+          <span className="inline-block h-[10px] w-[10px] shrink-0 rounded-[2px]" style={{ backgroundColor: sourceColor }} />
+          <span className="flex-1 truncate text-[10.5px] font-medium uppercase tracking-[0.03em] text-[var(--text-3)]">
+            {sourceName}
+          </span>
+          {relativeTime ? <span className="text-[11px] text-[var(--text-3)]">{relativeTime}</span> : null}
+        </div>
 
-      <div className="text-[13px] font-semibold leading-[1.38] text-[var(--text)]">{displayTitle}</div>
-      {originalTitle ? <div className="mt-[3px] text-[11px] italic leading-[1.35] text-[var(--text-3)]">{originalTitle}</div> : null}
-      {pendingRead ? (
-        <button
-          type="button"
-          aria-label={t('feed.undoReadAria')}
-          onClick={(event) => {
-            event.stopPropagation();
-            onUndoRead?.();
-          }}
-          className="mt-[6px] rounded-full bg-[var(--bg-elevated)] px-2 py-[3px] text-[10.5px] font-medium text-[var(--text-3)] shadow-[inset_0_0_0_1px_var(--border)] transition-colors hover:text-[var(--accent)]"
-        >
-          {t('feed.readUndo')}
-        </button>
-      ) : onMarkRead && !item.is_read ? (
-        <button
-          type="button"
-          aria-label={t('feed.markRead')}
-          onClick={(event) => {
-            event.stopPropagation();
-            onMarkRead();
-          }}
-          className="mt-[6px] rounded-full px-2 py-[3px] text-[10.5px] font-medium text-[var(--text-3)] opacity-0 transition-[background,color,opacity] hover:bg-[var(--accent-bg)] hover:text-[var(--accent)] group-hover:opacity-100 focus:opacity-100"
-        >
-          {t('feed.markRead')}
-        </button>
-      ) : null}
-    </article>
+        <div className="text-[13px] font-semibold leading-[1.38] text-[var(--text)]">{displayTitle}</div>
+        {originalTitle ? <div className="mt-[3px] text-[11px] italic leading-[1.35] text-[var(--text-3)]">{originalTitle}</div> : null}
+        {pendingRead ? (
+          <button
+            type="button"
+            aria-label={t('feed.undoReadAria')}
+            onClick={(event) => {
+              event.stopPropagation();
+              onUndoRead?.();
+            }}
+            className="mt-[6px] rounded-full bg-[var(--bg-elevated)] px-2 py-[3px] text-[10.5px] font-medium text-[var(--text-3)] shadow-[inset_0_0_0_1px_var(--border)] transition-colors hover:text-[var(--accent)]"
+          >
+            {t('feed.readUndo')}
+          </button>
+        ) : onMarkRead && !item.is_read ? (
+          <button
+            type="button"
+            aria-label={t('feed.markRead')}
+            onClick={(event) => {
+              event.stopPropagation();
+              onMarkRead();
+            }}
+            className="mt-[6px] rounded-full px-2 py-[3px] text-[10.5px] font-medium text-[var(--text-3)] opacity-0 transition-[background,color,opacity] hover:bg-[var(--accent-bg)] hover:text-[var(--accent)] group-hover:opacity-100 focus:opacity-100"
+          >
+            {t('feed.markRead')}
+          </button>
+        ) : null}
+      </article>
+    </div>
   );
 }

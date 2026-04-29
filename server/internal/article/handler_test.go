@@ -108,6 +108,42 @@ func TestArticleHandler_ListAndDetail(t *testing.T) {
 	require.Equal(t, "<p>hello world</p>", detailResp["content_html"])
 }
 
+func TestArticleHandler_DetailIncludesNativeLanguageAI(t *testing.T) {
+	r, handler, queries, _, userID, sourceID, cleanup := setupArticleHandlerTest(t)
+	t.Cleanup(cleanup)
+	ctx := context.Background()
+
+	article := insertHandlerArticle(t, queries, ctx, sourceID, "original title", time.Now())
+	require.NoError(t, queries.EnsureArticleAI(ctx, gen.EnsureArticleAIParams{
+		ArticleID:      article.ID,
+		TargetLanguage: "zh-CN",
+	}))
+	require.NoError(t, queries.UpsertTitleTranslation(ctx, gen.UpsertTitleTranslationParams{
+		ArticleID:       article.ID,
+		TargetLanguage:  "zh-CN",
+		TitleTranslated: "中文标题",
+	}))
+	require.NoError(t, queries.UpsertSummary(ctx, gen.UpsertSummaryParams{
+		ArticleID:      article.ID,
+		TargetLanguage: "zh-CN",
+		Summary:        "要点内容",
+		SummaryStatus:  "done",
+	}))
+
+	r.Use(withArticleUser(userID))
+	r.GET("/api/articles/:id", handler.GetByID)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/articles/%d", article.ID), nil)
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var detailResp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &detailResp))
+	require.Equal(t, "中文标题", detailResp["title_translated"])
+	require.Equal(t, "要点内容", detailResp["summary"])
+}
+
 func TestArticleHandler_LoadOriginalUsesArticleLink(t *testing.T) {
 	r, handler, queries, _, userID, sourceID, cleanup := setupArticleHandlerTest(t)
 	t.Cleanup(cleanup)

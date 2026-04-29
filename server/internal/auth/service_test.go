@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/jin/xreader-web/internal/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -118,4 +119,42 @@ func TestAuthService_Callback_RejectsInvalidState(t *testing.T) {
 
 	_, err := svc.Callback(ctx, "bad-state", "gh-code", "test-agent")
 	require.ErrorIs(t, err, ErrInvalidState)
+}
+
+func TestAuthService_Callback_SeededAdminFirstLoginGetsAdminRole(t *testing.T) {
+	ctx := context.Background()
+	pool, cleanup := testutil.SetupTestDB(t, ctx)
+	t.Cleanup(cleanup)
+
+	_, err := pool.Exec(ctx,
+		"INSERT INTO auth_allowlist (github_username, note) VALUES ($1, $2)",
+		"razeencheng", "seed-admin CLI",
+	)
+	require.NoError(t, err)
+
+	states := newMockStateStore()
+	require.NoError(t, states.Save(ctx, "valid-state"))
+
+	svc := &Service{
+		GitHub: &mockGitHub{
+			user: &GitHubUser{
+				GitHubID:  456,
+				Username:  "razeencheng",
+				AvatarURL: "https://avatar",
+			},
+		},
+		States:    states,
+		Allowlist: &mockAllowlist{allowed: map[string]bool{"razeencheng": true}},
+		Users:     NewPgUserStore(pool),
+		Sessions:  &mockSessionCreator{},
+	}
+
+	result, err := svc.Callback(ctx, "valid-state", "gh-code", "test-agent")
+	require.NoError(t, err)
+	require.NotZero(t, result.UserID)
+
+	var role string
+	err = pool.QueryRow(ctx, "SELECT role FROM users WHERE id = $1", result.UserID).Scan(&role)
+	require.NoError(t, err)
+	require.Equal(t, "admin", role)
 }

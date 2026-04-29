@@ -1,6 +1,7 @@
 package source
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -132,7 +133,7 @@ func (h *SourceHandler) Refresh(c *gin.Context) {
 	user := middleware.GetUser(c)
 	inserted, err := h.Service.Refresh(c.Request.Context(), user.ID, id)
 	if err != nil {
-		if err.Error() == "source not found" {
+		if errors.Is(err, ErrSourceNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "source not found"})
 			return
 		}

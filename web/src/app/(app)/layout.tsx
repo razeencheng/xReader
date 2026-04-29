@@ -19,11 +19,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, isLoading, fetchMe } = useAuthStore();
   const hydrate = useUIStore((state) => state.hydrate);
+  const hydrateFromLocalStorage = useUIStore((state) => state.hydrateFromLocalStorage);
   const focusMode = useUIStore((state) => state.focusMode);
   const isShortcutsOpen = useUIStore((state) => state.isShortcutsOpen);
   const closeShortcuts = useUIStore((state) => state.closeShortcuts);
 
   useGlobalShortcuts();
+
+  // Hydrate UI state from localStorage on mount (avoids SSR mismatch)
+  useEffect(() => {
+    hydrateFromLocalStorage();
+  }, [hydrateFromLocalStorage]);
 
   useEffect(() => {
     void fetchMe();

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -20,8 +21,14 @@ import (
 	"github.com/jin/xreader-web/db/gen"
 )
 
-// TODO: move this local passphrase to deployment-managed secret storage before production use.
-const aiSettingsEncryptionPassphrase = "xreader-local-ai-settings-v1"
+const defaultEncryptionPassphrase = "xreader-local-ai-settings-v1"
+
+func aiSettingsEncryptionPassphrase() string {
+	if v := os.Getenv("XREADER_AI_ENCRYPTION_KEY"); v != "" {
+		return v
+	}
+	return defaultEncryptionPassphrase
+}
 
 type SettingsSnapshot struct {
 	Endpoint   string `json:"endpoint"`
@@ -278,7 +285,7 @@ func decryptAPIKey(ciphertext, nonce []byte) (string, error) {
 }
 
 func apiKeyCipher() (cipher.AEAD, error) {
-	key := sha256.Sum256([]byte(aiSettingsEncryptionPassphrase))
+	key := sha256.Sum256([]byte(aiSettingsEncryptionPassphrase()))
 	block, err := aes.NewCipher(key[:])
 	if err != nil {
 		return nil, err

@@ -60,6 +60,12 @@ func (h *SSEHandler) BodyTranslation(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
 		return
 	}
+	// Verify article ownership via its source
+	source, err := h.queries.GetSourceByID(ctx, article.SourceID)
+	if err != nil || source.UserID != user.ID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
+		return
+	}
 	paragraphs := ai.SplitParagraphs(article.ContentHtml)
 	start, end, err := parseBodyTranslationRange(c, len(paragraphs))
 	if err != nil {
@@ -285,7 +291,7 @@ func (h *SSEHandler) translateBatch(ctx context.Context, batch []ai.Paragraph, t
 
 	resp, err := h.aiClient.ChatCompletion(ctx, ai.ChatRequest{
 		Messages: []ai.ChatMessage{
-			{Role: "system", Content: fmt.Sprintf("Translate each numbered paragraph into %s. Keep the numbering and output one translated paragraph per line.", targetLang)},
+			{Role: "system", Content: fmt.Sprintf("Translate each numbered paragraph into %s. Preserve each [index] label exactly, do not reorder paragraphs, and do not merge separate paragraphs.", targetLang)},
 			{Role: "user", Content: prompt.String()},
 		},
 	})
@@ -293,23 +299,7 @@ func (h *SSEHandler) translateBatch(ctx context.Context, batch []ai.Paragraph, t
 		return nil, err
 	}
 
-	lines := strings.Split(strings.TrimSpace(resp.Content), "\n")
-	results := make([]ai.TranslatedParagraph, 0, len(batch))
-	for _, p := range batch {
-		translation := ""
-		prefix := fmt.Sprintf("[%d]", p.Index)
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, prefix) {
-				translation = strings.TrimSpace(strings.TrimPrefix(line, prefix))
-				break
-			}
-		}
-		results = append(results, ai.TranslatedParagraph{
-			Index: p.Index, Original: p.Original, Translation: translation,
-		})
-	}
-	return results, nil
+	return ai.ParseParagraphTranslations(batch, resp.Content), nil
 }
 
 func writeCachedBodyTranslationRange(w http.ResponseWriter, paragraphs []ai.Paragraph, cached map[int]ai.TranslatedParagraph) {
@@ -336,9 +326,9 @@ func writeSSENamedEvent(w http.ResponseWriter, event string, payload map[string]
 }
 
 func setSSEHeaders(c *gin.Context) {
-	c.Status(http.StatusOK)
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
 	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Status(http.StatusOK)
 	c.Writer.Flush()
 }

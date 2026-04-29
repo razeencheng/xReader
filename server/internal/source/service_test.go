@@ -3,9 +3,12 @@ package source
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/jin/xreader-web/db/gen"
+	"github.com/jin/xreader-web/internal/ai"
 	"github.com/jin/xreader-web/internal/testutil"
 	"github.com/stretchr/testify/require"
 )
@@ -29,6 +32,21 @@ func (m *mockAdapter) Validate(ctx context.Context, url string) (SourceMetadata,
 		return SourceMetadata{}, m.validateErr
 	}
 	return m.validateMeta, nil
+}
+
+type sequenceAIClient struct {
+	responses []ai.ChatResponse
+	calls     []ai.ChatRequest
+}
+
+func (c *sequenceAIClient) ChatCompletion(ctx context.Context, req ai.ChatRequest) (ai.ChatResponse, error) {
+	c.calls = append(c.calls, req)
+	if len(c.responses) == 0 {
+		return ai.ChatResponse{}, nil
+	}
+	resp := c.responses[0]
+	c.responses = c.responses[1:]
+	return resp, nil
 }
 
 func setupService(t *testing.T) (*SourceService, int64, func()) {
@@ -175,6 +193,60 @@ func TestSourceService_Refresh_FetchesNowAndResetsHealth(t *testing.T) {
 	require.NotNil(t, sources[0].LastSuccessAt)
 	require.EqualValues(t, 0, sources[0].ConsecutiveFails)
 	require.Equal(t, "ok", sources[0].Health)
+}
+
+func TestSourceService_RefreshRunsEagerAIForInsertedArticles(t *testing.T) {
+	ctx := context.Background()
+	pool, cleanup := testutil.SetupTestDB(t, ctx)
+	t.Cleanup(cleanup)
+
+	var userID int64
+	err := pool.QueryRow(ctx,
+		"INSERT INTO users (github_id, github_username, role, native_language) VALUES ($1, $2, $3, $4) RETURNING id",
+		1, "testuser", "user", "zh-CN",
+	).Scan(&userID)
+	require.NoError(t, err)
+
+	adapter := &mockAdapter{
+		validateMeta: SourceMetadata{Title: "Test Feed", LanguageHint: "en"},
+		fetchItems: []RawItem{
+			{
+				ExternalID:   "manual-ai-1",
+				Link:         "https://example.com/manual-ai-1",
+				Title:        "Manual Refresh Title",
+				ContentHTML:  "<p>" + strings.Repeat("This is a long English article body used to trigger summary generation. ", 8) + "</p>",
+				LanguageHint: "en",
+				PublishedAt:  time.Now(),
+			},
+		},
+	}
+	client := &sequenceAIClient{responses: []ai.ChatResponse{
+		{Content: "手动刷新标题"},
+		{Content: "• 要点一"},
+	}}
+	svc := NewSourceService(pool, adapter)
+	svc.SetAIClient(client)
+
+	src, err := svc.Create(ctx, userID, "https://example.com/feed.xml", "")
+	require.NoError(t, err)
+
+	inserted, err := svc.Refresh(ctx, userID, src.ID)
+	require.NoError(t, err)
+	require.Equal(t, 1, inserted)
+	require.Len(t, client.calls, 2)
+
+	var articleID int64
+	err = pool.QueryRow(ctx, "SELECT id FROM articles WHERE normalized_link = $1", "https://example.com/manual-ai-1").Scan(&articleID)
+	require.NoError(t, err)
+
+	aiRow, err := svc.queries.GetArticleAI(ctx, gen.GetArticleAIParams{
+		ArticleID:      articleID,
+		TargetLanguage: "zh-CN",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "手动刷新标题", aiRow.TitleTranslated)
+	require.Equal(t, "• 要点一", aiRow.Summary)
+	require.Equal(t, "done", aiRow.SummaryStatus)
 }
 
 func TestSourceService_Create_DuplicateURL_ReturnsError(t *testing.T) {
