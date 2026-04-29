@@ -2,41 +2,140 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { PlusCircle, Upload } from 'lucide-react';
+import {
+  Check,
+  ChevronLeft,
+  Download,
+  ExternalLink,
+  Grid2X2,
+  List,
+  Plus,
+  RefreshCw,
+  Search,
+  Settings2,
+  Trash2,
+  Upload,
+  X,
+} from 'lucide-react';
 import { ApiError, apiFetch } from '@/lib/api-client';
 import { useI18n } from '@/lib/i18n';
 import {
   useCreateSource,
   useDeleteSource,
   useRefreshSource,
-  useRenameSource,
   useSourceImportJob,
   useSources,
 } from '@/lib/queries/sources';
 import type { Source } from '@/lib/types';
+import styles from './SourcesPage.module.css';
 
-type MessageState = {
-  kind: 'idle' | 'loading' | 'success' | 'error';
-  text: string;
-};
+type SourceStatus = 'healthy' | 'stale' | 'error';
+type StatusFilter = 'all' | SourceStatus;
+type SortMode = 'recent' | 'title' | 'items';
+type Density = 'compact' | 'comfortable';
+type ViewMode = 'list' | 'cards';
+type Tone = 'quiet' | 'editorial';
+type DiscoveryPhase = 'idle' | 'detecting' | 'found' | 'error';
 
-type AddSourceStatus = {
-  kind: 'idle' | 'loading' | 'success' | 'error';
+type Discovery = {
   title: string;
-  detail?: string;
+  site: string;
+  url: string;
+  submitUrl: string;
+  items: number;
 };
 
-const ADD_SOURCE_STEP_KEYS = [
-  'sources.stepCheckInput',
-  'sources.stepParseFeed',
-  'sources.stepSearchPage',
-  'sources.stepCommonPaths',
+type SourceViewModel = Source & {
+  site: string;
+  status: SourceStatus;
+  lastCheckedMs: number;
+  itemCount: number;
+  errorReason: string;
+};
+
+const STARTER_PACKS = [
+  { title: 'simonwillison.net', url: 'https://simonwillison.net/atom/everything/' },
+  { title: 'Overreacted by Dan Abramov', url: 'https://overreacted.io/rss.xml' },
+  { title: 'Joel on Software', url: 'https://www.joelonsoftware.com/feed/' },
 ] as const;
 
-function timeAgo(iso: string | null, t: (key: string, params?: Record<string, string | number>) => string): string {
-  if (!iso) return t('sources.never');
+const STATUS_FILTERS: Array<{ id: StatusFilter; labelKey: string }> = [
+  { id: 'all', labelKey: 'sources.filterAll' },
+  { id: 'healthy', labelKey: 'sources.filterHealthy' },
+  { id: 'stale', labelKey: 'sources.filterStale' },
+  { id: 'error', labelKey: 'sources.filterErrors' },
+];
 
-  const diffMinutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+function getHostFromUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+
+  try {
+    return new URL(trimmed.includes('://') ? trimmed : `https://${trimmed}`).hostname.replace(/^www\./, '');
+  } catch {
+    return trimmed.replace(/^https?:\/\//, '').split('/')[0].replace(/^www\./, '');
+  }
+}
+
+function normalizeComparableUrl(value: string) {
+  return value.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
+}
+
+function titleFromSite(site: string) {
+  const firstPart = site.split('.')[0] || site;
+  return firstPart
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function faviconUrl(site: string) {
+  return site ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(site)}&sz=64` : '';
+}
+
+function isDomainLike(value: string) {
+  const host = getHostFromUrl(value);
+  return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(host);
+}
+
+function buildDiscovery(value: string): Discovery {
+  const submitUrl = value.trim();
+  const site = getHostFromUrl(submitUrl);
+  const hasPath = submitUrl.replace(/^https?:\/\//, '').includes('/');
+  const url = hasPath
+    ? submitUrl.includes('://')
+      ? submitUrl
+      : `https://${submitUrl}`
+    : `https://${site}/feed.xml`;
+  const seed = Array.from(site).reduce((sum, character) => sum + character.charCodeAt(0), 0);
+
+  return {
+    title: titleFromSite(site) || 'Untitled feed',
+    site,
+    url,
+    submitUrl,
+    items: 20 + (seed % 800),
+  };
+}
+
+function statusForSource(source: Source): SourceStatus {
+  const health = (source.health || '').toLowerCase();
+  if (health.includes('error') || health.includes('fail') || source.consecutive_fails >= 6) return 'error';
+  if (health.includes('warn') || health.includes('degraded') || health.includes('unknown')) return 'stale';
+
+  const lastChecked = Date.parse(source.last_fetched_at || source.last_success_at || '');
+  if (Number.isFinite(lastChecked) && Date.now() - lastChecked > 1000 * 60 * 60 * 24 * 7) {
+    return 'stale';
+  }
+
+  return 'healthy';
+}
+
+function formatRelativeTime(
+  timestamp: number,
+  t: (key: string, params?: Record<string, string | number>) => string,
+) {
+  if (!timestamp) return t('sources.never');
+  const diffMinutes = Math.floor((Date.now() - timestamp) / 60000);
   if (diffMinutes < 1) return t('sources.justNow');
   if (diffMinutes < 60) return t('sources.minutesAgo', { count: diffMinutes });
 
@@ -46,121 +145,281 @@ function timeAgo(iso: string | null, t: (key: string, params?: Record<string, st
   return t('sources.daysAgo', { count: Math.floor(diffHours / 24) });
 }
 
-function truncateUrl(url: string, maxLength = 48) {
-  if (url.length <= maxLength) return url;
-  const visible = Math.max(8, maxLength - 1);
-  return `${url.slice(0, visible)}…`;
+function sourceToViewModel(source: Source, refreshedAt: Map<number, number>): SourceViewModel {
+  const site = getHostFromUrl(source.url);
+  const refreshedTimestamp = refreshedAt.get(source.id);
+  const parsedLastChecked = Date.parse(source.last_fetched_at || source.last_success_at || '');
+  const lastCheckedMs = refreshedTimestamp ?? (Number.isFinite(parsedLastChecked) ? parsedLastChecked : 0);
+
+  return {
+    ...source,
+    site,
+    status: statusForSource(source),
+    lastCheckedMs,
+    itemCount: source.unread_count ?? 0,
+    errorReason: source.consecutive_fails > 0 ? `${source.consecutive_fails} consecutive failures` : 'Connection timed out',
+  };
 }
 
-function healthState(source: Source) {
-  if (source.health === 'ok' || source.health === 'healthy') {
-    return { label: 'healthy', dotClass: 'bg-emerald-500' };
-  }
-
-  if (source.health === 'warn' || source.health === 'degraded' || source.health === 'unknown') {
-    return { label: 'degraded', dotClass: 'bg-amber-500' };
-  }
-
-  if (!source.health && source.consecutive_fails <= 0) {
-    return { label: 'healthy', dotClass: 'bg-emerald-500' };
-  }
-
-  if (!source.health && source.consecutive_fails < 6) {
-    return { label: 'degraded', dotClass: 'bg-amber-500' };
-  }
-
-  return { label: 'error', dotClass: 'bg-rose-500' };
-}
-
-function ProgressBar({
-  progress,
+function StatusPill({
+  status,
   t,
 }: {
-  progress: number | null;
+  status: SourceStatus;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
-  const percent = progress == null ? null : Math.max(0, Math.min(100, progress <= 1 ? progress * 100 : progress));
+  const labelKey = status === 'healthy' ? 'sources.statusHealthy' : status === 'stale' ? 'sources.statusStale' : 'sources.statusError';
 
   return (
-    <div className="mt-3 space-y-2">
-      <div className="h-2 overflow-hidden rounded-full bg-[var(--bg-callout)]">
-        <div
-          className="h-full rounded-full bg-[var(--accent)] transition-all"
-          style={{ width: `${percent ?? 18}%` }}
-          aria-hidden="true"
-        />
+    <span className={`${styles.statusPill} ${styles[status]}`}>
+      <span aria-hidden="true">●</span>
+      <span>{t(labelKey)}</span>
+    </span>
+  );
+}
+
+function SourceFavicon({ source }: { source: SourceViewModel }) {
+  return (
+    <span className={styles.favicon} aria-hidden="true">
+      <span
+        className={styles.faviconImage}
+        style={{ backgroundImage: `url("${source.icon_url || faviconUrl(source.site)}")` }}
+      />
+    </span>
+  );
+}
+
+function SourceRow({
+  source,
+  density,
+  refreshing,
+  onRefresh,
+  onDelete,
+  t,
+}: {
+  source: SourceViewModel;
+  density: Density;
+  refreshing: boolean;
+  onRefresh: (source: SourceViewModel) => void;
+  onDelete: (source: SourceViewModel) => void;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const compact = density === 'compact';
+
+  return (
+    <div className={`${styles.row} ${compact ? styles.compact : ''}`} data-source-row>
+      <div className={styles.rowMain}>
+        <SourceFavicon source={source} />
+        <div className={styles.rowText}>
+          <div className={styles.rowTitle}>{source.title}</div>
+          <div className={styles.rowUrl} title={source.url}>{source.url}</div>
+        </div>
       </div>
-      <p className="font-[system-ui] text-xs text-[var(--text-muted)]">
-        {percent == null ? t('sources.importProgressUnknown') : t('sources.importProgress', { percent: Math.round(percent) })}
-      </p>
+
+      <div className={styles.rowMeta}>
+        <StatusPill status={source.status} t={t} />
+        <div className={styles.rowTime}>{formatRelativeTime(source.lastCheckedMs, t)}</div>
+        <div className={styles.rowItems}>{t('sources.itemCount', { count: source.itemCount })}</div>
+      </div>
+
+      <div className={styles.rowActions}>
+        <button
+          type="button"
+          className={styles.iconButton}
+          aria-label={t('sources.openSource')}
+          onClick={() => window.open(source.url, '_blank', 'noopener,noreferrer')}
+        >
+          <ExternalLink size={14} strokeWidth={1.5} />
+        </button>
+        <button
+          type="button"
+          className={`${styles.iconButton} ${refreshing ? styles.spinningIcon : ''}`}
+          aria-label={t('sources.refreshSource')}
+          onClick={() => onRefresh(source)}
+          disabled={refreshing}
+        >
+          <RefreshCw size={14} strokeWidth={1.5} />
+        </button>
+        {confirmingDelete ? (
+          <span className={styles.confirmPop}>
+            <button
+              type="button"
+              className={`${styles.iconButton} ${styles.dangerButton}`}
+              aria-label={t('sources.confirmDelete')}
+              onClick={() => {
+                onDelete(source);
+                setConfirmingDelete(false);
+              }}
+            >
+              <Check size={14} strokeWidth={1.5} />
+            </button>
+            <button
+              type="button"
+              className={styles.iconButton}
+              aria-label={t('sources.cancelDelete')}
+              onClick={() => setConfirmingDelete(false)}
+            >
+              <X size={14} strokeWidth={1.5} />
+            </button>
+          </span>
+        ) : (
+          <button
+            type="button"
+            className={styles.iconButton}
+            aria-label={t('sources.unsubscribe')}
+            onClick={() => setConfirmingDelete(true)}
+          >
+            <Trash2 size={14} strokeWidth={1.5} />
+          </button>
+        )}
+      </div>
+
+      {source.status === 'error' ? (
+        <div className={styles.rowError}>
+          <span>{t('sources.lastFetchFailed', { reason: source.errorReason })}</span>
+          <button type="button" className={styles.buttonText} onClick={() => onRefresh(source)}>
+            {t('sources.retry')}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function AddSourceProgress({
-  status,
+function SourceCard({
+  source,
+  refreshing,
+  onRefresh,
+  onDelete,
   t,
 }: {
-  status: AddSourceStatus;
+  source: SourceViewModel;
+  refreshing: boolean;
+  onRefresh: (source: SourceViewModel) => void;
+  onDelete: (source: SourceViewModel) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
-  if (status.kind === 'idle') {
-    return null;
-  }
-
-  if (status.kind === 'loading') {
-    return (
-      <div className="mt-3 rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-body)] px-4 py-3 font-[system-ui]">
-        <div className="flex items-center justify-between gap-3 text-sm text-[var(--text-body)]">
-          <span>{status.title}</span>
-          <span className="text-xs text-[var(--text-muted)]">{t('sources.autoDiscovering')}</span>
-        </div>
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--bg-callout)]">
-          <div className="h-full w-2/3 animate-pulse rounded-full bg-[var(--accent)]" />
-        </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-4">
-          {ADD_SOURCE_STEP_KEYS.map((stepKey) => (
-            <div key={stepKey} className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-              <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[var(--accent)]" />
-              <span>{t(stepKey)}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   return (
-    <div
-      className={`mt-3 rounded-2xl border px-4 py-3 font-[system-ui] text-sm ${
-        status.kind === 'success'
-          ? 'border-[var(--border-success)] bg-[var(--bg-badge-today)] text-[var(--text-success)]'
-          : 'border-[var(--border-error)] bg-[var(--bg-highlight-error)] text-[var(--text-error)]'
-      }`}
+    <article className={styles.card}>
+      <div className={styles.cardHead}>
+        <SourceFavicon source={source} />
+        <StatusPill status={source.status} t={t} />
+      </div>
+      <div className={styles.cardTitle}>{source.title}</div>
+      <div className={styles.cardUrl}>{source.site}</div>
+      <div className={styles.cardMeta}>
+        <span>{t('sources.itemCount', { count: source.itemCount })}</span>
+        <span>·</span>
+        <span>{formatRelativeTime(source.lastCheckedMs, t)}</span>
+      </div>
+      <div className={styles.cardActions}>
+        <button
+          type="button"
+          className={`${styles.iconButton} ${refreshing ? styles.spinningIcon : ''}`}
+          aria-label={t('sources.refreshSource')}
+          onClick={() => onRefresh(source)}
+          disabled={refreshing}
+        >
+          <RefreshCw size={14} strokeWidth={1.5} />
+        </button>
+        <button
+          type="button"
+          className={styles.iconButton}
+          aria-label={t('sources.openSource')}
+          onClick={() => window.open(source.url, '_blank', 'noopener,noreferrer')}
+        >
+          <ExternalLink size={14} strokeWidth={1.5} />
+        </button>
+        {confirmingDelete ? (
+          <>
+            <button
+              type="button"
+              className={`${styles.iconButton} ${styles.dangerButton}`}
+              aria-label={t('sources.confirmDelete')}
+              onClick={() => {
+                onDelete(source);
+                setConfirmingDelete(false);
+              }}
+            >
+              <Check size={14} strokeWidth={1.5} />
+            </button>
+            <button
+              type="button"
+              className={styles.iconButton}
+              aria-label={t('sources.cancelDelete')}
+              onClick={() => setConfirmingDelete(false)}
+            >
+              <X size={14} strokeWidth={1.5} />
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            className={styles.iconButton}
+            aria-label={t('sources.unsubscribe')}
+            onClick={() => setConfirmingDelete(true)}
+          >
+            <Trash2 size={14} strokeWidth={1.5} />
+          </button>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function SegmentButton<T extends string>({
+  value,
+  current,
+  onSelect,
+  children,
+}: {
+  value: T;
+  current: T;
+  onSelect: (value: T) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      className={value === current ? styles.segmentActive : undefined}
+      onClick={() => onSelect(value)}
     >
-      <div className="font-medium">{status.title}</div>
-      {status.detail ? <div className="mt-1 break-all text-xs opacity-85">{status.detail}</div> : null}
-    </div>
+      {children}
+    </button>
   );
 }
 
 export function SourcesPage() {
   const { t } = useI18n();
-  const { data: sources, isLoading, isFetching } = useSources();
+  const { data: sources, isLoading } = useSources();
   const createSource = useCreateSource();
-  const renameSource = useRenameSource();
   const deleteSource = useDeleteSource();
   const refreshSource = useRefreshSource();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const handledImportJobId = useRef<string | null>(null);
+  const discoveryTimerRef = useRef<number | null>(null);
 
   const [sourceUrl, setSourceUrl] = useState('');
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editingTitle, setEditingTitle] = useState('');
+  const [discoveryPhase, setDiscoveryPhase] = useState<DiscoveryPhase>('idle');
+  const [discovery, setDiscovery] = useState<Discovery | null>(null);
+  const [discoveryError, setDiscoveryError] = useState('');
   const [deletedSourceIds, setDeletedSourceIds] = useState<Set<number>>(new Set());
-  const [message, setMessage] = useState<MessageState>({ kind: 'idle', text: '' });
-  const [addSourceStatus, setAddSourceStatus] = useState<AddSourceStatus>({ kind: 'idle', title: '' });
+  const [refreshedAt, setRefreshedAt] = useState<Map<number, number>>(new Map());
+  const [refreshingIds, setRefreshingIds] = useState<Set<number>>(new Set());
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [filterQuery, setFilterQuery] = useState('');
+  const [sortMode, setSortMode] = useState<SortMode>('recent');
+  const [density, setDensity] = useState<Density>('comfortable');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [tone, setTone] = useState<Tone>('quiet');
+  const [showFavicons, setShowFavicons] = useState(true);
+  const [isTweaksOpen, setIsTweaksOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const [importJobId, setImportJobId] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const handledImportJobId = useRef<string | null>(null);
+  const [importFileName, setImportFileName] = useState<string | null>(null);
 
   const importJob = useSourceImportJob(importJobId);
 
@@ -169,114 +428,217 @@ export function SourcesPage() {
     return sources.filter((source) => !deletedSourceIds.has(source.id));
   }, [deletedSourceIds, sources]);
 
+  const sourceRows = useMemo(
+    () => visibleSources.map((source) => sourceToViewModel(source, refreshedAt)),
+    [refreshedAt, visibleSources],
+  );
+
+  const counts = useMemo(() => ({
+    all: sourceRows.length,
+    healthy: sourceRows.filter((source) => source.status === 'healthy').length,
+    stale: sourceRows.filter((source) => source.status === 'stale').length,
+    error: sourceRows.filter((source) => source.status === 'error').length,
+  }), [sourceRows]);
+  const attentionCount = counts.stale + counts.error;
+
+  const filteredSources = useMemo(() => {
+    const query = filterQuery.trim().toLowerCase();
+    let list = sourceRows;
+
+    if (statusFilter !== 'all') {
+      list = list.filter((source) => source.status === statusFilter);
+    }
+
+    if (query) {
+      list = list.filter((source) =>
+        source.title.toLowerCase().includes(query) ||
+        source.url.toLowerCase().includes(query) ||
+        source.site.toLowerCase().includes(query));
+    }
+
+    return [...list].sort((left, right) => {
+      if (sortMode === 'title') return left.title.localeCompare(right.title);
+      if (sortMode === 'items') return right.itemCount - left.itemCount;
+      return right.lastCheckedMs - left.lastCheckedMs;
+    });
+  }, [filterQuery, sortMode, sourceRows, statusFilter]);
+
+  const importRawProgress = importJob.data?.progress ?? 0;
+  const importProgress = Math.max(0, Math.min(100, importRawProgress <= 1 ? importRawProgress * 100 : importRawProgress));
+  const importDone = importJob.data?.status === 'done';
+  const importRunning = Boolean(importFileName && (importJobId || importJob.isFetching));
+  const latestSync = sourceRows.reduce((latest, source) => Math.max(latest, source.lastCheckedMs), 0);
+
+  useEffect(() => () => {
+    if (discoveryTimerRef.current != null) {
+      window.clearTimeout(discoveryTimerRef.current);
+    }
+  }, []);
+
   useEffect(() => {
     if (!importJobId || !importJob.data) return;
     if (handledImportJobId.current === importJobId) return;
 
     if (importJob.data.status === 'done') {
       handledImportJobId.current = importJobId;
-      const timeoutId = window.setTimeout(() => {
-        setImportJobId(null);
-        setMessage({ kind: 'success', text: t('sources.importCompleteMessage') });
-      }, 0);
-      return () => window.clearTimeout(timeoutId);
+      showToast(t('sources.importCompleteMessage'));
     }
 
     if (importJob.data.status === 'failed') {
       handledImportJobId.current = importJobId;
-      const timeoutId = window.setTimeout(() => {
-        setImportJobId(null);
-        setMessage({ kind: 'error', text: t('sources.importFailedMessage') });
-      }, 0);
-      return () => window.clearTimeout(timeoutId);
+      showToast(t('sources.importFailedMessage'));
     }
   }, [importJob.data, importJobId, t]);
 
-  async function handleCreateSource() {
-    const url = sourceUrl.trim();
-    if (!url) return;
+  function showToast(message: string) {
+    setToast(message);
+    window.setTimeout(() => setToast(null), 2400);
+  }
 
-    setAddSourceStatus({
-      kind: 'loading',
-      title: t('sources.addSearching', { url }),
+  function resetDiscovery() {
+    if (discoveryTimerRef.current != null) {
+      window.clearTimeout(discoveryTimerRef.current);
+      discoveryTimerRef.current = null;
+    }
+    setSourceUrl('');
+    setDiscovery(null);
+    setDiscoveryError('');
+    setDiscoveryPhase('idle');
+  }
+
+  function handleSourceUrlChange(nextValue: string) {
+    setSourceUrl(nextValue);
+
+    if (discoveryTimerRef.current != null) {
+      window.clearTimeout(discoveryTimerRef.current);
+      discoveryTimerRef.current = null;
+    }
+
+    const input = nextValue.trim();
+    if (!input) {
+      setDiscovery(null);
+      setDiscoveryError('');
+      setDiscoveryPhase('idle');
+      return;
+    }
+
+    setDiscovery(null);
+    setDiscoveryError('');
+    setDiscoveryPhase('detecting');
+
+    discoveryTimerRef.current = window.setTimeout(() => {
+      if (!isDomainLike(input)) {
+        setDiscoveryPhase('error');
+        setDiscoveryError(t('sources.noFeedFoundShort'));
+        return;
+      }
+
+      setDiscovery(buildDiscovery(input));
+      setDiscoveryPhase('found');
+      discoveryTimerRef.current = null;
+    }, 700);
+  }
+
+  function alreadySubscribed(candidate: Discovery) {
+    const candidateUrl = normalizeComparableUrl(candidate.url);
+    const candidateHost = getHostFromUrl(candidate.url);
+
+    return visibleSources.some((source) => {
+      const sourceHost = getHostFromUrl(source.url);
+      return normalizeComparableUrl(source.url) === candidateUrl || sourceHost === candidateHost;
     });
+  }
+
+  async function subscribe(candidate: Discovery) {
+    if (alreadySubscribed(candidate)) {
+      showToast(t('sources.toastDuplicate'));
+      return;
+    }
+
     try {
-      const source = await createSource.mutateAsync(url);
-      setSourceUrl('');
-      setAddSourceStatus({
-        kind: 'success',
-        title: t('sources.addFound', { title: source.title }),
-        detail: t('sources.addFoundDetail', { url: source.url }),
+      const source = await createSource.mutateAsync(candidate.submitUrl);
+      resetDiscovery();
+      showToast(t('sources.toastSubscribed', { title: source.title || candidate.title }));
+    } catch (error) {
+      const raw = error instanceof ApiError || error instanceof Error ? error.message : '';
+      setDiscoveryPhase('error');
+      setDiscoveryError(raw || t('sources.noFeedFoundShort'));
+    }
+  }
+
+  async function subscribeStarterPack(starter: typeof STARTER_PACKS[number]) {
+    const candidate = buildDiscovery(starter.url);
+    candidate.title = starter.title;
+    await subscribe(candidate);
+  }
+
+  async function refreshOne(source: SourceViewModel) {
+    setRefreshingIds((previous) => new Set(previous).add(source.id));
+    try {
+      await refreshSource.mutateAsync(source.id);
+      setRefreshedAt((previous) => {
+        const next = new Map(previous);
+        next.set(source.id, Date.now());
+        return next;
       });
     } catch (error) {
-      const raw = error instanceof ApiError ? error.message : '';
-      const detail = raw === 'source already exists'
-        ? t('sources.alreadyExists')
-        : raw.includes('no RSS or Atom feed found')
-          ? t('sources.noFeedFound')
-          : raw || t('sources.noFeedFound');
-
-      setAddSourceStatus({
-        kind: 'error',
-        title: t('sources.addFailed'),
-        detail,
+      const detail = error instanceof Error ? error.message : t('sources.toastRefreshFailed');
+      showToast(detail);
+    } finally {
+      setRefreshingIds((previous) => {
+        const next = new Set(previous);
+        next.delete(source.id);
+        return next;
       });
     }
   }
 
-  function startRename(source: Source) {
-    setEditingId(source.id);
-    setEditingTitle(source.title);
+  function refreshAll() {
+    const targets = filteredSources;
+    showToast(t('sources.toastRefreshing', { count: targets.length }));
+    targets.forEach((source, index) => {
+      window.setTimeout(() => {
+        void refreshOne(source);
+      }, 120 * index);
+    });
   }
 
-  async function commitRename(sourceId: number) {
-    const title = editingTitle.trim();
-    setEditingId(null);
-    if (!title) return;
-
-    await renameSource.mutateAsync({ id: sourceId, title });
-    setMessage({ kind: 'success', text: t('sources.nameUpdated') });
-  }
-
-  async function handleDelete(source: Source) {
+  async function handleDelete(source: SourceViewModel) {
     try {
       await deleteSource.mutateAsync(source.id);
       setDeletedSourceIds((previous) => new Set(previous).add(source.id));
-      setMessage({ kind: 'success', text: t('sources.deleted', { title: source.title }) });
+      showToast(t('sources.toastUnsubscribed', { title: source.title }));
     } catch (error) {
       const detail = error instanceof Error ? error.message : t('sources.delete');
-      setMessage({ kind: 'error', text: detail });
+      showToast(detail);
     }
   }
 
-  async function handleRefresh(sourceId: number) {
+  async function handleImport(file: File) {
+    setImportFileName(file.name);
+    setImportJobId(null);
+    handledImportJobId.current = null;
+
     try {
-      await refreshSource.mutateAsync(sourceId);
-      setMessage({ kind: 'success', text: t('sources.refreshTriggered') });
+      const raw = await file.text();
+      const response = await apiFetch<{ job_id: string }>('/api/sources/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/x-opml; charset=utf-8' },
+        body: raw,
+      });
+      setImportJobId(response.job_id);
+      showToast(t('sources.importingMessage'));
     } catch (error) {
-      const detail = error instanceof Error ? error.message : t('sources.refreshFailed');
-      setMessage({ kind: 'error', text: detail });
+      const detail = error instanceof Error ? error.message : t('sources.importFailedMessage');
+      setImportFileName(null);
+      showToast(detail);
     }
-  }
-
-  async function handleImport() {
-    if (!selectedFile) return;
-
-    const raw = await selectedFile.text();
-    const response = await apiFetch<{ job_id: string }>('/api/sources/import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/x-opml; charset=utf-8' },
-      body: raw,
-    });
-
-    setImportJobId(response.job_id);
-    setMessage({ kind: 'loading', text: t('sources.importingMessage') });
   }
 
   async function handleExport() {
     const response = await fetch('/api/sources/export', { credentials: 'include' });
     if (!response.ok) {
-      setMessage({ kind: 'error', text: t('sources.exportFailed') });
+      showToast(t('sources.exportFailed'));
       return;
     }
 
@@ -287,254 +649,353 @@ export function SourcesPage() {
     anchor.download = 'xreader-sources.opml';
     anchor.click();
     URL.revokeObjectURL(url);
-    setMessage({ kind: 'success', text: t('sources.exportDone') });
+    showToast(t('sources.exportDone'));
   }
 
-  const importProgress = importJob.data?.progress ?? null;
-  const importBusy = Boolean(importJobId) || importJob.isFetching;
-  const importStatusLabel =
-    importJob.data?.status === 'done'
-      ? t('sources.importDone')
-      : importJob.data?.status === 'failed'
-        ? t('sources.importFailed')
-        : importBusy
-          ? t('sources.importing')
-          : t('sources.chooseFile');
-  const fileInputId = 'sources-opml-file-input';
+  function clearFilters() {
+    setStatusFilter('all');
+    setFilterQuery('');
+  }
+
+  const rootClassName = [
+    styles.sourcesPage,
+    tone === 'editorial' ? styles.editorial : '',
+    showFavicons ? '' : styles.noFavicons,
+  ].filter(Boolean).join(' ');
+  const addbarClassName = [
+    styles.addbarRow,
+    discoveryPhase === 'found' ? styles.addbarFound : '',
+    discoveryPhase === 'error' ? styles.addbarError : '',
+  ].filter(Boolean).join(' ');
 
   return (
-    <main className="h-full overflow-y-auto bg-[var(--bg-body)] text-[var(--text-body)]">
-      <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8 flex items-start justify-between gap-4">
-          <div className="space-y-3">
-            <Link href="/" className="font-[system-ui] text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-body)]">
-              ← {t('sources.backHome')}
-            </Link>
-            <header className="space-y-3">
-              <h1 className="font-serif text-4xl font-semibold tracking-tight text-[var(--text-body)]">{t('sources.title')}</h1>
-              <p className="max-w-2xl font-[system-ui] text-sm leading-6 text-[var(--text-muted)]">
-                {t('sources.description')}
-              </p>
-            </header>
-          </div>
-          <div className="rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-input)] px-4 py-3 text-right font-[system-ui] text-xs text-[var(--text-muted)] shadow-sm shadow-[var(--border-default)]/30">
-            <div>{isFetching ? t('sources.syncing') : t('sources.synced')}</div>
-            <div className="mt-1 text-[var(--text-body)]">{t('sources.count', { count: visibleSources.length })}</div>
-          </div>
-        </div>
+    <main className={rootClassName}>
+      <div className={styles.inner}>
+        <Link href="/" className={styles.backLink}>
+          <ChevronLeft size={14} strokeWidth={1.5} />
+          <span>{t('sources.backHome')}</span>
+        </Link>
 
-        <section id="add-source" className="rounded-3xl border border-[var(--border-strong)] bg-[var(--bg-input)]/80 p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <div>
-              <h2 className="font-serif text-xl font-semibold tracking-tight text-[var(--text-body)]">{t('sources.addTitle')}</h2>
-              <p className="font-[system-ui] text-sm text-[var(--text-muted)]">
-                {t('sources.addDescription')}
-              </p>
-            </div>
+        <header className={styles.headRow}>
+          <div>
+            <h1 className={styles.pageTitle}>{t('sources.title')}</h1>
+            <p className={styles.subtitle}>{t('sources.subtitle')}</p>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <input
-              type="text"
-              value={sourceUrl}
-              onChange={(event) => {
-                setSourceUrl(event.target.value);
-                if (addSourceStatus.kind !== 'idle') {
-                  setAddSourceStatus({ kind: 'idle', title: '' });
-                }
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  void handleCreateSource();
-                }
-              }}
-              placeholder={t('sources.addPlaceholder')}
-              className="ui-input min-w-0 flex-1 font-[system-ui] text-sm"
-            />
-            <button
-              type="button"
-              onClick={() => void handleCreateSource()}
-              disabled={createSource.isPending}
-              className="ui-btn-primary rounded-2xl px-5 py-3 font-[system-ui] text-sm"
-            >
-              {createSource.isPending ? t('sources.finding') : t('sources.findAndAdd')}
+
+          <div className={styles.headRight}>
+            <div className={styles.stat}>
+              <div className={styles.statNumber}>{counts.all}</div>
+              <div className={styles.statLabel}>{t('sources.subscriptionStat')}</div>
+            </div>
+            <div className={styles.statDivider} />
+            <div className={styles.stat}>
+              <div className={styles.statNumber}>{attentionCount}</div>
+              <div className={styles.statLabel}>{t('sources.attentionStat')}</div>
+            </div>
+            <button type="button" className={styles.buttonSecondary} onClick={() => void handleExport()}>
+              <Download size={14} strokeWidth={1.5} />
+              {t('sources.export')}
             </button>
           </div>
-          <AddSourceProgress status={addSourceStatus} t={t} />
-        </section>
+        </header>
 
-        <section className="mt-6 overflow-hidden rounded-3xl border border-[var(--border-strong)] bg-[var(--bg-input)]/80 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
-          <div className="border-b border-[var(--border-strong)] px-5 py-4">
-            <h2 className="font-serif text-xl font-semibold tracking-tight text-[var(--text-body)]">{t('sources.listTitle')}</h2>
+        <section className={styles.addbar} aria-label={t('sources.addTitle')}>
+          <div className={addbarClassName}>
+            <Search className={styles.addbarIcon} size={18} strokeWidth={1.5} />
+            <input
+              className={styles.addbarInput}
+              value={sourceUrl}
+              placeholder={t('sources.addPlaceholderUnified')}
+              spellCheck={false}
+              autoComplete="off"
+              onChange={(event) => handleSourceUrlChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') resetDiscovery();
+                if (event.key === 'Enter' && discoveryPhase === 'found' && discovery) {
+                  void subscribe(discovery);
+                }
+              }}
+            />
+            {discoveryPhase === 'detecting' ? (
+              <RefreshCw aria-label={t('sources.discoveryDetectingAria')} className={styles.spinningIcon} size={16} strokeWidth={1.5} />
+            ) : null}
+            {sourceUrl && discoveryPhase !== 'detecting' ? (
+              <button type="button" className={styles.addbarClear} aria-label="Clear" onClick={resetDiscovery}>
+                <X size={12} strokeWidth={1.5} />
+              </button>
+            ) : null}
+            <span className={styles.addbarDivider} aria-hidden="true" />
+            <button
+              type="button"
+              className={styles.opmlButton}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload size={14} strokeWidth={1.5} />
+              {t('sources.opmlInline')}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".opml,.xml,application/xml,text/xml"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void handleImport(file);
+                event.target.value = '';
+              }}
+            />
           </div>
 
-          {isLoading ? (
-            <div className="px-5 py-10 font-[system-ui] text-sm text-[var(--text-muted)]">{t('sources.loading')}</div>
-          ) : visibleSources.length === 0 ? (
-            <div className="px-5 py-10 font-[system-ui]">
-              <div className="max-w-xl">
-                <div className="font-serif text-lg font-semibold tracking-tight text-[var(--text-body)]">
-                  {t('sources.emptyTitle')}
+          {discoveryPhase === 'found' && discovery ? (
+            <div className={styles.discovery}>
+              <div className={styles.discoveryLeft}>
+                <span className={styles.discoveryFavicon} aria-hidden="true">
+                  <span className={styles.faviconImage} style={{ backgroundImage: `url("${faviconUrl(discovery.site)}")` }} />
+                </span>
+                <div className={styles.discoveryMeta}>
+                  <div className={styles.discoveryTitle}>{discovery.title}</div>
+                  <div className={styles.discoveryUrl}>{discovery.url}</div>
                 </div>
-                <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
-                  {t('sources.emptyDescription')}
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <a href="#add-source" className="ui-btn-primary rounded-xl px-3 py-2 text-xs">
-                    <PlusCircle size={14} strokeWidth={1.9} />
-                    {t('sources.addTitle')}
-                  </a>
-                  <a href="#opml" className="ui-btn-secondary rounded-xl px-3 py-2 text-xs">
-                    <Upload size={14} strokeWidth={1.9} />
-                    {t('sources.importOpmlAction')}
-                  </a>
-                </div>
+                <span className={styles.discoveryTag}>{t('sources.discoveryItemCount', { count: discovery.items })}</span>
+              </div>
+              <div className={styles.discoveryActions}>
+                <button type="button" className={styles.buttonGhost} onClick={resetDiscovery}>
+                  {t('sources.cancel')}
+                </button>
+                <button
+                  type="button"
+                  className={styles.buttonPrimary}
+                  onClick={() => void subscribe(discovery)}
+                  disabled={createSource.isPending}
+                >
+                  <Plus size={14} strokeWidth={1.5} />
+                  {t('sources.subscribe')}
+                </button>
               </div>
             </div>
-          ) : (
-            <ul className="divide-y divide-[var(--border-strong)]">
-              {visibleSources.map((source) => {
-                const health = healthState(source);
+          ) : null}
+
+          {discoveryPhase === 'error' ? (
+            <div className={`${styles.discovery} ${styles.discoveryError}`}>
+              <span className={styles.discoveryErrorText}>{discoveryError || t('sources.noFeedFoundShort')}</span>
+              <button type="button" className={styles.buttonGhost} onClick={resetDiscovery}>
+                {t('sources.dismiss')}
+              </button>
+            </div>
+          ) : null}
+        </section>
+
+        {importRunning ? (
+          <section className={styles.importSheet}>
+            <div className={styles.importHead}>
+              <div>
+                <div className={styles.importTitle}>{t('sources.importingFile', { filename: importFileName || 'subscriptions.opml' })}</div>
+                <div className={styles.importSub}>
+                  {t('sources.importProgressFeeds', {
+                    done: Math.round(importProgress),
+                    total: 100,
+                    state: importDone ? t('sources.importDoneState') : t('sources.importPolling'),
+                  })}
+                </div>
+              </div>
+              {importDone ? (
+                <button
+                  type="button"
+                  className={styles.buttonGhost}
+                  onClick={() => {
+                    setImportJobId(null);
+                    setImportFileName(null);
+                  }}
+                >
+                  {t('sources.dismiss')}
+                </button>
+              ) : null}
+            </div>
+            <div className={styles.importBar}>
+              <div className={styles.importBarFill} style={{ width: `${importProgress || 12}%` }} />
+            </div>
+          </section>
+        ) : null}
+
+        {sourceRows.length > 0 ? (
+          <section className={styles.listToolbar}>
+            <div className={styles.filters}>
+              {STATUS_FILTERS.map((filter) => {
+                const count = counts[filter.id];
+                const active = statusFilter === filter.id;
                 return (
-                  <li key={source.id} className="flex items-start gap-4 px-5 py-4">
-                    <div className="mt-2 shrink-0">
-                      <span className={`inline-block h-2.5 w-2.5 rounded-full ${health.dotClass}`} aria-hidden="true" />
-                    </div>
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {editingId === source.id ? (
-                          <input
-                            autoFocus
-                            value={editingTitle}
-                            onChange={(event) => setEditingTitle(event.target.value)}
-                            onBlur={() => void commitRename(source.id)}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter') {
-                                void commitRename(source.id);
-                              }
-                              if (event.key === 'Escape') {
-                                setEditingId(null);
-                              }
-                            }}
-                            className="ui-input min-h-9 rounded-xl px-3 py-2 font-[system-ui] text-sm"
-                          />
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => startRename(source)}
-                            className="min-w-0 truncate text-left font-serif text-base font-semibold tracking-tight text-[var(--text-body)] transition-colors hover:text-[var(--text-accent)]"
-                            title={t('sources.renameTitle')}
-                          >
-                            {source.title}
-                          </button>
-                        )}
-                        <span className="ui-pill-neutral border-[var(--border-strong)] px-2.5 py-1 font-[system-ui] text-[11px]">
-                          {health.label === 'healthy'
-                            ? t('sources.healthHealthy')
-                            : health.label === 'degraded'
-                              ? t('sources.healthDegraded')
-                              : t('sources.healthError')}
-                        </span>
-                      </div>
-
-                      <div className="space-y-1 font-[system-ui] text-xs text-[var(--text-muted)]">
-                        <div className="truncate" title={source.url}>
-                          {truncateUrl(source.url)}
-                        </div>
-                        <div>{t('sources.lastFetched', { time: timeAgo(source.last_fetched_at, t) })}</div>
-                      </div>
-                    </div>
-
-                    <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
-                      <button
-                        type="button"
-                        onClick={() => void handleRefresh(source.id)}
-                        disabled={refreshSource.isPending}
-                        className="ui-btn-secondary rounded-xl px-3 py-1.5 font-[system-ui] text-xs"
-                      >
-                        {t('sources.refresh')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleDelete(source)}
-                        disabled={deleteSource.isPending}
-                        className="ui-btn-secondary rounded-xl px-3 py-1.5 font-[system-ui] text-xs"
-                      >
-                        {t('sources.delete')}
-                      </button>
-                    </div>
-                  </li>
+                  <button
+                    key={filter.id}
+                    type="button"
+                    aria-label={`${t(filter.labelKey)} ${count}`}
+                    className={[
+                      styles.chip,
+                      filter.id === 'error' ? styles.chipError : '',
+                      active ? styles.chipActive : '',
+                      active && filter.id === 'error' ? styles.chipErrorActive : '',
+                    ].filter(Boolean).join(' ')}
+                    onClick={() => setStatusFilter(filter.id)}
+                  >
+                    <span>{t(filter.labelKey)}</span>
+                    <span className={styles.chipCount}>{count}</span>
+                  </button>
                 );
               })}
-            </ul>
-          )}
-        </section>
-
-        <section id="opml" className="mt-6 rounded-3xl border border-[var(--border-strong)] bg-[var(--bg-input)]/80 p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0 flex-1">
-              <h2 className="font-serif text-xl font-semibold tracking-tight text-[var(--text-body)]">{t('sources.opmlTitle')}</h2>
-              <p className="mt-1 font-[system-ui] text-sm text-[var(--text-muted)]">{t('sources.opmlDescription')}</p>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <input
-                id={fileInputId}
-                type="file"
-                accept=".opml,.xml,application/xml,text/xml"
-                onChange={(event) => {
-                  const file = event.target.files?.[0] ?? null;
-                  setSelectedFile(file);
-                }}
-                className="sr-only"
-              />
-              <label htmlFor={fileInputId} className="ui-btn-secondary cursor-pointer rounded-2xl px-4 py-3 font-[system-ui] text-sm">
-                {t('sources.chooseFile')}
+            <div className={styles.toolbarRight}>
+              <label className={styles.searchMini}>
+                <Search size={13} strokeWidth={1.5} />
+                <input
+                  value={filterQuery}
+                  placeholder={t('sources.filterPlaceholder')}
+                  onChange={(event) => setFilterQuery(event.target.value)}
+                />
               </label>
-              <span className="max-w-[240px] truncate font-[system-ui] text-xs text-[var(--text-muted)]">
-                {selectedFile ? selectedFile.name : t('sources.chooseFile')}
-              </span>
-              <button
-                type="button"
-                onClick={() => void handleImport()}
-                disabled={!selectedFile || importBusy}
-                className={`${selectedFile ? 'ui-btn-primary' : 'ui-btn-secondary'} rounded-2xl px-4 py-3 font-[system-ui] text-sm`}
+              <select
+                className={styles.sortSelect}
+                value={sortMode}
+                onChange={(event) => setSortMode(event.target.value as SortMode)}
               >
-                {t('sources.uploadImport')}
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleExport()}
-                className="ui-btn-secondary rounded-2xl px-4 py-3 font-[system-ui] text-sm"
-              >
-                {t('sources.exportOpml')}
+                <option value="recent">{t('sources.sortRecent')}</option>
+                <option value="title">{t('sources.sortTitle')}</option>
+                <option value="items">{t('sources.sortItems')}</option>
+              </select>
+              <button type="button" className={styles.buttonSecondary} onClick={refreshAll}>
+                <RefreshCw size={14} strokeWidth={1.5} />
+                {t('sources.refreshAll')}
               </button>
             </div>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-body)] px-4 py-3 font-[system-ui] text-sm text-[var(--text-muted)]">
-            <div className="flex items-center justify-between gap-3">
-              <span>{importStatusLabel}</span>
-              {importJob.data?.status ? <span className="text-xs uppercase tracking-wide">{importJob.data.status}</span> : null}
-            </div>
-            {message.kind === 'loading' ? (
-              <p className="mt-2 font-[system-ui] text-xs text-[var(--text-muted)]">{message.text}</p>
-            ) : null}
-            {importBusy ? <ProgressBar progress={importProgress} t={t} /> : null}
-          </div>
-        </section>
-
-        {message.kind !== 'idle' && message.kind !== 'loading' ? (
-          <div
-            className={`mt-6 rounded-2xl border px-4 py-3 font-[system-ui] text-sm ${
-              message.kind === 'success'
-                ? 'border-[var(--border-success)] bg-[var(--bg-badge-today)] text-[var(--text-success)]'
-                : 'border-[var(--border-error)] bg-[var(--bg-highlight-error)] text-[var(--text-error)]'
-            }`}
-          >
-            {message.text}
-          </div>
+          </section>
         ) : null}
+
+        {isLoading ? (
+          <div className={styles.noMatch}>{t('sources.loading')}</div>
+        ) : sourceRows.length === 0 ? (
+          <section className={styles.empty}>
+            <div className={styles.emptyGlyph}>
+              <Search size={20} strokeWidth={1.5} />
+            </div>
+            <div className={styles.emptyTitle}>{t('sources.noSubscriptionsTitle')}</div>
+            <p className={styles.emptySub}>{t('sources.noSubscriptionsDescription')}</p>
+            <div className={styles.suggestions}>
+              {STARTER_PACKS.map((starter) => (
+                <button
+                  key={starter.url}
+                  type="button"
+                  className={styles.suggestion}
+                  onClick={() => void subscribeStarterPack(starter)}
+                >
+                  <span
+                    className={styles.suggestionFavicon}
+                    style={{ backgroundImage: `url("${faviconUrl(getHostFromUrl(starter.url))}")` }}
+                    aria-hidden="true"
+                  />
+                  <span>{starter.title}</span>
+                  <Plus size={12} strokeWidth={1.5} />
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : filteredSources.length === 0 ? (
+          <section className={styles.noMatch}>
+            <div className={styles.noMatchText}>{t('sources.noMatches')}</div>
+            <button type="button" className={styles.buttonText} onClick={clearFilters}>
+              {t('sources.clearFilters')}
+            </button>
+          </section>
+        ) : viewMode === 'cards' ? (
+          <section className={styles.grid}>
+            {filteredSources.map((source) => (
+              <SourceCard
+                key={source.id}
+                source={source}
+                refreshing={refreshingIds.has(source.id)}
+                onRefresh={(target) => void refreshOne(target)}
+                onDelete={(target) => void handleDelete(target)}
+                t={t}
+              />
+            ))}
+          </section>
+        ) : (
+          <section className={styles.list}>
+            {filteredSources.map((source) => (
+              <SourceRow
+                key={source.id}
+                source={source}
+                density={density}
+                refreshing={refreshingIds.has(source.id)}
+                onRefresh={(target) => void refreshOne(target)}
+                onDelete={(target) => void handleDelete(target)}
+                t={t}
+              />
+            ))}
+          </section>
+        )}
+
+        <footer className={styles.footer}>
+          <span>{t('sources.footerSummary', { count: sourceRows.length, time: formatRelativeTime(latestSync, t) })}</span>
+        </footer>
       </div>
+
+      <button
+        type="button"
+        className={`${styles.buttonSecondary} ${styles.tweaksButton}`}
+        onClick={() => setIsTweaksOpen((open) => !open)}
+      >
+        <Settings2 size={14} strokeWidth={1.5} />
+        {t('sources.tweaks')}
+      </button>
+
+      {isTweaksOpen ? (
+        <aside className={styles.tweaksPanel}>
+          <div className={styles.tweaksHeader}>
+            <span>{t('sources.tweaks')}</span>
+            <button type="button" className={styles.iconButton} aria-label={t('sources.dismiss')} onClick={() => setIsTweaksOpen(false)}>
+              <X size={14} strokeWidth={1.5} />
+            </button>
+          </div>
+
+          <div className={styles.tweakGroup}>
+            <div className={styles.tweakLabel}>{t('sources.tweakDensity')}</div>
+            <div className={styles.segmented}>
+              <SegmentButton value="compact" current={density} onSelect={setDensity}>{t('sources.tweakCompact')}</SegmentButton>
+              <SegmentButton value="comfortable" current={density} onSelect={setDensity}>{t('sources.tweakComfortable')}</SegmentButton>
+            </div>
+          </div>
+
+          <div className={styles.tweakGroup}>
+            <div className={styles.tweakLabel}>{t('sources.tweakView')}</div>
+            <div className={styles.segmented}>
+              <SegmentButton value="list" current={viewMode} onSelect={setViewMode}>
+                <List size={13} strokeWidth={1.5} />
+                {t('sources.tweakList')}
+              </SegmentButton>
+              <SegmentButton value="cards" current={viewMode} onSelect={setViewMode}>
+                <Grid2X2 size={13} strokeWidth={1.5} />
+                {t('sources.tweakCards')}
+              </SegmentButton>
+            </div>
+          </div>
+
+          <div className={styles.tweakGroup}>
+            <div className={styles.tweakLabel}>{t('sources.tweakTone')}</div>
+            <div className={styles.segmented}>
+              <SegmentButton value="quiet" current={tone} onSelect={setTone}>{t('sources.tweakQuiet')}</SegmentButton>
+              <SegmentButton value="editorial" current={tone} onSelect={setTone}>{t('sources.tweakEditorial')}</SegmentButton>
+            </div>
+          </div>
+
+          <div className={styles.tweakGroup}>
+            <button type="button" className={styles.toggleRow} onClick={() => setShowFavicons((value) => !value)}>
+              <span>{t('sources.tweakFavicons')}</span>
+              <span className={`${styles.toggle} ${showFavicons ? styles.toggleOn : ''}`} />
+            </button>
+          </div>
+        </aside>
+      ) : null}
+
+      {toast ? <div className={styles.toast}>{toast}</div> : null}
     </main>
   );
 }

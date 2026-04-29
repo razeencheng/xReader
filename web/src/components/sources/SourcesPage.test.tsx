@@ -1,10 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useUIStore } from '@/stores/useUIStore';
 
 const queryState = vi.hoisted(() => ({
   sources: [] as unknown[],
+  createSource: {
+    mutateAsync: vi.fn(),
+    isPending: false,
+  },
   refreshSource: {
     mutateAsync: vi.fn(),
     isPending: false,
@@ -17,7 +21,7 @@ const queryState = vi.hoisted(() => ({
 
 vi.mock('@/lib/queries/sources', () => ({
   useSources: () => ({ data: queryState.sources, isLoading: false, isFetching: false }),
-  useCreateSource: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useCreateSource: () => queryState.createSource,
   useRenameSource: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteSource: () => queryState.deleteSource,
   useRefreshSource: () => queryState.refreshSource,
@@ -32,6 +36,13 @@ import { SourcesPage } from '@/app/(app)/sources/page';
 
 beforeEach(() => {
   queryState.sources = [];
+  queryState.createSource.mutateAsync.mockReset();
+  queryState.createSource.mutateAsync.mockResolvedValue({
+    id: 99,
+    title: 'Example',
+    url: 'https://example.com/feed.xml',
+  });
+  queryState.createSource.isPending = false;
   queryState.refreshSource.mutateAsync.mockReset();
   queryState.refreshSource.mutateAsync.mockResolvedValue(undefined);
   queryState.refreshSource.isPending = false;
@@ -49,78 +60,93 @@ function wrapper({ children }: { children: React.ReactNode }) {
   return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
 }
 
-test('SourcesPage renders title and add button', () => {
+test('SourcesPage renders one unified management surface', () => {
   render(<SourcesPage />, { wrapper });
 
-  expect(screen.queryByText('订阅源管理')).not.toBeInTheDocument();
   expect(screen.getByRole('heading', { name: '订阅源' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '寻找并添加' })).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: '← 返回首页' })).toBeInTheDocument();
+  expect(screen.getByText('通过 URL 订阅，管理阅读来源，导入或导出 OPML。')).toBeInTheDocument();
+  expect(screen.getByPlaceholderText('粘贴网站、RSS 或 Atom 地址…')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /OPML/ })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /导出/ })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: '添加订阅源' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: '订阅源列表' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: /OPML 导入/ })).not.toBeInTheDocument();
 });
 
-test('SourcesPage empty list gives an actionable next step', () => {
+test('SourcesPage empty state offers starter packs', () => {
   render(<SourcesPage />, { wrapper });
 
-  expect(screen.getByText('还没有订阅源')).toBeInTheDocument();
-  expect(screen.getByText('粘贴博客首页或 RSS 地址添加第一个源，也可以从 OPML 一次导入。')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: '导入 OPML' })).toHaveAttribute('href', '#opml');
+  expect(screen.getByText('还没有订阅')).toBeInTheDocument();
+  expect(screen.getByText('在上方粘贴网站地址，我们会自动寻找订阅源。也可以先试试这些来源。')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /simonwillison.net/ })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Overreacted/ })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Joel on Software/ })).toBeInTheDocument();
 });
 
-test('SourcesPage owns its scroll area inside the app shell', () => {
-  const { container } = render(<SourcesPage />, { wrapper });
-  const shell = container.firstElementChild;
-
-  expect(shell).toHaveClass('h-full');
-  expect(shell).toHaveClass('overflow-y-auto');
-  expect(shell).not.toHaveClass('min-h-screen');
-});
-
-test('SourcesPage follows native language for global labels', () => {
-  useUIStore.setState({ nativeLanguage: 'en-US' });
-
-  render(<SourcesPage />, { wrapper });
-
-  expect(screen.queryByText('Manage Sources')).not.toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: 'Sources' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Find and add' })).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: '← Back home' })).toBeInTheDocument();
-});
-
-test('SourcesPage shows selected OPML file name after choosing a file', async () => {
+test('SourcesPage debounces URL discovery and subscribes from the preview', async () => {
   const user = userEvent.setup();
+
   render(<SourcesPage />, { wrapper });
 
-  const input = screen.getByLabelText('选择文件后上传');
-  const file = new File(['<opml></opml>'], 'subscriptions.opml', { type: 'text/x-opml' });
-  await user.upload(input, file);
+  await user.type(screen.getByPlaceholderText('粘贴网站、RSS 或 Atom 地址…'), 'example.com');
+  expect(screen.getByLabelText('正在发现订阅源')).toBeInTheDocument();
 
-  expect(await screen.findByText('subscriptions.opml')).toBeInTheDocument();
+  expect(await screen.findByText('Example')).toBeInTheDocument();
+  expect(screen.getByText('https://example.com/feed.xml')).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: /订阅/ }));
+
+  expect(queryState.createSource.mutateAsync).toHaveBeenCalledWith('example.com');
+  expect(await screen.findByText('已订阅 Example')).toBeInTheDocument();
 });
 
-test('SourcesPage renders backend health and last fetch metadata', () => {
+test('SourcesPage filters, searches, and sorts populated sources', async () => {
   queryState.sources = [
     {
       id: 1,
-      title: "Let's Encrypt",
-      url: 'https://letsencrypt.org/feed.xml',
+      title: 'Healthy Feed',
+      url: 'https://healthy.example/feed.xml',
       category: 'General',
       icon_url: null,
-      unread_count: 0,
+      unread_count: 5,
       last_fetched_at: new Date().toISOString(),
-      last_success_at: new Date(Date.now() - 60_000).toISOString(),
-      consecutive_fails: 4,
-      health: 'warn',
+      last_success_at: new Date().toISOString(),
+      consecutive_fails: 0,
+      health: 'ok',
+    },
+    {
+      id: 2,
+      title: 'Broken Feed',
+      url: 'https://broken.example/feed.xml',
+      category: 'General',
+      icon_url: null,
+      unread_count: 0,
+      last_fetched_at: null,
+      last_success_at: null,
+      consecutive_fails: 8,
+      health: 'error',
     },
   ];
+  const user = userEvent.setup();
 
   render(<SourcesPage />, { wrapper });
 
-  expect(screen.getByText('不稳定')).toBeInTheDocument();
-  expect(screen.queryByText('错误')).not.toBeInTheDocument();
-  expect(screen.getByText(/上次抓取：刚刚/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /全部 2/ })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /健康 1/ })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /错误 1/ })).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: /错误 1/ }));
+
+  expect(screen.getByText('Broken Feed')).toBeInTheDocument();
+  expect(screen.queryByText('Healthy Feed')).not.toBeInTheDocument();
+  expect(screen.getByText(/Last fetch failed:/)).toBeInTheDocument();
+
+  await user.type(screen.getByPlaceholderText('过滤订阅源'), 'healthy');
+
+  expect(screen.getByText('没有订阅源匹配当前筛选。')).toBeInTheDocument();
 });
 
-test('SourcesPage shows refresh errors instead of failing silently', async () => {
+test('SourcesPage requires inline confirmation before deleting a source', async () => {
   queryState.sources = [
     {
       id: 1,
@@ -135,35 +161,18 @@ test('SourcesPage shows refresh errors instead of failing silently', async () =>
       health: 'unknown',
     },
   ];
-  queryState.refreshSource.mutateAsync.mockRejectedValue(new Error('network down'));
   const user = userEvent.setup();
 
   render(<SourcesPage />, { wrapper });
-  await user.click(screen.getByRole('button', { name: '刷新' }));
 
-  expect(await screen.findByText('network down')).toBeInTheDocument();
-});
+  const row = screen.getByText("Let's Encrypt").closest('[data-source-row]');
+  expect(row).not.toBeNull();
 
-test('SourcesPage deletes a source immediately instead of waiting for unloadable undo timer', async () => {
-  queryState.sources = [
-    {
-      id: 1,
-      title: "Let's Encrypt",
-      url: 'https://letsencrypt.org/feed.xml',
-      category: 'General',
-      icon_url: null,
-      unread_count: 0,
-      last_fetched_at: null,
-      last_success_at: null,
-      consecutive_fails: 0,
-      health: 'unknown',
-    },
-  ];
-  const user = userEvent.setup();
+  await user.click(within(row as HTMLElement).getByRole('button', { name: '取消订阅' }));
+  expect(queryState.deleteSource.mutateAsync).not.toHaveBeenCalled();
 
-  render(<SourcesPage />, { wrapper });
-  await user.click(screen.getByRole('button', { name: '删除' }));
+  await user.click(within(row as HTMLElement).getByRole('button', { name: '确认删除' }));
 
   expect(queryState.deleteSource.mutateAsync).toHaveBeenCalledWith(1);
-  expect(await screen.findByText("已删除 Let's Encrypt")).toBeInTheDocument();
+  expect(await screen.findByText("已取消订阅 Let's Encrypt")).toBeInTheDocument();
 });
