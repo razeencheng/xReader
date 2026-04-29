@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Globe, Highlighter, Keyboard, Settings } from 'lucide-react';
+import { Globe, Highlighter, Keyboard, PlusCircle, Settings } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { LanguageModal } from '@/components/layout/LanguageModal';
 import { getLanguageOption, PRIMARY_NAV_ITEMS } from '@/components/layout/navigationConfig';
@@ -68,6 +68,15 @@ export function Sidebar({ className = '' }: { className?: string }) {
             );
           })}
         </nav>
+
+        <button
+          type="button"
+          title={t('sources.addTitle')}
+          onClick={() => router.push('/sources#add-source')}
+          className="mb-1 flex h-9 w-9 items-center justify-center rounded-[9px] text-[var(--accent)] transition-colors hover:bg-[var(--accent-bg)] hover:text-[var(--accent)]"
+        >
+          <PlusCircle size={17} strokeWidth={1.75} />
+        </button>
 
         <button
           type="button"

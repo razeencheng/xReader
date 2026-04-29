@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useInView } from 'react-intersection-observer';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, PlusCircle, Upload } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
 import { useI18n } from '@/lib/i18n';
@@ -47,11 +48,12 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
     currentView === 'sources' ? selectedSourceId : null,
   );
 
-  const { data: sources = [] } = useQuery<Source[]>({
+  const { data: sourceData, isLoading: isSourceListLoading } = useQuery<Source[]>({
     queryKey: ['sources'],
     queryFn: () => apiFetch<Source[]>('/api/sources'),
-    enabled: currentView === 'sources' && selectedSourceId !== null,
   });
+  const sources = useMemo(() => (Array.isArray(sourceData) ? sourceData : []), [sourceData]);
+  const hasLoadedSourceList = Array.isArray(sourceData);
 
   const { ref, inView } = useInView({ rootMargin: '200px 0px' });
   const items = useMemo(() => data?.pages.flatMap((page) => page.items) ?? [], [data]);
@@ -111,6 +113,8 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
   const sourceColor = selectedSource ? getSourceColor(selectedSource) : null;
   const showBulkRead = Boolean(showReadFilters && readFilter === 'unread' && bulkScope && counts.unread > 0);
   const isBulkConfirmOpen = Boolean(showBulkRead && bulkScope && openBulkConfirmScope === bulkScope.scope);
+  const showSourceOnboarding =
+    hasLoadedSourceList && !isSourceListLoading && sources.length === 0 && filteredItems.length === 0;
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-[var(--bg)] lg:w-[300px] lg:border-r lg:border-[var(--border)]">
@@ -223,9 +227,38 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
         {isLoading && items.length === 0 ? (
           density === 'compact' ? <CompactSkeleton /> : <FeedSkeleton />
         ) : filteredItems.length === 0 ? (
-          <div className="px-7 py-10 text-center text-[13px] text-[var(--text-3)]">
-            {readFilter === 'unread' ? t('feed.allCaughtUp') : t('feed.nothingHere')}
-          </div>
+          showSourceOnboarding ? (
+            <div className="flex h-full items-center justify-center px-7 py-10 text-center">
+              <div className="w-full max-w-[238px]">
+                <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent)]">
+                  <PlusCircle size={18} strokeWidth={1.8} />
+                </div>
+                <div className="font-serif text-[18px] font-semibold tracking-tight text-[var(--text)]">
+                  {t('feed.emptySourcesTitle')}
+                </div>
+                <p className="mt-2 text-[12.5px] leading-5 text-[var(--text-3)]">
+                  {t('feed.emptySourcesDescription')}
+                </p>
+                <div className="mt-5 flex flex-col gap-2">
+                  <Link href="/sources#add-source" className="ui-btn-primary h-9 rounded-[11px] px-3 py-2 text-[12px]">
+                    <PlusCircle size={14} strokeWidth={1.9} />
+                    {t('sources.addTitle')}
+                  </Link>
+                  <Link href="/sources#opml" className="ui-btn-ghost h-8 rounded-[10px] px-3 py-1.5 text-[12px]">
+                    <Upload size={14} strokeWidth={1.9} />
+                    {t('sources.importOpmlAction')}
+                  </Link>
+                </div>
+                <p className="mt-4 text-[11.5px] leading-5 text-[var(--text-3)]">
+                  {t('feed.emptySourcesHint')}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="px-7 py-10 text-center text-[13px] text-[var(--text-3)]">
+              {readFilter === 'unread' ? t('feed.allCaughtUp') : t('feed.nothingHere')}
+            </div>
+          )
         ) : (
           <div className="flex flex-col">
             {filteredItems.map((item, index) => (

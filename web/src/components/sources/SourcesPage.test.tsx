@@ -58,6 +58,14 @@ test('SourcesPage renders title and add button', () => {
   expect(screen.getByRole('link', { name: '← 返回首页' })).toBeInTheDocument();
 });
 
+test('SourcesPage empty list gives an actionable next step', () => {
+  render(<SourcesPage />, { wrapper });
+
+  expect(screen.getByText('还没有订阅源')).toBeInTheDocument();
+  expect(screen.getByText('粘贴博客首页或 RSS 地址添加第一个源，也可以从 OPML 一次导入。')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: '导入 OPML' })).toHaveAttribute('href', '#opml');
+});
+
 test('SourcesPage owns its scroll area inside the app shell', () => {
   const { container } = render(<SourcesPage />, { wrapper });
   const shell = container.firstElementChild;

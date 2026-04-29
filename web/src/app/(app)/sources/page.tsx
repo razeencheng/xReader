@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { PlusCircle, Upload } from 'lucide-react';
 import { ApiError, apiFetch } from '@/lib/api-client';
 import { useI18n } from '@/lib/i18n';
 import {
@@ -322,7 +323,7 @@ export function SourcesPage() {
           </div>
         </div>
 
-        <section className="rounded-3xl border border-[var(--border-strong)] bg-[var(--bg-input)]/80 p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+        <section id="add-source" className="rounded-3xl border border-[var(--border-strong)] bg-[var(--bg-input)]/80 p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
           <div className="mb-4 flex items-center justify-between gap-4">
             <div>
               <h2 className="font-serif text-xl font-semibold tracking-tight text-[var(--text-body)]">{t('sources.addTitle')}</h2>
@@ -369,7 +370,26 @@ export function SourcesPage() {
           {isLoading ? (
             <div className="px-5 py-10 font-[system-ui] text-sm text-[var(--text-muted)]">{t('sources.loading')}</div>
           ) : visibleSources.length === 0 ? (
-            <div className="px-5 py-10 font-[system-ui] text-sm text-[var(--text-muted)]">{t('sources.empty')}</div>
+            <div className="px-5 py-10 font-[system-ui]">
+              <div className="max-w-xl">
+                <div className="font-serif text-lg font-semibold tracking-tight text-[var(--text-body)]">
+                  {t('sources.emptyTitle')}
+                </div>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
+                  {t('sources.emptyDescription')}
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <a href="#add-source" className="ui-btn-primary rounded-xl px-3 py-2 text-xs">
+                    <PlusCircle size={14} strokeWidth={1.9} />
+                    {t('sources.addTitle')}
+                  </a>
+                  <a href="#opml" className="ui-btn-secondary rounded-xl px-3 py-2 text-xs">
+                    <Upload size={14} strokeWidth={1.9} />
+                    {t('sources.importOpmlAction')}
+                  </a>
+                </div>
+              </div>
+            </div>
           ) : (
             <ul className="divide-y divide-[var(--border-strong)]">
               {visibleSources.map((source) => {
@@ -449,7 +469,7 @@ export function SourcesPage() {
           )}
         </section>
 
-        <section className="mt-6 rounded-3xl border border-[var(--border-strong)] bg-[var(--bg-input)]/80 p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+        <section id="opml" className="mt-6 rounded-3xl border border-[var(--border-strong)] bg-[var(--bg-input)]/80 p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0 flex-1">
               <h2 className="font-serif text-xl font-semibold tracking-tight text-[var(--text-body)]">{t('sources.opmlTitle')}</h2>

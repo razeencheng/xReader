@@ -44,3 +44,13 @@ test('sidebar exposes the highlights and notes page', async () => {
 
   expect(push).toHaveBeenCalledWith('/highlights');
 });
+
+test('sidebar exposes a direct add source shortcut', async () => {
+  const user = userEvent.setup();
+
+  render(<Sidebar />);
+
+  await user.click(screen.getByTitle('Add Source'));
+
+  expect(push).toHaveBeenCalledWith('/sources#add-source');
+});

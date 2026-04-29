@@ -41,6 +41,27 @@ test('FeedList shows all caught up message when unread filter has no items', asy
   expect(await screen.findByText(/已全部处理/)).toBeInTheDocument();
 });
 
+test('FeedList turns a zero-source account into subscription onboarding', async () => {
+  vi.mocked(apiFetch).mockImplementation(async (path) => {
+    if (String(path).startsWith('/api/sources')) {
+      return [];
+    }
+
+    if (String(path).startsWith('/api/articles?')) {
+      return { items: [], next_cursor: null };
+    }
+
+    return {};
+  });
+
+  render(<FeedList />, { wrapper });
+
+  expect(await screen.findByText('还没有订阅源')).toBeInTheDocument();
+  expect(screen.getByText('添加第一个 RSS 源，开始生成你的阅读流。')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: /添加订阅源/ })).toHaveAttribute('href', '/sources#add-source');
+  expect(screen.getByRole('link', { name: /导入 OPML/ })).toHaveAttribute('href', '/sources#opml');
+});
+
 test('FeedList only draws the split-pane divider on desktop widths', () => {
   vi.mocked(apiFetch).mockResolvedValue({ items: [], next_cursor: null });
 
