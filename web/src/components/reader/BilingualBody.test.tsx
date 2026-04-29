@@ -136,9 +136,10 @@ test('renders translated paragraphs without decorative left rule', () => {
   });
 
   const translation = screen.getByText('你好，世界');
-  expect(translation).toHaveAttribute('data-layer', 'translation');
-  expect(translation.className).not.toContain('border-l');
-  expect(translation.className).not.toContain('pl-4');
+  const translationLayer = translation.closest('[data-layer="translation"]');
+  expect(translationLayer).toHaveAttribute('data-layer', 'translation');
+  expect(translationLayer?.className).not.toContain('border-l');
+  expect(translationLayer?.className).not.toContain('pl-4');
 });
 
 test('does not render loading placeholders for prefetched paragraphs', () => {
@@ -245,6 +246,26 @@ test('keeps translations attached to their original text after empty article blo
   expect(text.indexOf('条纹项目初始化')).toBe(-1);
 });
 
+test('renders heading translations with the original heading level', () => {
+  const { container } = render(
+    <BilingualBody
+      articleId={1}
+      contentHtml="<h2>How it works: zero to production</h2>"
+      language="en"
+      nativeLanguage="zh-CN"
+    />,
+  );
+
+  enterParagraph(container, 0);
+
+  act(() => {
+    sse.pushParagraph(0, { index: 0, translation: '其工作原理：从零到生产' });
+  });
+
+  const translatedHeading = screen.getByRole('heading', { name: '其工作原理：从零到生产', level: 2 });
+  expect(translatedHeading.closest('[data-layer="translation"]')).toHaveAttribute('data-layer', 'translation');
+});
+
 test('renders list item translations directly under each original item', () => {
   const { container } = render(
     <BilingualBody
@@ -273,6 +294,14 @@ test('renders list item translations directly under each original item', () => {
   expect(text.indexOf('Purchased a domain')).toBeLessThan(text.indexOf('购买了一个域名'));
   expect(text.indexOf('购买了一个域名')).toBeLessThan(text.indexOf('Deployed an app to production'));
   expect(text.indexOf('Deployed an app to production')).toBeLessThan(text.indexOf('将应用程序部署到生产环境'));
+
+  const translatedItems = Array.from(container.querySelectorAll('[data-layer="translation"] li'));
+  expect(translatedItems.map((item) => item.textContent)).toEqual([
+    '配置了新的 Cloudflare 账户',
+    '获取了 API 令牌',
+    '购买了一个域名',
+    '将应用程序部署到生产环境',
+  ]);
 });
 
 test('removes hidden heading anchors from sanitized article html', () => {

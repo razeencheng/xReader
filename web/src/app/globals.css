@@ -341,7 +341,7 @@ a {
 }
 
 .reader-content > [data-block-tag='li'] [data-layer='translation'] {
-  padding-left: 1.55em;
+  padding-left: 0;
 }
 
 .reader-content h2 {

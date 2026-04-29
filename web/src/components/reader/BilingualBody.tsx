@@ -126,6 +126,40 @@ function hasStandaloneMedia(element: HTMLElement) {
   return element.querySelector('img, picture, video, audio, canvas, svg, table') !== null;
 }
 
+function isHeadingTag(tag: string) {
+  return /^h[1-6]$/.test(tag);
+}
+
+function listTagFromHtml(html: string) {
+  return html.trim().toLowerCase().startsWith('<ol') ? 'ol' : 'ul';
+}
+
+function translationHtmlForBlock(block: ReaderBlock, blockTag: string, translation: string) {
+  const escaped = escapeHtml(translation).replaceAll('\n', '<br />');
+
+  if (isHeadingTag(blockTag)) {
+    return `<${blockTag}>${escaped}</${blockTag}>`;
+  }
+
+  if (blockTag === 'li') {
+    const listTag = listTagFromHtml(block.html);
+    return `<${listTag}><li>${escaped}</li></${listTag}>`;
+  }
+
+  if (blockTag === 'blockquote') {
+    return `<blockquote>${escaped}</blockquote>`;
+  }
+
+  return `<p>${escaped}</p>`;
+}
+
+function translationClassName(blockTag: string) {
+  if (isHeadingTag(blockTag) || blockTag === 'li') {
+    return 'mt-1 text-[var(--text)]';
+  }
+  return 'mt-1 text-[0.92em] leading-[1.85] text-[var(--text)]';
+}
+
 function sanitizeHtml(html: string): string {
   return DOMPurify.sanitize(html, {
     USE_PROFILES: { html: true },
@@ -366,6 +400,7 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
         const translationIndex = block.translationIndex;
         const translation = translationIndex === null ? undefined : translations.get(translationIndex);
         const isLoading = translationIndex !== null && pendingTranslations.has(translationIndex) && !translation;
+        const translationHtml = translation ? translationHtmlForBlock(block, blockTag, translation) : '';
 
         if (isCode) {
           return (
@@ -408,11 +443,10 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
               <div
                 data-layer="translation"
                 data-paragraph-index={translationIndex ?? undefined}
-                className="mt-1 text-[0.92em] leading-[1.85] text-[var(--text)]"
+                className={translationClassName(blockTag)}
                 style={{ fontFamily: translationFont }}
-              >
-                {translation}
-              </div>
+                dangerouslySetInnerHTML={{ __html: translationHtml }}
+              />
             ) : isLoading ? (
               <div
                 data-testid="translation-loading"
