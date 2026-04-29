@@ -19,7 +19,7 @@ var blockTags = map[string]struct{}{
 }
 
 var wrapperTags = map[string]struct{}{
-	"article": {}, "aside": {}, "body": {}, "div": {}, "footer": {}, "header": {}, "main": {}, "section": {},
+	"article": {}, "aside": {}, "body": {}, "div": {}, "footer": {}, "header": {}, "main": {}, "ol": {}, "section": {}, "ul": {},
 }
 
 var skipEmptyTags = map[string]struct{}{

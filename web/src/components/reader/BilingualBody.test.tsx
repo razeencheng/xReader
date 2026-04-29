@@ -245,6 +245,36 @@ test('keeps translations attached to their original text after empty article blo
   expect(text.indexOf('条纹项目初始化')).toBe(-1);
 });
 
+test('renders list item translations directly under each original item', () => {
+  const { container } = render(
+    <BilingualBody
+      articleId={1}
+      contentHtml="<p>The agent has gone from zero to having:</p><ul><li>Provisioned a new Cloudflare account</li><li>Obtained an API token</li><li>Purchased a domain</li><li>Deployed an app to production</li></ul>"
+      language="en"
+      nativeLanguage="zh-CN"
+    />,
+  );
+
+  enterParagraph(container, 0);
+
+  act(() => {
+    sse.pushParagraph(0, { index: 0, translation: '该代理已经从零开始发展到拥有：' });
+    sse.pushParagraph(0, { index: 1, translation: '配置了新的 Cloudflare 账户' });
+    sse.pushParagraph(0, { index: 2, translation: '获取了 API 令牌' });
+    sse.pushParagraph(0, { index: 3, translation: '购买了一个域名' });
+    sse.pushParagraph(0, { index: 4, translation: '将应用程序部署到生产环境' });
+  });
+
+  const text = container.textContent ?? '';
+  expect(text.indexOf('Provisioned a new Cloudflare account')).toBeLessThan(text.indexOf('配置了新的 Cloudflare 账户'));
+  expect(text.indexOf('配置了新的 Cloudflare 账户')).toBeLessThan(text.indexOf('Obtained an API token'));
+  expect(text.indexOf('Obtained an API token')).toBeLessThan(text.indexOf('获取了 API 令牌'));
+  expect(text.indexOf('获取了 API 令牌')).toBeLessThan(text.indexOf('Purchased a domain'));
+  expect(text.indexOf('Purchased a domain')).toBeLessThan(text.indexOf('购买了一个域名'));
+  expect(text.indexOf('购买了一个域名')).toBeLessThan(text.indexOf('Deployed an app to production'));
+  expect(text.indexOf('Deployed an app to production')).toBeLessThan(text.indexOf('将应用程序部署到生产环境'));
+});
+
 test('removes hidden heading anchors from sanitized article html', () => {
   render(
     <BilingualBody

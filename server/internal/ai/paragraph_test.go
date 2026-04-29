@@ -22,11 +22,12 @@ func TestSplitParagraphs_SkipsEmpty(t *testing.T) {
 	require.Equal(t, "Content", paragraphs[0].Original)
 }
 
-func TestSplitParagraphs_KeepsListAsSingleBlock(t *testing.T) {
+func TestSplitParagraphs_SplitsListItems(t *testing.T) {
 	source := "<p>Intro</p><ul><li>One</li><li>Two</li></ul><p>Outro</p>"
 	paragraphs := SplitParagraphs(source)
-	require.Len(t, paragraphs, 3)
+	require.Len(t, paragraphs, 4)
 	require.Equal(t, "Intro", paragraphs[0].Original)
-	require.Equal(t, "OneTwo", paragraphs[1].Original)
-	require.Equal(t, "Outro", paragraphs[2].Original)
+	require.Equal(t, "One", paragraphs[1].Original)
+	require.Equal(t, "Two", paragraphs[2].Original)
+	require.Equal(t, "Outro", paragraphs[3].Original)
 }

@@ -332,6 +332,18 @@ a {
   margin-top: 0;
 }
 
+.reader-content > [data-block-tag='li'] {
+  margin-top: 0.85em;
+}
+
+.reader-content > [data-block-tag='li'] + [data-block-tag='li'] {
+  margin-top: 0.7em;
+}
+
+.reader-content > [data-block-tag='li'] [data-layer='translation'] {
+  padding-left: 1.55em;
+}
+
 .reader-content h2 {
   border-top: 1px solid var(--border-light);
   padding-top: 1.1em;

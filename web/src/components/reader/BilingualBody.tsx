@@ -39,12 +39,13 @@ const BLOCK_TAGS = new Set([
   'ul',
 ]);
 
-const WRAPPER_TAGS = new Set(['article', 'aside', 'div', 'footer', 'header', 'main', 'section']);
+const WRAPPER_TAGS = new Set(['article', 'aside', 'div', 'footer', 'header', 'main', 'ol', 'section', 'ul']);
 const SKIP_EMPTY_TAGS = new Set(['br', 'ins']);
 const TRANSLATION_PREFETCH_COUNT = 5;
 
 type ReaderBlock = {
   html: string;
+  blockTag?: string;
   translationIndex: number | null;
 };
 
@@ -142,8 +143,8 @@ function splitContentHtml(contentHtml: string) {
   const blocks: ReaderBlock[] = [];
   let translationIndex = 0;
 
-  const pushBlock = (html: string, translatable: boolean) => {
-    blocks.push({ html, translationIndex: translatable ? translationIndex : null });
+  const pushBlock = (html: string, translatable: boolean, blockTag?: string) => {
+    blocks.push({ html, blockTag, translationIndex: translatable ? translationIndex : null });
     if (translatable) {
       translationIndex += 1;
     }
@@ -175,6 +176,15 @@ function splitContentHtml(contentHtml: string) {
 
     if (WRAPPER_TAGS.has(tag)) {
       Array.from(element.childNodes).forEach(traverseNodes);
+      return;
+    }
+
+    if (tag === 'li') {
+      const hasText = normalizeBlockText(element.textContent ?? '') !== '';
+      const parentTag = element.parentElement?.tagName.toLowerCase() === 'ol' ? 'ol' : 'ul';
+      if (hasText || hasStandaloneMedia(element)) {
+        pushBlock(`<${parentTag}>${element.outerHTML}</${parentTag}>`, hasText, 'li');
+      }
       return;
     }
 
@@ -351,7 +361,7 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
   return (
     <div className="reader-content">
       {blocks.map((block, index) => {
-        const blockTag = primaryTagFromHtml(block.html);
+        const blockTag = block.blockTag ?? primaryTagFromHtml(block.html);
         const isCode = blockTag === 'pre';
         const translationIndex = block.translationIndex;
         const translation = translationIndex === null ? undefined : translations.get(translationIndex);
