@@ -5,9 +5,14 @@ const apiProxyTarget =
   process.env.NEXT_PUBLIC_API_BASE?.trim() ||
   "http://localhost:8080";
 
+const extraAllowedDevOrigins =
+  process.env.NEXT_ALLOWED_DEV_ORIGINS?.split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean) ?? [];
+
 const nextConfig: NextConfig = {
   output: 'standalone',
-  allowedDevOrigins: ['127.0.0.1', 'localhost'],
+  allowedDevOrigins: ['127.0.0.1', 'localhost', ...extraAllowedDevOrigins],
   async rewrites() {
     return {
       beforeFiles: [],
