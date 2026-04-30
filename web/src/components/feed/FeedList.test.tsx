@@ -123,12 +123,13 @@ test('renders read filters as a segmented control', async () => {
   await screen.findByText('Unread Article');
 
   const filterGroup = screen.getByRole('group', { name: '未读 / 全部 / 已读' });
-  expect(filterGroup).toHaveClass('rounded-[14px]');
+  expect(filterGroup).toHaveClass('rounded-[10px]');
   expect(filterGroup).toHaveClass('bg-[var(--bg-panel)]');
 
   const unread = screen.getByRole('button', { name: '未读1' });
   const all = screen.getByRole('button', { name: '全部2' });
   const read = screen.getByRole('button', { name: '已读1' });
+  expect(unread).toHaveClass('rounded-[8px]');
   expect(unread).toHaveAttribute('aria-pressed', 'true');
   expect(all).toHaveAttribute('aria-pressed', 'false');
   expect(read).toHaveAttribute('aria-pressed', 'false');
