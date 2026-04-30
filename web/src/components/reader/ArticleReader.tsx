@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Languages } from 'lucide-react';
-import { apiFetch } from '@/lib/api-client';
+import { ApiError, apiFetch } from '@/lib/api-client';
 import { applyArticleStateChange } from '@/lib/article-state-cache';
 import { broadcast } from '@/lib/broadcast';
 import { estimateReadMinutes, formatRelativeTime, getDisplayTitle, isLikelySummaryOnly, isSameLanguage } from '@/lib/article-meta';
@@ -56,6 +56,7 @@ export interface ArticleReaderProps {
   /** Content rendered after the scroll area (e.g. PrevNextBar) */
   afterScroll?: React.ReactNode;
   className?: string;
+  onNotFound?: () => void;
 }
 
 export function ArticleReader({
@@ -70,6 +71,7 @@ export function ArticleReader({
   afterBody,
   afterScroll,
   className = '',
+  onNotFound,
 }: ArticleReaderProps) {
   const queryClient = useQueryClient();
   const { t } = useI18n();
@@ -89,10 +91,21 @@ export function ArticleReader({
 
   const activeLayout = getActiveReaderLayout(layout, focusMode);
 
-  const { data: article, isLoading } = useQuery({
+  const { data: article, isLoading, error } = useQuery({
     queryKey: ['article', id],
     queryFn: () => apiFetch<ArticleDetail>(`/api/articles/${id}`),
   });
+
+  useEffect(() => {
+    if (!error || !onNotFound) {
+      return;
+    }
+
+    const status = error instanceof ApiError ? error.status : undefined;
+    if (status === 404) {
+      onNotFound();
+    }
+  }, [error, onNotFound]);
 
   const titleNeedsTranslation = article ? !isSameLanguage(article.language, nativeLanguage) : false;
   const { data: ai, isFetching: isFetchingAI } = useQuery({

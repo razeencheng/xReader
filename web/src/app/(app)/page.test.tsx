@@ -8,6 +8,9 @@ import type { ArticleItem } from '@/lib/types';
 const push = vi.fn();
 const replace = vi.fn();
 const searchParamsMock = vi.fn(() => new URLSearchParams());
+const articleItemsMock = vi.hoisted(() => ({
+  items: [] as ArticleItem[],
+}));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push, replace }),
@@ -41,7 +44,12 @@ vi.mock('@/components/layout/SourceBrowser', () => ({
 }));
 
 vi.mock('@/components/reader/ArticleView', () => ({
-  ArticleView: ({ id }: { id: string }) => <div data-testid="article-view">Article {id}</div>,
+  ArticleView: ({ id, onNotFound }: { id: string; onNotFound?: () => void }) => (
+    <div data-testid="article-view">
+      Article {id}
+      <button type="button" onClick={onNotFound}>Report missing article</button>
+    </div>
+  ),
 }));
 
 vi.mock('@/hooks/useArticleNavigation', () => ({
@@ -53,10 +61,7 @@ vi.mock('@/lib/queries/articles', () => ({
     data: {
       pages: [
         {
-          items: [
-            { id: 2, source_id: 1, title: 'Article 2', link: 'https://example.com/2', language: 'en', is_read: false },
-            { id: 7, source_id: 1, title: 'Article 7', link: 'https://example.com/7', language: 'en', is_read: false },
-          ],
+          items: articleItemsMock.items,
           next_cursor: null,
         },
       ],
@@ -70,6 +75,10 @@ beforeEach(() => {
   replace.mockReset();
   searchParamsMock.mockReset();
   searchParamsMock.mockReturnValue(new URLSearchParams());
+  articleItemsMock.items = [
+    { id: 2, source_id: 1, title: 'Article 2', link: 'https://example.com/2', language: 'en', is_read: false },
+    { id: 7, source_id: 1, title: 'Article 7', link: 'https://example.com/7', language: 'en', is_read: false },
+  ];
   useUIStore.setState({
     currentView: 'today',
     selectedSourceId: null,
@@ -136,4 +145,32 @@ test('writes the opened article into the URL so refresh keeps reading context', 
   await user.click(screen.getByRole('button', { name: 'Open Article 7' }));
 
   expect(push).toHaveBeenCalledWith('/?article=7&ctx=today');
+});
+
+test('replaces a missing selected article with the first visible article', async () => {
+  const user = userEvent.setup();
+  searchParamsMock.mockReturnValue(new URLSearchParams('article=149&ctx=today'));
+
+  render(<FeedPage />, { wrapper });
+
+  expect(await screen.findByTestId('article-view')).toHaveTextContent('Article 149');
+  await user.click(screen.getByRole('button', { name: 'Report missing article' }));
+
+  expect(replace).toHaveBeenCalledWith('/?article=2&ctx=today', { scroll: false });
+});
+
+test('skips a missing selected article that is still present in the cached list', async () => {
+  const user = userEvent.setup();
+  searchParamsMock.mockReturnValue(new URLSearchParams('article=149&ctx=today'));
+  articleItemsMock.items = [
+    { id: 149, source_id: 1, title: 'Missing Article', link: 'https://example.com/149', language: 'en', is_read: false },
+    { id: 2, source_id: 1, title: 'Article 2', link: 'https://example.com/2', language: 'en', is_read: false },
+  ];
+
+  render(<FeedPage />, { wrapper });
+
+  expect(await screen.findByTestId('article-view')).toHaveTextContent('Article 149');
+  await user.click(screen.getByRole('button', { name: 'Report missing article' }));
+
+  expect(replace).toHaveBeenCalledWith('/?article=2&ctx=today', { scroll: false });
 });

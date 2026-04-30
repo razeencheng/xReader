@@ -7,16 +7,18 @@ interface ArticleViewProps {
   onClose?: () => void;
   onNext?: () => void;
   onPrev?: () => void;
+  onNotFound?: () => void;
   className?: string;
 }
 
-export function ArticleView({ id, onClose, onNext, onPrev, className = '' }: ArticleViewProps) {
+export function ArticleView({ id, onClose, onNext, onPrev, onNotFound, className = '' }: ArticleViewProps) {
   return (
     <ArticleReader
       id={id}
       onClose={onClose}
       onNext={onNext}
       onPrev={onPrev}
+      onNotFound={onNotFound}
       className={className}
     />
   );

@@ -78,6 +78,16 @@ function FeedPageContent() {
   const currentIndex = filteredItems.findIndex((item) => item.id === selectedArticleIdForList);
   const currentArticle = currentIndex >= 0 ? filteredItems[currentIndex] : null;
 
+  const handleArticleNotFound = useCallback(() => {
+    const fallbackArticle = filteredItems.find((item) => item.id !== selectedArticleIdForList) ?? null;
+    if (fallbackArticle) {
+      router.replace(buildReaderUrl(fallbackArticle.id), { scroll: false });
+      return;
+    }
+
+    closeArticle();
+  }, [buildReaderUrl, closeArticle, filteredItems, router, selectedArticleIdForList]);
+
   const updateArticleState = useCallback(
     async (
       articleId: number,
@@ -189,6 +199,7 @@ function FeedPageContent() {
                 onClose={closeArticle}
                 onNext={currentIndex >= 0 && currentIndex < filteredItems.length - 1 ? () => selectArticleAtIndex(currentIndex + 1) : undefined}
                 onPrev={currentIndex > 0 ? () => selectArticleAtIndex(currentIndex - 1) : undefined}
+                onNotFound={handleArticleNotFound}
                 className="h-full"
               />
             </motion.div>

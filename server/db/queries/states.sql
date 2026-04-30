@@ -38,6 +38,7 @@ WITH upserted AS (
   JOIN sources s ON a.source_id = s.id
   LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
   WHERE s.id = $2 AND s.user_id = $1
+    AND s.deleted_at IS NULL
     AND COALESCE(st.is_read, false) <> $3
   ON CONFLICT (user_id, article_id) DO UPDATE SET
     is_read = $3,
@@ -57,6 +58,7 @@ WITH upserted AS (
   JOIN sources s ON a.source_id = s.id
   LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
   WHERE s.user_id = $1 AND a.published_at >= now() - interval '24 hours'
+    AND s.deleted_at IS NULL
     AND COALESCE(st.is_read, false) <> $2
   ON CONFLICT (user_id, article_id) DO UPDATE SET
     is_read = $2,
@@ -76,6 +78,7 @@ WITH upserted AS (
   JOIN sources s ON a.source_id = s.id
   LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
   WHERE s.user_id = $1
+    AND s.deleted_at IS NULL
     AND COALESCE(st.is_read, false) <> $2
   ON CONFLICT (user_id, article_id) DO UPDATE SET
     is_read = $2,
@@ -98,7 +101,7 @@ WITH ranked AS (
   INSERT INTO article_states (user_id, article_id, is_read, last_read_at)
   SELECT s.user_id, ranked.id, true, now()
   FROM ranked
-  JOIN sources s ON s.id = $1
+  JOIN sources s ON s.id = $1 AND s.deleted_at IS NULL
   WHERE NOT (
     ranked.published_at >= now() - interval '7 days'
     OR ranked.rn <= 20
@@ -110,6 +113,6 @@ WITH ranked AS (
 ), changes AS (
   INSERT INTO article_state_changes (user_id, article_id)
   SELECT s.user_id, article_id FROM upserted
-  JOIN sources s ON s.id = $1
+  JOIN sources s ON s.id = $1 AND s.deleted_at IS NULL
 )
 SELECT article_id FROM upserted;

@@ -57,6 +57,20 @@ func insertArticleForTest(t *testing.T, queries *gen.Queries, ctx context.Contex
 	return article
 }
 
+func createSourceForTest(t *testing.T, queries *gen.Queries, ctx context.Context, userID int64, url, title string) gen.Source {
+	t.Helper()
+	source, err := queries.CreateSource(ctx, gen.CreateSourceParams{
+		UserID:        userID,
+		Kind:          "rss",
+		Url:           url,
+		NormalizedUrl: url,
+		Title:         title,
+		Health:        "unknown",
+	})
+	require.NoError(t, err)
+	return source
+}
+
 func TestListToday(t *testing.T) {
 	svc, queries, _, userID, sourceID, cleanup := setupArticleServiceTest(t)
 	t.Cleanup(cleanup)
@@ -64,11 +78,30 @@ func TestListToday(t *testing.T) {
 
 	recent := insertArticleForTest(t, queries, ctx, sourceID, "recent", time.Now().Add(-2*time.Hour))
 	insertArticleForTest(t, queries, ctx, sourceID, "old", time.Now().Add(-48*time.Hour))
+	deletedSource := createSourceForTest(t, queries, ctx, userID, "https://deleted.example/feed.xml", "Deleted Feed")
+	insertArticleForTest(t, queries, ctx, deletedSource.ID, "deleted-source-recent", time.Now().Add(-time.Hour))
+	require.NoError(t, queries.SoftDeleteSource(ctx, deletedSource.ID))
 
 	items, err := svc.ListToday(ctx, userID)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 	require.Equal(t, recent.ID, items[0].ID)
+}
+
+func TestListTodayEnrichedExcludesDeletedSources(t *testing.T) {
+	svc, queries, _, userID, sourceID, cleanup := setupArticleServiceTest(t)
+	t.Cleanup(cleanup)
+	ctx := context.Background()
+
+	visible := insertArticleForTest(t, queries, ctx, sourceID, "visible-today", time.Now().Add(-2*time.Hour))
+	deletedSource := createSourceForTest(t, queries, ctx, userID, "https://deleted.example/feed.xml", "Deleted Feed")
+	insertArticleForTest(t, queries, ctx, deletedSource.ID, "hidden-today", time.Now().Add(-time.Hour))
+	require.NoError(t, queries.SoftDeleteSource(ctx, deletedSource.ID))
+
+	items, err := svc.ListTodayEnriched(ctx, userID, "zh-CN")
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, visible.ID, items[0].ID)
 }
 
 func TestListStream_CursorPagination(t *testing.T) {
@@ -150,13 +183,20 @@ func TestBatchMarkRead_Today(t *testing.T) {
 	ctx := context.Background()
 
 	article := insertArticleForTest(t, queries, ctx, sourceID, "today", time.Now().Add(-time.Hour))
+	deletedSource := createSourceForTest(t, queries, ctx, userID, "https://deleted.example/feed.xml", "Deleted Feed")
+	deletedArticle := insertArticleForTest(t, queries, ctx, deletedSource.ID, "deleted-today", time.Now().Add(-30*time.Minute))
+	require.NoError(t, queries.SoftDeleteSource(ctx, deletedSource.ID))
+
 	updated, err := svc.BatchSetRead(ctx, userID, "tab:today", true)
 	require.NoError(t, err)
-	require.Contains(t, updated, article.ID)
+	require.ElementsMatch(t, []int64{article.ID}, updated)
 
 	state, err := gen.New(pool).GetArticleState(ctx, gen.GetArticleStateParams{UserID: userID, ArticleID: article.ID})
 	require.NoError(t, err)
 	require.True(t, state.IsRead)
+
+	_, err = gen.New(pool).GetArticleState(ctx, gen.GetArticleStateParams{UserID: userID, ArticleID: deletedArticle.ID})
+	require.Error(t, err)
 }
 
 func TestSearch(t *testing.T) {
@@ -165,6 +205,9 @@ func TestSearch(t *testing.T) {
 	ctx := context.Background()
 
 	article := insertArticleForTest(t, queries, ctx, sourceID, "postgresql search guide", time.Now())
+	deletedSource := createSourceForTest(t, queries, ctx, userID, "https://deleted.example/feed.xml", "Deleted Feed")
+	insertArticleForTest(t, queries, ctx, deletedSource.ID, "hidden postgresql guide", time.Now())
+	require.NoError(t, queries.SoftDeleteSource(ctx, deletedSource.ID))
 
 	items, err := svc.Search(ctx, userID, "postgresql search")
 	require.NoError(t, err)
