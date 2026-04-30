@@ -95,6 +95,46 @@ test('FeedList renders items', async () => {
   expect(screen.getByRole('button', { name: /未读/i })).toBeInTheDocument();
 });
 
+test('renders read filters as a segmented control', async () => {
+  vi.mocked(apiFetch).mockResolvedValue({
+    items: [
+      {
+        id: 1,
+        source_id: 1,
+        title: 'Unread Article',
+        link: 'https://example.com/1',
+        language: 'en',
+        is_read: false,
+      },
+      {
+        id: 2,
+        source_id: 1,
+        title: 'Read Article',
+        link: 'https://example.com/2',
+        language: 'en',
+        is_read: true,
+      },
+    ],
+    next_cursor: null,
+  });
+
+  const { container } = render(<FeedList />, { wrapper });
+
+  await screen.findByText('Unread Article');
+
+  const filterGroup = screen.getByRole('group', { name: '未读 / 全部 / 已读' });
+  expect(filterGroup).toHaveClass('rounded-[14px]');
+  expect(filterGroup).toHaveClass('bg-[var(--bg-panel)]');
+
+  const unread = screen.getByRole('button', { name: '未读1' });
+  const all = screen.getByRole('button', { name: '全部2' });
+  const read = screen.getByRole('button', { name: '已读1' });
+  expect(unread).toHaveAttribute('aria-pressed', 'true');
+  expect(all).toHaveAttribute('aria-pressed', 'false');
+  expect(read).toHaveAttribute('aria-pressed', 'false');
+  expect(container.querySelector('.read-filter-segment-active')).toBe(unread);
+});
+
 test('FeedList aligns the aggregate sources title with the source browser title', async () => {
   useUIStore.setState({
     currentView: 'sources',

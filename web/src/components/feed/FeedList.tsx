@@ -9,7 +9,8 @@ import { apiFetch } from '@/lib/api-client';
 import { useI18n } from '@/lib/i18n';
 import { useArticles } from '@/lib/queries/articles';
 import { useBulkRead } from '@/hooks/useBulkRead';
-import { useUIStore, type ReadFilter } from '@/stores/useUIStore';
+import { useUIStore } from '@/stores/useUIStore';
+import { ReadFilterSegmentedControl } from './ReadFilterSegmentedControl';
 import { FeedRowComfortable } from './FeedRowComfortable';
 import { FeedRowCompact } from './FeedRowCompact';
 import { FeedSkeleton, CompactSkeleton } from './FeedSkeleton';
@@ -20,12 +21,6 @@ type FeedArticleItem = ArticleItem & {
   is_starred?: boolean;
   is_read?: boolean;
 };
-
-const READ_FILTERS: Array<{ id: ReadFilter; labelKey: string }> = [
-  { id: 'unread', labelKey: 'feed.unread' },
-  { id: 'all', labelKey: 'feed.all' },
-  { id: 'read', labelKey: 'feed.read' },
-];
 
 interface FeedListProps {
   onOpenArticle?: (article: ArticleItem) => void;
@@ -138,27 +133,14 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
         {showReadFilters ? (
           <>
             <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 gap-0.5">
-                {READ_FILTERS.map(({ id, labelKey }) => {
-                  const active = readFilter === id;
-                  const count = counts[id];
-
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => {
-                        setReadFilter(id);
-                        setOpenBulkConfirmScope(null);
-                      }}
-                      className={`${active ? 'ui-pill-active' : 'ui-pill-neutral'} text-[11.5px]`}
-                    >
-                      {t(labelKey)}
-                      <span className="text-[10px] opacity-75">{count}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <ReadFilterSegmentedControl
+                value={readFilter}
+                counts={counts}
+                onChange={(nextReadFilter) => {
+                  setReadFilter(nextReadFilter);
+                  setOpenBulkConfirmScope(null);
+                }}
+              />
               {showBulkRead ? (
                 <div className="relative shrink-0">
                   <button
