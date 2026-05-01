@@ -5,7 +5,6 @@ import { apiFetch } from '@/lib/api-client';
 import { broadcast } from '@/lib/broadcast';
 import { ArticleReader } from '@/components/reader/ArticleReader';
 import { NextUpCard } from '@/components/reader/NextUpCard';
-import { PrevNextBar } from '@/components/reader/PrevNextBar';
 import type { ArticleItem } from '@/lib/types';
 
 interface ArticleViewProps {
@@ -56,17 +55,11 @@ export function ArticleView({
       onNotFound={onNotFound}
       className={className}
       afterBody={
-        next ? <NextUpCard next={next} currentId={articleId} markRead={markRead} /> : undefined
-      }
-      afterScroll={
-        <PrevNextBar
-          current={null}
-          prev={prev ?? null}
-          next={next ?? null}
-          position={position}
-          total={total}
-          markRead={markRead}
-        />
+        next ? (
+          <div className="mt-16 mb-12">
+            <NextUpCard next={next} currentId={articleId} markRead={markRead} />
+          </div>
+        ) : undefined
       }
     />
   );
