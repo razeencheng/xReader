@@ -62,7 +62,7 @@ export default function SettingsPage() {
   });
 
   return (
-    <main className="min-h-screen bg-[var(--bg-body)] text-[var(--text-body)]">
+    <main className="h-full overflow-y-auto bg-[var(--bg-body)] pb-[env(safe-area-inset-bottom)] text-[var(--text-body)]">
       <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-6 flex items-center justify-between gap-4">
           <Link href="/" className="font-[system-ui] text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-body)]">

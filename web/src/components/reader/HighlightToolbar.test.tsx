@@ -61,10 +61,14 @@ test('creates a highlight with note through an inline editor instead of a browse
   await user.click(screen.getByRole('button', { name: '高亮并添加备注' }));
 
   expect(promptSpy).not.toHaveBeenCalled();
+  expect(screen.getByRole('button', { name: '高亮' })).toHaveClass('min-h-11', 'min-w-11');
+  expect(screen.getByRole('button', { name: '高亮并添加备注' })).toHaveClass('min-h-11', 'min-w-11');
   expect(screen.getByRole('dialog', { name: '高亮备注' })).toBeInTheDocument();
 
   await user.type(screen.getByLabelText('备注'), 'note text');
-  await user.click(screen.getByRole('button', { name: '保存' }));
+  const saveButton = screen.getByRole('button', { name: '保存' });
+  expect(saveButton).toHaveClass('min-h-11');
+  await user.click(saveButton);
 
   expect(createHighlight).toHaveBeenCalledWith({
     article_id: 7,

@@ -11,8 +11,10 @@ import {
   useRemoveAllowlistEntry,
 } from '@/lib/queries/admin';
 
-function formatAddedAt(addedAt: string) {
-  return new Date(addedAt).toLocaleDateString();
+function formatAddedAt(addedAt?: string) {
+  if (!addedAt) return '—';
+  const date = new Date(addedAt);
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString();
 }
 
 export default function AdminPage() {
@@ -53,7 +55,7 @@ export default function AdminPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[var(--bg-body)] text-[var(--text-body)]">
+    <main className="h-full overflow-y-auto bg-[var(--bg-body)] pb-[env(safe-area-inset-bottom)] text-[var(--text-body)]">
       <div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-4">
           <Link href="/" className="text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-body)]">
@@ -116,13 +118,13 @@ export default function AdminPage() {
                   {entries.map((entry) => (
                     <tr key={entry.github_username}>
                       <td className="px-4 py-3 font-medium">{entry.github_username}</td>
-                      <td className="px-4 py-3 text-[var(--text-muted)]">{formatAddedAt(entry.created_at)}</td>
+                      <td className="px-4 py-3 text-[var(--text-muted)]">{formatAddedAt(entry.added_at)}</td>
                       <td className="px-4 py-3 text-right">
                         <button
                           type="button"
                           onClick={() => void handleRemove(entry.github_username)}
                           disabled={removeEntry.isPending}
-                          className="rounded-lg border border-[var(--border-strong)] px-3 py-1.5 text-xs font-medium text-[var(--text-body)] transition hover:border-[var(--border-accent)] hover:text-[var(--text-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--border-strong)] px-3 py-1.5 text-xs font-medium text-[var(--text-body)] transition hover:border-[var(--border-accent)] hover:text-[var(--text-accent)] disabled:cursor-not-allowed disabled:opacity-60 md:min-h-0"
                         >
                           {removeEntry.isPending ? t('admin.processing') : t('admin.remove')}
                         </button>

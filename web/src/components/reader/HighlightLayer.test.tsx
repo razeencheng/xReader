@@ -138,7 +138,9 @@ test('opens an inline note editor for existing highlights instead of a browser p
   const textarea = screen.getByLabelText('备注');
   await user.clear(textarea);
   await user.type(textarea, 'new note');
-  await user.click(screen.getByRole('button', { name: '保存' }));
+  const saveButton = screen.getByRole('button', { name: '保存' });
+  expect(saveButton).toHaveClass('min-h-11');
+  await user.click(saveButton);
 
   expect(updateHighlightNote).toHaveBeenCalledWith(43, 'new note');
   promptSpy.mockRestore();

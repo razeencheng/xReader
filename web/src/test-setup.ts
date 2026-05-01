@@ -5,4 +5,4 @@ class MockIntersectionObserver {
   unobserve() {}
   disconnect() {}
 }
-globalThis.IntersectionObserver = MockIntersectionObserver as any;
+globalThis.IntersectionObserver = MockIntersectionObserver as unknown as typeof IntersectionObserver;

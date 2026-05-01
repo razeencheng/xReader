@@ -52,7 +52,7 @@ export function KeyboardShortcutsButton({
       onClick={onClick}
       title={`${t('shortcuts.open')} (?)`}
       aria-label={t('shortcuts.openAria')}
-      className={`fixed bottom-4 left-4 md:left-[68px] z-[90] inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[rgba(248,244,238,0.92)] px-3 py-2 text-[11px] text-[var(--text-3)] shadow-[0_16px_40px_rgba(65,52,35,0.12)] backdrop-blur transition-colors hover:bg-[var(--bg)] hover:text-[var(--text-2)] ${className}`}
+      className={`fixed bottom-[max(16px,calc(env(safe-area-inset-bottom)+8px))] left-4 z-[90] inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--bg-body)_92%,transparent)] px-3 py-2 text-[11px] text-[var(--text-3)] shadow-[0_16px_40px_rgba(65,52,35,0.12)] backdrop-blur transition-colors hover:bg-[var(--bg)] hover:text-[var(--text-2)] md:left-[68px] ${className}`}
     >
       <Keyboard size={13} />
       <span className="font-medium">{t('shortcuts.open')}</span>
@@ -97,7 +97,7 @@ export function KeyboardShortcutsModal({
             type="button"
             onClick={onClose}
             aria-label={t('shortcuts.closeAria')}
-            className="rounded-[9px] p-2 text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-[9px] p-2 text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
           >
             <X size={16} />
           </button>
@@ -113,7 +113,7 @@ export function KeyboardShortcutsModal({
                 {group.items.map(([key, labelKey], index) => (
                   <div
                     key={key}
-                    className={`flex items-center justify-between gap-4 bg-[rgba(255,255,255,0.6)] px-3 py-2.5 ${
+                    className={`flex items-center justify-between gap-4 bg-[var(--bg-panel)] px-3 py-2.5 ${
                       index > 0 ? 'border-t border-[var(--border-light)]' : ''
                     }`}
                   >

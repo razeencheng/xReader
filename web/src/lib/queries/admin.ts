@@ -3,8 +3,9 @@ import { apiFetch } from '@/lib/api-client';
 
 interface AllowlistEntry {
   github_username: string;
-  role: string;
-  created_at: string;
+  added_by_user_id?: number;
+  added_at: string;
+  note?: string;
 }
 
 export function useAllowlist() {

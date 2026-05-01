@@ -4,5 +4,5 @@ test('login page shows GitHub OAuth button', async ({ page }) => {
   await page.goto('/login');
 
   await expect(page.getByRole('heading', { name: 'xReader' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Sign in with GitHub' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /GitHub/ })).toBeVisible();
 });

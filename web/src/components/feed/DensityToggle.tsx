@@ -24,7 +24,7 @@ export function DensityToggle() {
             type="button"
             onClick={() => setDensity(key)}
             aria-pressed={active}
-            className={`rounded-[11px] px-3 py-1.5 transition-colors ${
+            className={`min-h-11 rounded-[11px] px-3 py-1.5 transition-colors ${
               active
                 ? 'bg-[var(--bg-body)] font-semibold text-[var(--text-body)] shadow-sm'
                 : 'text-[var(--text-muted)] opacity-75 hover:text-[var(--text-secondary)]'

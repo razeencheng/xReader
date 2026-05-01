@@ -45,6 +45,23 @@ test('renders 用户白名单管理 for admin user', () => {
   expect(screen.getByText('用户白名单管理')).toBeInTheDocument();
 });
 
+test('renders allowlist added_at without showing Invalid Date', () => {
+  const addedAt = '2026-04-29T12:00:00Z';
+  useAuthStore.mockImplementation((selector: (state: { user: { role: string; github_username: string } | null }) => unknown) =>
+    selector({ user: { role: 'admin', github_username: 'razeencheng' } }),
+  );
+  useAllowlist.mockReturnValue({
+    data: [{ github_username: 'alice', role: 'user', added_at: addedAt }],
+    isLoading: false,
+  });
+
+  render(<AdminPage />);
+
+  expect(screen.getByText('alice')).toBeInTheDocument();
+  expect(screen.getByText(new Date(addedAt).toLocaleDateString())).toBeInTheDocument();
+  expect(screen.queryByText('Invalid Date')).not.toBeInTheDocument();
+});
+
 test('redirects non-admin users to home', () => {
   useAuthStore.mockImplementation((selector: (state: { user: { role: string } | null }) => unknown) =>
     selector({ user: { role: 'member' } }),

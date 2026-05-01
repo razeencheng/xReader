@@ -83,12 +83,12 @@ export function HighlightToolbar({ articleId, onHighlightCreated }: Props) {
           initial={{ opacity: 0, y: 10, scale: 0.9 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 10, scale: 0.9 }}
-          className="fixed z-[100] flex items-center gap-1 p-1 bg-[color-mix(in_oklch,var(--bg-panel)_85%,transparent)] backdrop-blur-xl border border-[var(--border)] rounded-full shadow-2xl"
+          className="fixed z-[100] flex items-center gap-1 rounded-full border border-[var(--border)] bg-[color-mix(in_oklch,var(--bg-panel)_85%,transparent)] p-1 shadow-2xl backdrop-blur-xl"
           style={{ top: position.top, left: position.left, transform: 'translateX(-50%)' }}
         >
           <button
             onClick={() => save()}
-            className="p-2 text-[var(--accent)] hover:bg-[var(--accent-bg)] rounded-full transition-colors"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-3 text-[var(--accent)] transition-colors hover:bg-[var(--accent-bg)]"
             title={t('reader.highlight')}
             aria-label={t('reader.highlight')}
           >
@@ -100,7 +100,7 @@ export function HighlightToolbar({ articleId, onHighlightCreated }: Props) {
               setNoteDraft('');
               setIsNoteEditorOpen(true);
             }}
-            className="p-2 text-[var(--accent)] hover:bg-[var(--accent-bg)] rounded-full transition-colors"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-3 text-[var(--accent)] transition-colors hover:bg-[var(--accent-bg)]"
             title={t('reader.highlightWithNote')}
             aria-label={t('reader.highlightWithNote')}
           >
@@ -129,10 +129,10 @@ export function HighlightToolbar({ articleId, onHighlightCreated }: Props) {
             />
           </label>
           <div className="mt-3 flex justify-end gap-2">
-            <button type="button" onClick={() => setIsNoteEditorOpen(false)} className="rounded-[9px] px-3 py-1.5 text-xs font-medium text-[var(--text-3)] hover:bg-[var(--bg-hover)]">
+            <button type="button" onClick={() => setIsNoteEditorOpen(false)} className="inline-flex min-h-11 items-center justify-center rounded-[9px] px-4 py-2 text-xs font-medium text-[var(--text-3)] hover:bg-[var(--bg-hover)]">
               {t('reader.cancelNote')}
             </button>
-            <button type="button" onClick={() => save(noteDraft)} className="rounded-[9px] bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">
+            <button type="button" onClick={() => save(noteDraft)} className="inline-flex min-h-11 items-center justify-center rounded-[9px] bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white hover:opacity-90">
               {t('reader.saveNote')}
             </button>
           </div>

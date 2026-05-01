@@ -32,7 +32,7 @@ export function ReadFilterSegmentedControl({ value, counts, onChange }: ReadFilt
             type="button"
             aria-pressed={active}
             onClick={() => onChange(id)}
-            className={`inline-flex min-h-8 min-w-[58px] items-center justify-center gap-[5px] rounded-[8px] px-2.5 font-semibold transition-[background,color,box-shadow] duration-150 ${
+            className={`inline-flex min-h-11 min-w-[58px] items-center justify-center gap-[5px] rounded-[8px] px-2.5 font-semibold transition-[background,color,box-shadow] duration-150 ${
               active
                 ? 'read-filter-segment-active bg-[var(--bg-elevated)] text-[var(--text)] shadow-[0_1px_2px_rgba(30,24,16,0.10),0_5px_14px_rgba(30,24,16,0.06)]'
                 : 'text-[var(--text-3)] hover:text-[var(--text-2)]'

@@ -30,3 +30,9 @@ test('does not render reading-time footer in compact mode', () => {
   render(<FeedRowCompact item={mockItem} />);
   expect(screen.queryByText(/分钟阅读/i)).not.toBeInTheDocument();
 });
+
+test('renders a mobile-sized mark-read action target', () => {
+  render(<FeedRowCompact item={mockItem} onMarkRead={vi.fn()} />);
+
+  expect(screen.getByRole('button', { name: '标已读' })).toHaveClass('min-h-11', 'min-w-11');
+});

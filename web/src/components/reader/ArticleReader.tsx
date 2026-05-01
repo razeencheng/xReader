@@ -270,7 +270,7 @@ export function ArticleReader({
   if (isLoading) {
     return (
       <div className={`flex h-full flex-col bg-[var(--bg)] ${className}`}>
-        <div className="mx-auto w-full max-w-[680px] space-y-6 px-8 py-16">
+        <div className="mx-auto w-full max-w-[680px] space-y-6 px-7 py-16">
           <div className="h-4 w-28 animate-pulse rounded bg-[var(--bg-hover)]" />
           <div className="h-12 w-full animate-pulse rounded bg-[var(--bg-hover)]" />
           <div className="h-12 w-2/3 animate-pulse rounded bg-[var(--bg-hover)]" />
@@ -315,7 +315,7 @@ export function ArticleReader({
       >
         <HighlightLayer articleId={Number(id)}>
           <div className={`pb-20 pt-[44px] ${activeLayout === 'wide' ? 'px-7 md:px-14' : 'px-7 md:px-7'}`}>
-            <article className={activeLayout === 'wide' ? 'max-w-none' : 'mx-auto max-w-[680px]'}>
+            <article className={activeLayout === 'wide' ? 'mx-auto max-w-[960px]' : 'mx-auto max-w-[680px]'}>
               {titleLoading ? (
                 <div className="mb-3 inline-flex items-center gap-2 font-serif text-[18px] text-[var(--text-3)]">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />

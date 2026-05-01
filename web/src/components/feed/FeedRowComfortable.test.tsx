@@ -46,3 +46,10 @@ test('shows source name and reading time footer', () => {
   expect(screen.getByText('VERCEL BLOG')).toBeInTheDocument();
   expect(screen.getByText(/分钟阅读/i)).toBeInTheDocument();
 });
+
+test('renders mobile-sized action targets for mark-read and star actions', () => {
+  render(<FeedRowComfortable item={mockTranslated} onMarkRead={vi.fn()} onStar={vi.fn()} />);
+
+  expect(screen.getByRole('button', { name: '标已读' })).toHaveClass('min-h-11', 'min-w-11');
+  expect(screen.getByRole('button', { name: 'Star article' })).toHaveClass('min-h-11', 'min-w-11');
+});

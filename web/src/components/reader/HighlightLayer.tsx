@@ -50,18 +50,18 @@ function HighlightEditorDialog({
       </label>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <button type="button" onClick={onCopyQuote} className="rounded-[9px] px-3 py-1.5 text-xs font-medium text-[var(--text-3)] hover:bg-[var(--bg-hover)]">
+          <button type="button" onClick={onCopyQuote} className="inline-flex min-h-11 items-center justify-center rounded-[9px] px-4 py-2 text-xs font-medium text-[var(--text-3)] hover:bg-[var(--bg-hover)]">
             {t('reader.copyQuote')}
           </button>
-          <button type="button" onClick={onRemoveHighlight} className="rounded-[9px] px-3 py-1.5 text-xs font-medium text-[var(--text-error)] hover:bg-[var(--bg-hover)]">
+          <button type="button" onClick={onRemoveHighlight} className="inline-flex min-h-11 items-center justify-center rounded-[9px] px-4 py-2 text-xs font-medium text-[var(--text-error)] hover:bg-[var(--bg-hover)]">
             {t('reader.deleteHighlight')}
           </button>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={onClose} className="rounded-[9px] px-3 py-1.5 text-xs font-medium text-[var(--text-3)] hover:bg-[var(--bg-hover)]">
+          <button type="button" onClick={onClose} className="inline-flex min-h-11 items-center justify-center rounded-[9px] px-4 py-2 text-xs font-medium text-[var(--text-3)] hover:bg-[var(--bg-hover)]">
             {t('reader.cancelNote')}
           </button>
-          <button type="button" onClick={onSaveNote} className="rounded-[9px] bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">
+          <button type="button" onClick={onSaveNote} className="inline-flex min-h-11 items-center justify-center rounded-[9px] bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white hover:opacity-90">
             {t('reader.saveNote')}
           </button>
         </div>

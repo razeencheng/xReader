@@ -75,14 +75,15 @@ function NavButton({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-[11px] px-3 py-2 text-[13px] font-medium transition-colors ${
+      aria-label={label}
+      className={`inline-flex min-h-11 items-center gap-2 rounded-[11px] px-3 py-2 text-[13px] font-medium transition-colors ${
         active
           ? 'bg-[var(--accent-bg)] text-[var(--accent)]'
           : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]'
       }`}
     >
       <Icon size={16} strokeWidth={1.75} />
-      <span>{label}</span>
+      <span className="hidden min-[900px]:inline">{label}</span>
     </button>
   );
 }
@@ -97,7 +98,7 @@ export function TabletTopNav({ focusMode }: { focusMode: boolean }) {
 
   return (
     <>
-      <header className="glass-effect hidden h-14 shrink-0 items-center justify-between gap-4 px-4 md:flex lg:hidden">
+      <header className="glass-effect hidden h-14 shrink-0 items-center justify-between gap-2 px-4 md:flex min-[900px]:gap-4 lg:hidden">
         <button
           type="button"
           onClick={() => nav.goToView('today')}
@@ -124,7 +125,7 @@ export function TabletTopNav({ focusMode }: { focusMode: boolean }) {
               type="button"
               title={nav.t('nav.admin')}
               onClick={() => nav.router.push('/admin')}
-              className={`flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors ${
+              className={`flex h-10 w-10 items-center justify-center rounded-[10px] transition-colors ${
                 nav.pathname === '/admin'
                   ? 'bg-[var(--accent-bg)] text-[var(--accent)]'
                   : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]'
@@ -137,7 +138,7 @@ export function TabletTopNav({ focusMode }: { focusMode: boolean }) {
             type="button"
             title={nav.t('nav.nativeLanguageTitle', { language: nav.currentLanguage.name })}
             onClick={() => setIsLanguageOpen(true)}
-            className="flex h-9 items-center gap-1 rounded-[10px] px-2 text-[12px] font-semibold text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
+            className="flex h-10 items-center gap-1 rounded-[10px] px-2 text-[12px] font-semibold text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
           >
             <Globe size={15} strokeWidth={1.75} />
             {nav.currentLanguage.short}
@@ -146,7 +147,7 @@ export function TabletTopNav({ focusMode }: { focusMode: boolean }) {
             type="button"
             title={nav.t('nav.highlights')}
             onClick={() => nav.router.push('/highlights')}
-            className={`flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors ${
+            className={`flex h-10 w-10 items-center justify-center rounded-[10px] transition-colors ${
               nav.pathname === '/highlights'
                 ? 'bg-[var(--accent-bg)] text-[var(--accent)]'
                 : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]'
@@ -158,7 +159,7 @@ export function TabletTopNav({ focusMode }: { focusMode: boolean }) {
             type="button"
             title={nav.t('shortcuts.open')}
             onClick={nav.openShortcuts}
-            className="flex h-9 w-9 items-center justify-center rounded-[10px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
+            className="flex h-10 w-10 items-center justify-center rounded-[10px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
           >
             <Keyboard size={16} strokeWidth={1.75} />
           </button>
@@ -166,7 +167,7 @@ export function TabletTopNav({ focusMode }: { focusMode: boolean }) {
             type="button"
             title={nav.t('nav.settings')}
             onClick={() => nav.router.push('/settings')}
-            className={`flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors ${
+            className={`flex h-10 w-10 items-center justify-center rounded-[10px] transition-colors ${
               nav.pathname === '/settings'
                 ? 'bg-[var(--accent-bg)] text-[var(--accent)]'
                 : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]'
@@ -213,7 +214,7 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
           <button
             type="button"
             onClick={() => setIsMenuOpen((value) => !value)}
-            className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-panel)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-2)] shadow-[0_10px_30px_rgba(65,52,35,0.08)]"
+            className="inline-flex min-h-11 items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-panel)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-2)] shadow-[0_10px_30px_rgba(65,52,35,0.08)]"
             aria-expanded={isMenuOpen}
           >
             {menuLabel}

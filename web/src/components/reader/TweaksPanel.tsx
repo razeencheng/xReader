@@ -78,7 +78,7 @@ export function TweaksPanel() {
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-[100] flex flex-col items-end gap-2">
+    <div className="fixed bottom-[max(20px,calc(env(safe-area-inset-bottom)+8px))] right-5 z-[100] flex flex-col items-end gap-2">
       <AnimatePresence>
         {isOpen ? (
           <motion.div

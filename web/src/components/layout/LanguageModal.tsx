@@ -34,7 +34,7 @@ export function LanguageModal({
           {t('language.description')}
         </p>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
           {LANGUAGE_OPTIONS.map((language) => {
             const active = isLanguageOptionActive(currentLanguage, language.code);
 
@@ -46,7 +46,7 @@ export function LanguageModal({
                   onSelect(language.code);
                   onClose();
                 }}
-                className={`flex items-center justify-between rounded-[9px] border px-3 py-[9px] text-[13px] transition-colors ${
+                className={`flex min-h-11 items-center justify-between rounded-[9px] border px-3 py-[9px] text-[13px] transition-colors ${
                   active
                     ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
                     : 'border-[var(--border)] bg-transparent text-[var(--text)] hover:bg-[var(--bg-hover)]'

@@ -84,7 +84,7 @@ export function FeedRowComfortable({
                 event.stopPropagation();
                 onUndoRead?.();
               }}
-              className="mr-1 rounded-full bg-[var(--bg-elevated)] px-2 py-[3px] text-[10.5px] font-medium text-[var(--text-3)] shadow-[inset_0_0_0_1px_var(--border)] transition-colors hover:text-[var(--accent)]"
+              className="mr-1 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full bg-[var(--bg-elevated)] px-3 py-2 text-[10.5px] font-medium text-[var(--text-3)] shadow-[inset_0_0_0_1px_var(--border)] transition-colors hover:text-[var(--accent)] md:min-h-0 md:min-w-0 md:px-2 md:py-[3px]"
             >
               {t('feed.readUndo')}
             </button>
@@ -96,7 +96,7 @@ export function FeedRowComfortable({
                 event.stopPropagation();
                 onMarkRead();
               }}
-              className="mr-1 rounded-full px-2 py-[3px] text-[10.5px] font-medium text-[var(--text-3)] opacity-0 transition-[background,color,opacity] hover:bg-[var(--accent-bg)] hover:text-[var(--accent)] group-hover:opacity-100 focus:opacity-100"
+              className="mr-1 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 py-2 text-[10.5px] font-medium text-[var(--text-3)] opacity-100 transition-[background,color,opacity] hover:bg-[var(--accent-bg)] hover:text-[var(--accent)] md:min-h-0 md:min-w-0 md:px-2 md:py-[3px] md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
             >
               {t('feed.markRead')}
             </button>
@@ -109,10 +109,10 @@ export function FeedRowComfortable({
                 event.stopPropagation();
                 onStar(item.id);
               }}
-              className={`rounded p-[3px] transition-[opacity,color] duration-150 ${
+              className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded p-[3px] transition-[opacity,color] duration-150 md:min-h-0 md:min-w-0 ${
                 item.is_starred
                   ? 'text-[var(--star)] opacity-100'
-                  : 'text-[var(--text-3)] opacity-0 hover:text-[var(--star)] group-hover:opacity-100'
+                  : 'text-[var(--text-3)] opacity-100 hover:text-[var(--star)] md:opacity-0 md:group-hover:opacity-100'
               }`}
             >
               <Star size={13} fill={item.is_starred ? 'currentColor' : 'none'} strokeWidth={item.is_starred ? 0 : 1.8} />

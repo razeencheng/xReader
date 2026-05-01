@@ -43,3 +43,11 @@ test('hides prev button when prev is null', () => {
   expect(screen.queryByRole('button', { name: /上一篇/i })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: /下一篇/i })).toBeInTheDocument();
 });
+
+test('keeps the navigation bar visible on mobile with safe-area padding', () => {
+  const { container } = render(<PrevNextBar current={current} prev={prev} next={next} markRead={vi.fn()} />);
+
+  expect(container.firstElementChild).not.toHaveClass('hidden');
+  expect(container.firstElementChild).toHaveClass('pb-[max(16px,calc(env(safe-area-inset-bottom)+12px))]');
+  expect(container.querySelector('.hide-mobile')).toBeNull();
+});

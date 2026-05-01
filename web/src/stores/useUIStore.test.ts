@@ -14,7 +14,7 @@ beforeAll(() => {
 beforeEach(() => {
   storage.clear();
   useUIStore.setState({ density: 'comfortable', theme: 'system', nativeLanguage: 'zh-CN' });
-  globalThis.fetch = vi.fn(async () => new Response('{}', { status: 200 })) as any;
+  globalThis.fetch = vi.fn(async () => new Response('{}', { status: 200 })) as typeof fetch;
 });
 
 afterEach(() => {

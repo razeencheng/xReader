@@ -17,7 +17,7 @@ test('renders as an inline metadata action instead of a primary button', () => {
   render(<OriginalArticleButton href="https://example.com/original" />);
 
   const button = screen.getByRole('button', { name: '阅读原文' });
+  expect(button.className).toContain('min-h-11');
   expect(button.className).toContain('text-[var(--accent)]');
   expect(button.className).not.toContain('bg-[#f73a69]');
-  expect(button.className).not.toContain('min-h-10');
 });

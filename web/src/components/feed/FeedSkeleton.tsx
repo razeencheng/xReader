@@ -2,7 +2,7 @@
 
 export function FeedSkeleton() {
   return (
-    <div className="mx-auto max-w-5xl px-4 py-1.5 md:px-7">
+    <div className="w-full px-4 py-1.5 md:px-7">
       <div className="divide-y divide-[var(--border-default)]">
         {[...Array(6)].map((_, i) => (
           <div key={i} className="py-6 animate-pulse">
@@ -21,7 +21,7 @@ export function FeedSkeleton() {
 
 export function CompactSkeleton() {
   return (
-    <div className="mx-auto max-w-5xl px-4 py-1.5 md:px-7">
+    <div className="w-full px-4 py-1.5 md:px-7">
       <div className="divide-y divide-[var(--border-default)]">
         {[...Array(10)].map((_, i) => (
           <div key={i} className="py-3 flex items-center gap-3 animate-pulse">

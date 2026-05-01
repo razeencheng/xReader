@@ -149,7 +149,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
                     aria-expanded={isBulkConfirmOpen}
                     onClick={() => setOpenBulkConfirmScope((scope) => (scope === bulkScope?.scope ? null : (bulkScope?.scope ?? null)))}
                     disabled={isBulkUpdating}
-                    className="ui-pill-neutral px-2.5 py-[3px] text-[11px] font-semibold shadow-[0_1px_0_rgba(65,52,35,0.04)]"
+                    className="ui-pill-neutral min-h-11 px-2.5 py-[3px] text-[11px] font-semibold shadow-[0_1px_0_rgba(65,52,35,0.04)]"
                   >
                     {t('feed.allRead')}
                   </button>
@@ -166,7 +166,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
                           type="button"
                           onClick={() => setOpenBulkConfirmScope(null)}
                           disabled={isBulkUpdating}
-                          className="ui-btn-ghost h-8 rounded-full px-3 py-1.5 text-[11px] font-medium"
+                          className="ui-btn-ghost min-h-11 rounded-full px-3 py-1.5 text-[11px] font-medium md:h-8 md:min-h-0"
                         >
                           {t('feed.cancel')}
                         </button>
@@ -175,7 +175,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
                           aria-label={t('feed.confirmAllReadAria')}
                           onClick={() => void handleBulkMarkRead()}
                           disabled={isBulkUpdating}
-                          className="ui-btn-solid h-8 rounded-full px-3 py-1.5 text-[11px] font-semibold"
+                          className="ui-btn-solid min-h-11 rounded-full px-3 py-1.5 text-[11px] font-semibold md:h-8 md:min-h-0"
                         >
                           {t('feed.confirm')}
                         </button>
@@ -226,7 +226,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
                     <PlusCircle size={14} strokeWidth={1.9} />
                     {t('sources.addTitle')}
                   </Link>
-                  <Link href="/sources#opml" className="ui-btn-ghost h-8 rounded-[10px] px-3 py-1.5 text-[12px]">
+                  <Link href="/sources#opml" className="ui-btn-ghost min-h-11 rounded-[10px] px-3 py-1.5 text-[12px] md:h-8 md:min-h-0">
                     <Upload size={14} strokeWidth={1.9} />
                     {t('sources.importOpmlAction')}
                   </Link>

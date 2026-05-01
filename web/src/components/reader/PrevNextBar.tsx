@@ -43,10 +43,10 @@ function NavCard({
     <button
       type="button"
       onClick={onClick}
-      className={`group flex min-w-0 flex-1 items-center gap-3 rounded-[16px] border border-[var(--border-light)] bg-[rgba(255,255,255,0.86)] px-3 py-3 transition-all hover:-translate-y-[1px] hover:border-[var(--accent)] hover:bg-[var(--bg)] ${align === 'right' ? 'justify-end' : ''}`}
+      className={`group flex min-w-0 flex-1 items-center gap-3 rounded-[16px] border border-[var(--border-light)] bg-[var(--bg-panel)] px-3 py-3 transition-all hover:-translate-y-[1px] hover:border-[var(--accent)] hover:bg-[var(--bg)] ${align === 'right' ? 'justify-end' : ''}`}
     >
       {align === 'left' ? (
-        <span className="hide-mobile inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[var(--bg-hover)] text-[12px] font-semibold text-[var(--text-3)] transition-colors group-hover:bg-[var(--accent-bg)] group-hover:text-[var(--accent)]">
+        <span className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[var(--bg-hover)] text-[12px] font-semibold text-[var(--text-3)] transition-colors group-hover:bg-[var(--accent-bg)] group-hover:text-[var(--accent)] md:inline-flex">
           {hotkey}
         </span>
       ) : null}
@@ -61,7 +61,7 @@ function NavCard({
       </div>
 
       {align === 'right' ? (
-        <span className="hide-mobile inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[var(--bg-hover)] text-[12px] font-semibold text-[var(--text-3)] transition-colors group-hover:bg-[var(--accent-bg)] group-hover:text-[var(--accent)]">
+        <span className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[var(--bg-hover)] text-[12px] font-semibold text-[var(--text-3)] transition-colors group-hover:bg-[var(--accent-bg)] group-hover:text-[var(--accent)] md:inline-flex">
           {hotkey}
         </span>
       ) : null}
@@ -87,7 +87,7 @@ export function PrevNextBar({ current, prev, next, position, total, markRead }: 
   };
 
   return (
-    <div className="sticky bottom-0 z-20 hidden border-t border-[var(--border-light)] bg-[rgba(248,244,238,0.92)] px-4 pb-4 pt-3 font-sans text-[13px] text-[var(--text-body)] backdrop-blur md:block md:px-6">
+    <div className="sticky bottom-0 z-20 block border-t border-[var(--border-light)] bg-[color-mix(in_srgb,var(--bg-body)_92%,transparent)] px-3 pb-[max(16px,calc(env(safe-area-inset-bottom)+12px))] pt-3 font-sans text-[13px] text-[var(--text-body)] backdrop-blur md:px-6">
       <div className="flex items-center gap-3">
         {prev ? (
           <NavCard article={prev} direction={t('reader.previousArticle')} hotkey="← K" onClick={() => navigate(prev)} />

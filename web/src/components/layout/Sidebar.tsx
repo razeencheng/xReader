@@ -56,7 +56,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
                 type="button"
                 title={t(NAV_LABEL_KEYS[item.id])}
                 onClick={() => handleSelectView(item.id)}
-                className={`relative flex h-9 w-9 items-center justify-center rounded-[9px] transition-colors ${
+                className={`relative flex h-10 w-10 items-center justify-center rounded-[9px] transition-colors ${
                   active
                     ? 'text-[var(--accent)]'
                     : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]'
@@ -72,7 +72,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
             type="button"
             title={t('sources.addTitle')}
             onClick={() => router.push('/sources#add-source')}
-            className="relative flex h-9 w-9 items-center justify-center rounded-[9px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
+            className="relative flex h-10 w-10 items-center justify-center rounded-[9px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
           >
             <BadgePlus size={17} strokeWidth={1.75} />
           </button>
@@ -82,7 +82,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
           type="button"
           title={t('shortcuts.open')}
           onClick={openShortcuts}
-          className="mb-1 flex h-9 w-9 items-center justify-center rounded-[9px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
+          className="mb-1 flex h-10 w-10 items-center justify-center rounded-[9px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
         >
           <Keyboard size={16} strokeWidth={1.75} />
         </button>
@@ -91,7 +91,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
           type="button"
           title={t('nav.highlights')}
           onClick={() => router.push('/highlights')}
-          className="mb-1 flex h-9 w-9 items-center justify-center rounded-[9px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
+          className="mb-1 flex h-10 w-10 items-center justify-center rounded-[9px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
         >
           <Highlighter size={16} strokeWidth={1.75} />
         </button>
@@ -100,7 +100,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
           type="button"
           title={t('nav.nativeLanguageTitle', { language: currentLanguage.name })}
           onClick={() => setIsLanguageOpen(true)}
-          className="flex h-9 w-9 flex-col items-center justify-center gap-[1px] rounded-[9px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
+          className="flex h-10 w-10 flex-col items-center justify-center gap-[1px] rounded-[9px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
         >
           <Globe size={15} strokeWidth={1.75} />
           <span className="text-[8px] font-semibold leading-none tracking-[0.03em] text-[var(--accent)]">
@@ -112,7 +112,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
           type="button"
           title={t('nav.settings')}
           onClick={() => router.push('/settings')}
-          className="flex h-9 w-9 items-center justify-center rounded-[9px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
+          className="flex h-10 w-10 items-center justify-center rounded-[9px] text-[var(--text-3)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
         >
           <Settings size={17} strokeWidth={1.75} />
         </button>

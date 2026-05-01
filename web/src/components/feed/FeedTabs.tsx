@@ -36,7 +36,7 @@ export function FeedTabs() {
             key={key}
             type="button"
             onClick={() => handleTabChange(key)}
-            className={`rounded-full px-3.5 py-1.5 transition-colors ${
+            className={`min-h-11 rounded-full px-3.5 py-1.5 transition-colors ${
               active
                 ? 'bg-[var(--bg-nav)] font-semibold text-[var(--text-inverse)]'
                 : 'opacity-55 hover:opacity-80'
