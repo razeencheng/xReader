@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const isDev = process.env.NODE_ENV === 'development';
+
 const apiProxyTarget =
   process.env.API_PROXY_TARGET?.trim() ||
   process.env.NEXT_PUBLIC_API_BASE?.trim() ||
@@ -11,20 +13,25 @@ const extraAllowedDevOrigins =
     .filter(Boolean) ?? [];
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
+  output: isDev ? undefined : 'export',
+  images: { unoptimized: true },
   allowedDevOrigins: ['127.0.0.1', 'localhost', ...extraAllowedDevOrigins],
-  async rewrites() {
-    return {
-      beforeFiles: [],
-      afterFiles: [],
-      fallback: [
-        {
-          source: '/api/:path*',
-          destination: `${apiProxyTarget}/api/:path*`,
+  ...(isDev
+    ? {
+        async rewrites() {
+          return {
+            beforeFiles: [],
+            afterFiles: [],
+            fallback: [
+              {
+                source: '/api/:path*',
+                destination: `${apiProxyTarget}/api/:path*`,
+              },
+            ],
+          };
         },
-      ],
-    };
-  },
+      }
+    : {}),
 };
 
 export default nextConfig;
