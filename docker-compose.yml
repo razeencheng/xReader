@@ -1,35 +1,30 @@
 services:
+  xreader:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://xreader:xreader@postgres:5432/xreader?sslmode=disable
+      SESSION_SECRET: ${SESSION_SECRET:-change-me-to-a-random-string}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:16
+    volumes:
+      - pgdata:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: xreader
       POSTGRES_PASSWORD: xreader
       POSTGRES_DB: xreader
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U xreader"]
       interval: 5s
       timeout: 3s
       retries: 5
-
-  xreader:
-    build: ./server
-    command: ["/app/xreader"]
-    ports:
-      - "3000:3000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgres://xreader:xreader@postgres:5432/xreader?sslmode=disable}
-      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
-      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
-      GITHUB_CALLBACK_URL: ${GITHUB_CALLBACK_URL:-http://localhost:3000/api/auth/callback}
-      SESSION_SECRET: ${SESSION_SECRET:-change-me}
-      PORT: "3000"
 
 volumes:
   pgdata: {}
