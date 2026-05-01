@@ -13,12 +13,11 @@ import (
 	"github.com/jin/xreader-web/internal/middleware"
 	"github.com/jin/xreader-web/internal/source"
 	"github.com/jin/xreader-web/internal/user"
-	"github.com/redis/go-redis/v9"
 )
 
 type RouterDeps struct {
-	Pool  *pgxpool.Pool
-	Redis *redis.Client
+	Pool          *pgxpool.Pool
+	SessionSecret string
 }
 
 func NewRouter(deps RouterDeps) *gin.Engine {
@@ -33,17 +32,17 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		os.Getenv("GITHUB_CLIENT_SECRET"),
 		os.Getenv("GITHUB_CALLBACK_URL"),
 	)
-	sessions := auth.NewRedisSessionStore(deps.Redis, deps.Pool)
-	states := auth.NewRedisStateStore(deps.Redis)
+	sessions := auth.NewPgSessionStore(deps.Pool)
+	cookieState := auth.NewCookieState([]byte(deps.SessionSecret))
 	allowSvc := admin.NewAllowlistService(deps.Pool)
 	userStore := auth.NewPgUserStore(deps.Pool)
 
 	authSvc := &auth.Service{
-		GitHub:    ghClient,
-		States:    states,
-		Allowlist: allowSvc,
-		Users:     userStore,
-		Sessions:  sessions,
+		GitHub:      ghClient,
+		CookieState: cookieState,
+		Allowlist:   allowSvc,
+		Users:       userStore,
+		Sessions:    sessions,
 	}
 	authH := auth.NewHandler(authSvc, sessions)
 	aiSettings := ai.NewSettingsService(ai.NewPostgresSettingsRepository(deps.Pool))

@@ -26,23 +26,37 @@ func (h *Handler) isSecureCookie(c *gin.Context) bool {
 }
 
 func (h *Handler) BeginLogin(c *gin.Context) {
-	redirectURL, err := h.Service.BeginLogin()
+	redirectURL, state, err := h.Service.BeginLogin()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start login"})
 		return
 	}
+	// Set the CSRF state as an HttpOnly cookie so HandleCallback can verify it.
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("xreader_oauth_state", state, 600, "/", "", h.isSecureCookie(c), true)
 	c.Redirect(http.StatusTemporaryRedirect, redirectURL)
 }
 
 func (h *Handler) HandleCallback(c *gin.Context) {
-	state := c.Query("state")
+	stateParam := c.Query("state")
 	code := c.Query("code")
-	if state == "" || code == "" {
+	if stateParam == "" || code == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing state or code"})
 		return
 	}
 
-	result, err := h.Service.Callback(c.Request.Context(), state, code, c.GetHeader("User-Agent"))
+	cookieValue, err := c.Cookie("xreader_oauth_state")
+	if err != nil || cookieValue == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing state cookie"})
+		return
+	}
+
+	result, err := h.Service.Callback(c.Request.Context(), stateParam, cookieValue, code, c.GetHeader("User-Agent"))
+
+	// Clear the one-time state cookie regardless of outcome.
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("xreader_oauth_state", "", -1, "/", "", h.isSecureCookie(c), true)
+
 	if err != nil {
 		switch err {
 		case ErrInvalidState:

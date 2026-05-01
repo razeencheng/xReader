@@ -22,11 +22,6 @@ type GitHubClient interface {
 	FetchUser(ctx context.Context, token string) (*GitHubUser, error)
 }
 
-type StateStore interface {
-	Save(ctx context.Context, state string) error
-	Verify(ctx context.Context, state string) (bool, error)
-}
-
 type AllowlistChecker interface {
 	IsAllowlisted(ctx context.Context, username string) (bool, error)
 }
@@ -40,11 +35,11 @@ type SessionCreator interface {
 }
 
 type Service struct {
-	GitHub     GitHubClient
-	States     StateStore
-	Allowlist  AllowlistChecker
-	Users      UserStore
-	Sessions   SessionCreator
+	GitHub      GitHubClient
+	CookieState *CookieState
+	Allowlist   AllowlistChecker
+	Users       UserStore
+	Sessions    SessionCreator
 }
 
 type CallbackResult struct {
@@ -52,20 +47,21 @@ type CallbackResult struct {
 	UserID    int64
 }
 
-func (s *Service) BeginLogin() (redirectURL string, err error) {
-	state := generateState()
-	if err := s.States.Save(context.Background(), state); err != nil {
-		return "", err
+// BeginLogin generates a signed CSRF state token and returns the GitHub
+// redirect URL along with the raw state value (so the handler can set it
+// as a cookie).
+func (s *Service) BeginLogin() (redirectURL, state string, err error) {
+	state, err = s.CookieState.Generate()
+	if err != nil {
+		return "", "", err
 	}
-	return s.GitHub.AuthCodeURL(state), nil
+	return s.GitHub.AuthCodeURL(state), state, nil
 }
 
-func (s *Service) Callback(ctx context.Context, state, code, userAgent string) (*CallbackResult, error) {
-	ok, err := s.States.Verify(ctx, state)
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
+// Callback verifies the OAuth CSRF state by comparing the query-string
+// state parameter with the cookie value, then completes the login flow.
+func (s *Service) Callback(ctx context.Context, stateParam, cookieValue, code, userAgent string) (*CallbackResult, error) {
+	if !s.CookieState.Verify(stateParam, cookieValue) {
 		return nil, ErrInvalidState
 	}
 
