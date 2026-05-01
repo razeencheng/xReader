@@ -74,7 +74,7 @@ test('renders grouped sources with all-sources summary and unread badges', async
 
   const hackerNewsRow = screen.getByRole('button', { name: /Hacker News/i });
   expect(within(hackerNewsRow).getByText('2')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: '管理' })).toHaveAttribute('href', '/sources');
+  expect(screen.queryByRole('link', { name: '管理' })).not.toBeInTheDocument();
 });
 
 test('uses a single-column shell below desktop widths', async () => {

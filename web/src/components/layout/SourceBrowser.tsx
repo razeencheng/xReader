@@ -1,8 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import Link from 'next/link';
-import { SlidersHorizontal } from 'lucide-react';
 import { useUIStore } from '@/stores/useUIStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useQuery } from '@tanstack/react-query';
@@ -99,20 +97,11 @@ export function SourceBrowser() {
       className="flex h-full w-full flex-col overflow-hidden bg-[var(--bg)] lg:w-[300px] lg:border-r lg:border-[var(--border)]"
     >
       <header className="shrink-0 border-b border-[var(--border-light)] px-4 pb-[10px] pt-[11px]">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-[14px] font-semibold text-[var(--text)]">{t('sources.title')}</h1>
-            <p className="mt-[2px] text-[11.5px] text-[var(--text-3)]">
-              {t('sources.unreadFeeds', { unread: totalUnread, feeds: sources.length })}
-            </p>
-          </div>
-          <Link
-            href="/sources"
-            className="ui-btn-primary h-8 shrink-0 rounded-[10px] px-2.5 py-1.5 text-[11.5px] font-medium"
-          >
-            <SlidersHorizontal size={13} strokeWidth={1.9} />
-            {t('sources.manageButton')}
-          </Link>
+        <div className="min-w-0">
+          <h1 className="text-[14px] font-semibold text-[var(--text)]">{t('sources.title')}</h1>
+          <p className="mt-[2px] text-[11.5px] text-[var(--text-3)]">
+            {t('sources.unreadFeeds', { unread: totalUnread, feeds: sources.length })}
+          </p>
         </div>
       </header>
 

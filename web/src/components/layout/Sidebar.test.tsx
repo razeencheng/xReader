@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useUIStore } from '@/stores/useUIStore';
 
@@ -53,4 +53,18 @@ test('sidebar exposes a direct add source shortcut', async () => {
   await user.click(screen.getByTitle('Add Source'));
 
   expect(push).toHaveBeenCalledWith('/sources#add-source');
+});
+
+test('sidebar keeps the add source shortcut directly under sources', () => {
+  render(<Sidebar />);
+
+  const navButtons = within(screen.getByRole('navigation')).getAllByRole('button');
+
+  expect(navButtons.map((button) => button.getAttribute('title'))).toEqual([
+    'Today',
+    'All',
+    'Starred',
+    'Sources',
+    'Add Source',
+  ]);
 });
