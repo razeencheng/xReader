@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"io/fs"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +19,7 @@ import (
 type RouterDeps struct {
 	Pool          *pgxpool.Pool
 	SessionSecret string
+	StaticFS      fs.FS
 }
 
 func NewRouter(deps RouterDeps) *gin.Engine {
@@ -123,6 +125,11 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 			adminGroup.GET("/ai/settings", aiSettingsH.Get)
 			adminGroup.PATCH("/ai/settings", aiSettingsH.Update)
 		}
+	}
+
+	if deps.StaticFS != nil {
+		subFS, _ := fs.Sub(deps.StaticFS, "static")
+		r.NoRoute(gin.WrapH(NewSPAHandler(subFS)))
 	}
 
 	return r
