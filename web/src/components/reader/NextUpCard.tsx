@@ -53,11 +53,11 @@ export function NextUpCard({ next, currentId, markRead }: Props) {
   };
 
   return (
-    <div className="mx-auto mb-10 max-w-[680px] px-5 font-sans md:px-12">
+    <div className="mb-7 font-sans">
       <button
         type="button"
         onClick={handleClick}
-        className="group flex w-full items-start gap-4 rounded-[16px] border border-[var(--border-strong)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--bg-panel)_92%,transparent)_0%,var(--bg-callout)_100%)] p-5 text-left shadow-[0_18px_50px_rgba(65,52,35,0.08)] transition-all hover:-translate-y-[1px] hover:border-[var(--accent)] hover:shadow-[0_22px_60px_rgba(65,52,35,0.12)]"
+        className="group flex w-full items-start gap-4 rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-callout)] px-4 py-3 text-left text-sm leading-6 text-[var(--text-secondary)] transition-all hover:-translate-y-[1px] hover:border-[var(--accent)]"
       >
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-[var(--bg-nav)] text-lg font-bold text-[var(--text-inverse)] transition-transform group-hover:translate-x-[2px]">
           J
@@ -73,7 +73,7 @@ export function NextUpCard({ next, currentId, markRead }: Props) {
             <div className="mb-2 font-serif text-[15px] italic leading-[1.45] text-[var(--text-3)]">{originalTitle}</div>
           ) : null}
           <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-[var(--text-3)]">
-            <span className="inline-flex items-center gap-2 rounded-full bg-[var(--bg-elevated)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-2)]">
+            <span className="inline-flex items-center gap-2 rounded-[10px] bg-[var(--bg-elevated)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-2)]">
               <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: sourceColor }} />
               {next.source_title || t('common.source')}
             </span>

@@ -35,8 +35,8 @@ function useAppNavigation() {
 
   const goToView = (view: ViewTab) => {
     setCurrentView(view, view === 'sources' ? null : undefined);
-    if (pathname !== '/') {
-      router.push('/');
+    if (pathname !== '/' || (typeof window !== 'undefined' && window.location.search.includes('article='))) {
+      window.location.href = '/';
     }
   };
 
@@ -76,7 +76,7 @@ function NavButton({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className={`inline-flex min-h-11 items-center gap-2 rounded-[11px] px-3 py-2 text-[13px] font-medium transition-colors ${
+      className={`inline-flex min-h-11 items-center gap-2 rounded-[10px] px-3 py-2 text-[13px] font-medium transition-colors ${
         active
           ? 'bg-[var(--accent-bg)] text-[var(--accent)]'
           : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]'
@@ -214,7 +214,7 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
           <button
             type="button"
             onClick={() => setIsMenuOpen((value) => !value)}
-            className="inline-flex min-h-11 items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-panel)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-2)] shadow-[0_10px_30px_rgba(65,52,35,0.08)]"
+            className="inline-flex min-h-11 items-center gap-1 rounded-[10px] border border-[var(--border)] bg-[var(--bg-panel)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-2)] shadow-[0_10px_30px_rgba(65,52,35,0.08)]"
             aria-expanded={isMenuOpen}
           >
             {menuLabel}
@@ -255,7 +255,7 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
                         nav.goToView(item.id);
                         setIsMenuOpen(false);
                       }}
-                      className={`flex items-center gap-2 rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition-colors ${
+                      className={`flex items-center gap-2 rounded-[10px] border px-3 py-3 text-left text-sm font-semibold transition-colors ${
                         active
                           ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--text-accent)]'
                           : 'border-[var(--border-light)] bg-[var(--bg-panel)] text-[var(--text-2)] hover:bg-[var(--bg-hover)]'
@@ -280,7 +280,7 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
                     nav.router.push('/sources');
                     setIsMenuOpen(false);
                   }}
-                  className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+                  className="flex w-full items-center gap-3 rounded-[10px] px-3 py-3 text-left text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
                 >
                   <PlusCircle size={17} />
                   {nav.t('nav.manageSources')}
@@ -291,7 +291,7 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
                     nav.router.push('/highlights');
                     setIsMenuOpen(false);
                   }}
-                  className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+                  className="flex w-full items-center gap-3 rounded-[10px] px-3 py-3 text-left text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
                 >
                   <Highlighter size={17} />
                   {nav.t('nav.highlights')}
@@ -302,7 +302,7 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
                     nav.openShortcuts();
                     setIsMenuOpen(false);
                   }}
-                  className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+                  className="flex w-full items-center gap-3 rounded-[10px] px-3 py-3 text-left text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
                 >
                   <Keyboard size={17} />
                   {nav.t('shortcuts.title')}
@@ -313,7 +313,7 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
                     setIsLanguageOpen(true);
                     setIsMenuOpen(false);
                   }}
-                  className="flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+                  className="flex w-full items-center justify-between gap-3 rounded-[10px] px-3 py-3 text-left text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
                 >
                   <span className="inline-flex items-center gap-3">
                     <Globe size={17} />
@@ -327,7 +327,7 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
                     nav.router.push('/settings');
                     setIsMenuOpen(false);
                   }}
-                  className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+                  className="flex w-full items-center gap-3 rounded-[10px] px-3 py-3 text-left text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
                 >
                   <Settings size={17} />
                   {nav.t('nav.settings')}
@@ -339,7 +339,7 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
                       nav.router.push('/admin');
                       setIsMenuOpen(false);
                     }}
-                    className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+                    className="flex w-full items-center gap-3 rounded-[10px] px-3 py-3 text-left text-sm font-medium text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
                   >
                     <ShieldCheck size={17} />
                     {nav.t('nav.admin')}
@@ -354,7 +354,7 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
                 void nav.handleLogout();
                 setIsMenuOpen(false);
               }}
-              className="mt-4 flex w-full items-center gap-3 rounded-2xl border border-[var(--border-light)] px-3 py-3 text-left text-sm font-medium text-[var(--text-3)] hover:bg-[var(--bg-hover)]"
+              className="mt-4 flex w-full items-center gap-3 rounded-[10px] border border-[var(--border-light)] px-3 py-3 text-left text-sm font-medium text-[var(--text-3)] hover:bg-[var(--bg-hover)]"
             >
               <LogOut size={17} />
               {nav.t('nav.logOut')}

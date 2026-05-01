@@ -132,6 +132,10 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		authed.PUT("/highlights/:id/note", highlightH.UpdateNote)
 		authed.DELETE("/highlights/:id", highlightH.Delete)
 
+		// AI settings (GET is available to all authenticated users)
+		aiSettingsH := ai.NewSettingsHandler(aiSettings)
+		authed.GET("/ai/settings", aiSettingsH.Get)
+
 		// Admin routes
 		adminGroup := authed.Group("")
 		adminGroup.Use(middleware.RequireAdmin())
@@ -141,8 +145,6 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 			adminGroup.POST("/admin/allowlist", allowH.Add)
 			adminGroup.DELETE("/admin/allowlist/:username", allowH.Remove)
 
-			aiSettingsH := ai.NewSettingsHandler(aiSettings)
-			adminGroup.GET("/ai/settings", aiSettingsH.Get)
 			adminGroup.PATCH("/ai/settings", aiSettingsH.Update)
 		}
 	}

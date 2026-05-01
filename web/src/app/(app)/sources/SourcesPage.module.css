@@ -884,9 +884,9 @@
 .footer {
   display: flex;
   justify-content: space-between;
-  margin-top: 32px;
+  margin-top: 12px;
   border-top: 1px solid var(--src-line);
-  padding-top: 16px;
+  padding-top: 12px;
   color: var(--src-ink-4);
   font-size: 12px;
 }

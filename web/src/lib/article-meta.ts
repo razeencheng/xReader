@@ -41,11 +41,15 @@ export function formatRelativeTime(value?: string) {
 }
 
 export function estimateReadMinutes(
-  article: Pick<ArticleItem, 'title' | 'title_translated' | 'summary'> & {
+  article: Pick<ArticleItem, 'title' | 'title_translated' | 'summary' | 'word_count'> & {
     content_text?: string;
     content_html?: string;
   },
 ) {
+  if (article.word_count && article.word_count > 0) {
+    return Math.max(1, Math.round(article.word_count / 300));
+  }
+
   const content = [
     article.title_translated,
     article.title,

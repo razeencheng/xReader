@@ -55,14 +55,15 @@ function FeedPageContent() {
   );
 
   const closeArticle = useCallback(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete('article');
-    params.delete('ctx');
-    const query = params.toString();
-    const nextUrl = query ? `/?${query}` : '/';
+    if (focusMode) {
+      setFocusMode(false);
+      if (layout === 'focus') {
+        setLayout('classic');
+      }
+    }
 
-    router.replace(nextUrl, { scroll: false });
-  }, [router, searchParams]);
+    window.location.href = '/';
+  }, [focusMode, layout, setFocusMode, setLayout]);
 
   const showSourceBrowser = currentView === 'sources' && selectedSourceId === null;
   const { data } = useArticles(tab, currentView === 'sources' ? selectedSourceId : null, undefined, {

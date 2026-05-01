@@ -34,6 +34,7 @@ func NewWorker(pool *pgxpool.Pool, adapter source.SourceAdapter, aiClient ai.AIC
 
 func (w *Worker) Run(ctx context.Context) error {
 	log.Println("worker: starting fetch loop")
+	go w.catchUpAI(ctx)
 	w.tick(ctx)
 	ticker := time.NewTicker(w.interval)
 	defer ticker.Stop()
@@ -103,4 +104,52 @@ func (w *Worker) tick(ctx context.Context) {
 	}
 
 	wg.Wait()
+}
+
+const catchUpThrottle = 2 * time.Second
+
+func (w *Worker) catchUpAI(ctx context.Context) {
+	if w.aiClient == nil {
+		return
+	}
+
+	// Check if catch-up already ran recently (within 10 minutes)
+	var lastRun *time.Time
+	row := w.pool.QueryRow(ctx,
+		"SELECT updated_at FROM article_ai ORDER BY updated_at DESC LIMIT 1")
+	var t time.Time
+	if row.Scan(&t) == nil {
+		lastRun = &t
+	}
+	if lastRun != nil && time.Since(*lastRun) < 10*time.Minute {
+		log.Println("worker: AI catch-up skipped (ran recently)")
+		return
+	}
+
+	languages, err := w.queries.ListDistinctNativeLanguages(ctx)
+	if err != nil || len(languages) == 0 {
+		return
+	}
+
+	for _, lang := range languages {
+		ids, err := w.queries.ListArticlesMissingAI(ctx, gen.ListArticlesMissingAIParams{
+			TargetLanguage: lang,
+			Limit:          200,
+		})
+		if err != nil || len(ids) == 0 {
+			continue
+		}
+		log.Printf("worker: AI catch-up: %d articles for %s (throttle %v)", len(ids), lang, catchUpThrottle)
+		for _, id := range ids {
+			if ctx.Err() != nil {
+				return
+			}
+			job := ai.NewEagerJob(w.pool, w.aiClient, id, lang)
+			if err := job.Run(ctx); err != nil {
+				log.Printf("worker: AI catch-up article %d (%s): %v", id, lang, err)
+			}
+			time.Sleep(catchUpThrottle)
+		}
+	}
+	log.Println("worker: AI catch-up complete")
 }

@@ -37,6 +37,7 @@ export function createSSEClient(url: string): SSEClient {
 
     source.removeEventListener('paragraph', handleParagraph);
     source.removeEventListener('done', handleDone);
+    source.removeEventListener('same-language', handleDone);
     source.removeEventListener('error', handleError);
     source.close();
     source = null;
@@ -50,6 +51,7 @@ export function createSSEClient(url: string): SSEClient {
     source = new EventSource(url, { withCredentials: true });
     source.addEventListener('paragraph', handleParagraph);
     source.addEventListener('done', handleDone);
+    source.addEventListener('same-language', handleDone);
     source.addEventListener('error', handleError);
   };
 

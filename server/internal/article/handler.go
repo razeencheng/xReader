@@ -48,6 +48,7 @@ type articleResponse struct {
 	PublishedAt     *string `json:"published_at,omitempty"`
 	ContentHtml     string  `json:"content_html,omitempty"`
 	ContentText     string  `json:"content_text,omitempty"`
+	WordCount       int     `json:"word_count,omitempty"`
 	IsRead          bool    `json:"is_read"`
 	IsStarred       bool    `json:"is_starred"`
 }
@@ -381,6 +382,7 @@ func enrichedToArticleResponses(items []EnrichedArticle) []articleResponse {
 			TitleTranslated: item.TitleTranslated, Summary: item.Summary,
 			SourceTitle: item.SourceTitle, Link: item.Link, Language: item.Language,
 			IsRead: item.IsRead, IsStarred: item.IsStarred,
+			WordCount: countWords(item.ContentText),
 		}
 		if item.Author.Valid {
 			author := item.Author.String
@@ -410,6 +412,15 @@ func toArticleResponse(item gen.Article, detail bool) articleResponse {
 		resp.ContentText = item.ContentText
 	}
 	return resp
+}
+
+func countWords(text string) int {
+	words := len(strings.Fields(text))
+	chars := len([]rune(strings.Join(strings.Fields(text), "")))
+	if estimate := chars / 2; estimate > words {
+		return estimate
+	}
+	return words
 }
 
 func parseLimit(raw string) int32 {

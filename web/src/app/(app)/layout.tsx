@@ -65,7 +65,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-[var(--bg-body)] text-[var(--text-body)]">
+    <div className="flex h-dvh flex-col overflow-hidden bg-[var(--bg-body)] text-[var(--text-body)]">
       <TabletTopNav focusMode={focusMode} />
       <MobileTopBar focusMode={focusMode} />
 

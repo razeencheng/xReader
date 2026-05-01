@@ -16,10 +16,45 @@ func TitleTranslationPrompt(targetLang string) string {
 func SummaryPrompt(targetLang string) string {
 	switch targetLang {
 	case "zh-CN":
-		return "你是一个信息摘要助手。请将以下文章内容提炼为3-5个要点，使用中文，每个要点一行，以「•」开头。只输出要点，不要其他内容。"
+		return "你是一个信息摘要助手。请用中文将以下文章浓缩为一段200字以内的摘要，语言简洁流畅，不要分点，不要使用列表符号，只输出摘要正文。"
 	case "en":
-		return "You are a summarization assistant. Extract 3-5 key points from the following article. One point per line, starting with '•'. Output only the key points."
+		return "You are a summarization assistant. Summarize the following article in one concise paragraph of no more than 100 words. Do not use bullet points or lists. Output only the summary paragraph."
 	default:
-		return fmt.Sprintf("Extract 3-5 key points from the following article in %s. One per line, starting with '•'. Output only the points.", targetLang)
+		return fmt.Sprintf("Summarize the following article in one concise paragraph of no more than 100 words in %s. No bullet points or lists. Output only the summary.", targetLang)
 	}
+}
+
+func CombinedTitleSummaryPrompt(targetLang string) string {
+	switch targetLang {
+	case "zh-CN":
+		return `你是一个翻译和摘要助手。请完成以下两个任务：
+1. 将标题翻译成中文
+2. 将正文浓缩为一段200字以内的中文摘要，语言简洁流畅，不要分点
+
+严格按以下格式输出，不要输出其他任何内容：
+TITLE: 翻译后的标题
+SUMMARY: 摘要正文`
+	case "en":
+		return `You are a translation and summarization assistant. Complete these two tasks:
+1. Translate the title into English
+2. Summarize the body in one concise paragraph of no more than 100 words
+
+Output strictly in this format, nothing else:
+TITLE: translated title
+SUMMARY: summary paragraph`
+	default:
+		return fmt.Sprintf(`Translate the title and summarize the body in %s.
+
+Output strictly in this format, nothing else:
+TITLE: translated title
+SUMMARY: summary paragraph (max 100 words, no bullet points)`, targetLang)
+	}
+}
+
+func CombinedTitleSummaryUserMessage(title, content string) string {
+	const maxChars = 8000
+	if len(content) > maxChars {
+		content = content[:maxChars]
+	}
+	return fmt.Sprintf("标题: %s\n\n正文: %s", title, content)
 }

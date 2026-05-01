@@ -90,7 +90,10 @@ func fetchProxiedImage(ctx context.Context, rawURL string) (ProxiedImage, error)
 		return ProxiedImage{}, err
 	}
 	req.Header.Set("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8")
-	req.Header.Set("User-Agent", "xReader image proxy")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; xReader/1.0)")
+	if u.Host != "" {
+		req.Header.Set("Referer", u.Scheme+"://"+u.Host+"/")
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {

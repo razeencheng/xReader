@@ -113,19 +113,19 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-[var(--bg)] lg:w-[300px] lg:border-r lg:border-[var(--border)]">
-      <header className="shrink-0 border-b border-[var(--border-light)] px-3 pb-2 pt-[10px]">
+      <header className="shrink-0 border-b border-[var(--border-light)] px-3 bg-[var(--bg)] pb-2 pt-[10px] md:pt-[10px] pt-[6px]">
         {currentView === 'sources' && selectedSource ? (
           <button
             type="button"
             onClick={() => setCurrentView('sources', null)}
-            className="flex items-center gap-1 pb-[6px] text-[11.5px] text-[var(--text-3)] transition-colors hover:text-[var(--text-2)]"
+            className="hidden md:flex items-center gap-1 pb-[6px] text-[11.5px] text-[var(--text-3)] transition-colors hover:text-[var(--text-2)]"
           >
             <ChevronLeft size={13} />
             {t('feed.allSources')}
           </button>
         ) : null}
 
-        <div className={`flex items-center gap-[7px] ${showReadFilters ? 'mb-[7px]' : ''}`}>
+        <div className={`hidden md:flex items-center gap-[7px] ${showReadFilters ? 'mb-[7px]' : ''}`}>
           {sourceColor ? <span className="inline-block h-[9px] w-[9px] rounded-[2px]" style={{ backgroundColor: sourceColor }} /> : null}
           <span className="text-[14px] font-semibold text-[var(--text)]">{headerLabel}</span>
         </div>
@@ -134,6 +134,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
           <>
             <div className="flex items-center justify-between gap-2">
               <ReadFilterSegmentedControl
+                fullWidth
                 value={readFilter}
                 counts={counts}
                 onChange={(nextReadFilter) => {
@@ -142,19 +143,19 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
                 }}
               />
               {showBulkRead ? (
-                <div className="relative shrink-0">
+                <div className="relative shrink-0 self-stretch">
                   <button
                     type="button"
                     aria-label={t('feed.allRead')}
                     aria-expanded={isBulkConfirmOpen}
                     onClick={() => setOpenBulkConfirmScope((scope) => (scope === bulkScope?.scope ? null : (bulkScope?.scope ?? null)))}
                     disabled={isBulkUpdating}
-                    className="ui-pill-neutral min-h-11 px-2.5 py-[3px] text-[11px] font-semibold shadow-[0_1px_0_rgba(65,52,35,0.04)] md:min-h-0"
+                    className="inline-flex h-full items-center rounded-[10px] bg-[var(--bg-panel)] px-2.5 text-[13px] font-semibold leading-none text-[var(--text-3)] ring-1 ring-inset ring-[var(--border-light)] transition-colors hover:text-[var(--text-2)] disabled:cursor-not-allowed disabled:opacity-58"
                   >
                     {t('feed.allRead')}
                   </button>
                   {isBulkConfirmOpen ? (
-                    <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-[238px] rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-2 shadow-[0_18px_48px_rgba(30,24,16,0.16)]">
+                    <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-[238px] rounded-[10px] border border-[var(--border)] bg-[var(--bg-elevated)] p-2 shadow-[0_18px_48px_rgba(30,24,16,0.16)]">
                       <div className="px-2 pb-2 pt-1">
                         <div className="text-[11.5px] font-semibold text-[var(--text)]">{t('feed.confirmAllRead')}</div>
                         <div className="mt-0.5 text-[10.5px] leading-4 text-[var(--text-3)]">
@@ -166,7 +167,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
                           type="button"
                           onClick={() => setOpenBulkConfirmScope(null)}
                           disabled={isBulkUpdating}
-                          className="ui-btn-ghost min-h-11 rounded-full px-3 py-1.5 text-[11px] font-medium md:h-8 md:min-h-0"
+                          className="ui-btn-ghost min-h-11 rounded-[10px] px-3 py-1.5 text-[11px] font-medium md:h-8 md:min-h-0"
                         >
                           {t('feed.cancel')}
                         </button>
@@ -175,7 +176,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
                           aria-label={t('feed.confirmAllReadAria')}
                           onClick={() => void handleBulkMarkRead()}
                           disabled={isBulkUpdating}
-                          className="ui-btn-solid min-h-11 rounded-full px-3 py-1.5 text-[11px] font-semibold md:h-8 md:min-h-0"
+                          className="ui-btn-solid min-h-11 rounded-[10px] px-3 py-1.5 text-[11px] font-semibold md:h-8 md:min-h-0"
                         >
                           {t('feed.confirm')}
                         </button>
@@ -205,7 +206,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
         ) : null}
       </header>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overscroll-none">
         {isLoading && items.length === 0 ? (
           density === 'compact' ? <CompactSkeleton /> : <FeedSkeleton />
         ) : filteredItems.length === 0 ? (
@@ -222,7 +223,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
                   {t('feed.emptySourcesDescription')}
                 </p>
                 <div className="mt-5 flex flex-col gap-2">
-                  <Link href="/sources#add-source" className="ui-btn-primary h-9 rounded-[11px] px-3 py-2 text-[12px]">
+                  <Link href="/sources#add-source" className="ui-btn-primary h-9 rounded-[10px] px-3 py-2 text-[12px]">
                     <PlusCircle size={14} strokeWidth={1.9} />
                     {t('sources.addTitle')}
                   </Link>

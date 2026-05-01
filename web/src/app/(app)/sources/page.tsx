@@ -120,7 +120,7 @@ function buildDiscovery(value: string): Discovery {
 function statusForSource(source: Source): SourceStatus {
   const health = (source.health || '').toLowerCase();
   if (health.includes('error') || health.includes('fail') || source.consecutive_fails >= 6) return 'error';
-  if (health.includes('warn') || health.includes('degraded') || health.includes('unknown')) return 'stale';
+  if (health.includes('warn') || health.includes('degraded')) return 'stale';
 
   const lastChecked = Date.parse(source.last_fetched_at || source.last_success_at || '');
   if (Number.isFinite(lastChecked) && Date.now() - lastChecked > 1000 * 60 * 60 * 24 * 7) {
@@ -556,9 +556,10 @@ export function SourcesPage() {
     }
 
     try {
-      const source = await createSource.mutateAsync(candidate.submitUrl);
+      const source = await createSource.mutateAsync(candidate.url);
       resetDiscovery();
       showToast(t('sources.toastSubscribed', { title: source.title || candidate.title }));
+      refreshSource.mutate(source.id);
     } catch (error) {
       const raw = error instanceof ApiError || error instanceof Error ? error.message : '';
       setDiscoveryPhase('error');
@@ -768,8 +769,12 @@ export function SourcesPage() {
                   onClick={() => void subscribe(discovery)}
                   disabled={createSource.isPending}
                 >
-                  <Plus size={14} strokeWidth={1.5} />
-                  {t('sources.subscribe')}
+                  {createSource.isPending ? (
+                    <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  ) : (
+                    <Plus size={14} strokeWidth={1.5} />
+                  )}
+                  {createSource.isPending ? t('sources.subscribing') : t('sources.subscribe')}
                 </button>
               </div>
             </div>

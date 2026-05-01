@@ -6,8 +6,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const seedAdminAllowlistNote = "seed-admin CLI"
-
 type PgUserStore struct {
 	pool *pgxpool.Pool
 }
@@ -24,11 +22,11 @@ func (s *PgUserStore) UpsertUser(ctx context.Context, githubID int64, username, 
 				SELECT 1
 				FROM auth_allowlist
 				WHERE github_username = $1
-				  AND note = $2
+				  AND note IN ('seed-admin CLI', 'setup-wizard')
 			) THEN 'admin'
 			ELSE 'user'
 		END`,
-		username, seedAdminAllowlistNote,
+		username,
 	).Scan(&desiredRole); err != nil {
 		return 0, err
 	}

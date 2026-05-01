@@ -78,7 +78,7 @@ export function TweaksPanel() {
   };
 
   return (
-    <div className="fixed bottom-[max(20px,calc(env(safe-area-inset-bottom)+8px))] right-5 z-[100] flex flex-col items-end gap-2">
+    <div className="absolute bottom-5 right-5 z-[100] flex flex-col items-end gap-2">
       <AnimatePresence>
         {isOpen ? (
           <motion.div
@@ -171,7 +171,7 @@ export function TweaksPanel() {
         type="button"
         aria-label={isOpen ? t('tweaks.close') : t('tweaks.open')}
         onClick={() => setIsOpen((value) => !value)}
-        className={`flex h-11 w-11 items-center justify-center rounded-full border transition-colors ${
+        className={`flex h-11 w-11 items-center justify-center rounded-[10px] border transition-colors ${
           isOpen
             ? 'border-[var(--accent-solid)] bg-[var(--accent-solid)] text-[var(--accent-on-solid)]'
             : 'border-[var(--border)] bg-[var(--bg-panel)] text-[var(--text-2)] hover:border-[var(--accent-border)] hover:text-[var(--accent-text)]'

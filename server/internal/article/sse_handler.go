@@ -66,6 +66,13 @@ func (h *SSEHandler) BodyTranslation(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
 		return
 	}
+	detectedLang := ai.DetectLanguage(article.ContentText, article.Language)
+	if detectedLang == targetLang {
+		setSSEHeaders(c)
+		writeSSENamedEvent(c.Writer, "same-language", map[string]any{})
+		return
+	}
+
 	paragraphs := ai.SplitParagraphs(article.ContentHtml)
 	start, end, err := parseBodyTranslationRange(c, len(paragraphs))
 	if err != nil {

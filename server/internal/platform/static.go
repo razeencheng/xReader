@@ -38,6 +38,9 @@ func NewSPAHandler(staticFS fs.FS) http.Handler {
 			ct = "application/json"
 		}
 		w.Header().Set("Content-Type", ct)
+		if strings.HasSuffix(name, ".html") {
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		}
 		if stat != nil {
 			w.Header().Set("Content-Length", fmt.Sprintf("%d", stat.Size()))
 		}

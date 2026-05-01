@@ -22,7 +22,7 @@ export function SourceExcerptNotice({ error, isLoading = false, link, onLoadOrig
           type="button"
           onClick={onLoadOriginal}
           disabled={isLoading}
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-[var(--bg-nav)] px-3 py-1.5 text-xs font-medium text-[var(--text-inverse)] transition-colors hover:bg-[var(--bg-surface)] disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-[10px] bg-[var(--bg-nav)] px-3 py-1.5 text-xs font-medium text-[var(--text-inverse)] transition-colors hover:bg-[var(--bg-surface)] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isLoading ? (
             <>
@@ -37,7 +37,7 @@ export function SourceExcerptNotice({ error, isLoading = false, link, onLoadOrig
           href={link}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-[var(--border-strong)] bg-[var(--bg-body)] px-3 py-1.5 text-xs font-medium text-[var(--text-body)] transition-colors hover:border-[var(--border-accent)] hover:text-[var(--text-accent)]"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-[var(--border-strong)] bg-[var(--bg-body)] px-3 py-1.5 text-xs font-medium text-[var(--text-body)] transition-colors hover:border-[var(--border-accent)] hover:text-[var(--text-accent)]"
         >
           {t('reader.openInNewTab')}
           <ExternalLink size={13} />

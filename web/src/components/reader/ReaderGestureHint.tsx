@@ -18,7 +18,7 @@ export function ReaderGestureHint({ hint }: { hint: ReaderGestureHintType }) {
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-[76px] z-[90] flex justify-center px-5 md:hidden">
-      <div className="rounded-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-4 py-2 font-[system-ui] text-xs font-semibold text-[var(--text-accent)] shadow-[0_14px_40px_rgba(65,52,35,0.14)]">
+      <div className="rounded-[10px] border border-[var(--accent-border)] bg-[var(--accent-soft)] px-4 py-2 font-[system-ui] text-xs font-semibold text-[var(--text-accent)] shadow-[0_14px_40px_rgba(65,52,35,0.14)]">
         {t(HINT_KEYS[hint])}
       </div>
     </div>

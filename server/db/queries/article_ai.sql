@@ -47,3 +47,15 @@ WHERE article_id = $1 AND target_language = $2;
 INSERT INTO article_ai (article_id, target_language)
 VALUES ($1, $2)
 ON CONFLICT (article_id, target_language) DO NOTHING;
+
+-- name: ListArticlesMissingAI :many
+SELECT a.id
+FROM articles a
+WHERE NOT EXISTS (
+  SELECT 1 FROM article_ai ai
+  WHERE ai.article_id = a.id AND ai.target_language = $1
+    AND ai.title_translated IS NOT NULL AND ai.title_translated != ''
+    AND ai.summary_status IN ('done', 'skipped')
+)
+ORDER BY a.published_at DESC
+LIMIT $2;

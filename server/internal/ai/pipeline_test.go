@@ -117,7 +117,7 @@ func TestEagerJob_ShortItem_SkipsSummary(t *testing.T) {
 	require.Len(t, mock.Calls, 1)
 }
 
-func TestEagerJob_TranslatesTitleAndSummary_HappyPath(t *testing.T) {
+func TestEagerJob_TranslatesTitleAndSummary_Combined(t *testing.T) {
 	pool, queries, userID, cleanup := setupPipelineTest(t)
 	t.Cleanup(cleanup)
 	ctx := context.Background()
@@ -126,8 +126,7 @@ func TestEagerJob_TranslatesTitleAndSummary_HappyPath(t *testing.T) {
 	article := insertTestArticle(t, queries, ctx, userID, "English Title", longText, "en")
 
 	mock := &sequenceMock{responses: []ChatResponse{
-		{Content: "英文标题"},
-		{Content: "• 要点一\n• 要点二"},
+		{Content: "TITLE: 英文标题\nSUMMARY: 这是一段摘要"},
 	}}
 	job := NewEagerJob(pool, mock, article.ID, "zh-CN")
 	require.NoError(t, job.Run(ctx))
@@ -139,6 +138,16 @@ func TestEagerJob_TranslatesTitleAndSummary_HappyPath(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "英文标题", ai.TitleTranslated)
 	require.Equal(t, "done", ai.SummaryStatus)
-	require.Contains(t, ai.Summary, "要点")
-	require.Len(t, mock.Calls, 2)
+	require.Equal(t, "这是一段摘要", ai.Summary)
+	require.Len(t, mock.Calls, 1)
+}
+
+func TestParseCombinedResponse(t *testing.T) {
+	title, summary := parseCombinedResponse("TITLE: 测试标题\nSUMMARY: 这是摘要内容")
+	require.Equal(t, "测试标题", title)
+	require.Equal(t, "这是摘要内容", summary)
+
+	title2, summary2 := parseCombinedResponse("TITLE: 标题\n\n这是一段没有前缀的摘要")
+	require.Equal(t, "标题", title2)
+	require.Equal(t, "这是一段没有前缀的摘要", summary2)
 }

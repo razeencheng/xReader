@@ -3,7 +3,7 @@ import { useUIStore } from '@/stores/useUIStore';
 
 export type UILanguage = 'zh-CN' | 'zh-TW' | 'en' | 'ja' | 'ko' | 'es' | 'fr' | 'de' | 'pt';
 
-type MessageValue = string | ((params: Record<string, string | number>) => string);
+type MessageValue = string | string[] | ((params: Record<string, string | number>) => string);
 type MessageMap = Record<string, MessageValue>;
 
 export function getUILanguage(language: string | null | undefined): UILanguage {
@@ -77,7 +77,14 @@ const en: MessageMap = {
   'feed.bulkScopeCurrentView': 'current view',
   'feed.bulkReadNotice': ({ scope, count }) => `Marked ${count} articles in ${scope} as read`,
   'feed.undo': 'Undo',
-  'feed.allCaughtUp': 'All caught up ✓',
+  'feed.allCaughtUp': [
+    'All caught up — nicely done!',
+    "Zero unread. You're on fire!",
+    'Inbox zero, reading hero.',
+    'Clean slate. Time well spent!',
+    'All done — treat yourself to a break.',
+    'Nothing left unread. Impressive!',
+  ],
   'feed.nothingHere': 'Nothing here yet',
   'feed.emptySourcesTitle': 'No sources yet',
   'feed.emptySourcesDescription': 'Add your first RSS source to start building your reading stream.',
@@ -109,6 +116,7 @@ const en: MessageMap = {
   'sources.discoveryItemCount': ({ count }) => `${count} items`,
   'sources.cancel': 'Cancel',
   'sources.subscribe': 'Subscribe',
+  'sources.subscribing': 'Subscribing…',
   'sources.dismiss': 'Dismiss',
   'sources.noFeedFoundShort': 'No feed found at that URL.',
   'sources.importingFile': ({ filename }) => `Importing ${filename}`,
@@ -406,7 +414,14 @@ const zh: MessageMap = {
   'feed.bulkScopeCurrentView': '当前视图',
   'feed.bulkReadNotice': ({ scope, count }) => `已将${scope} ${count} 篇标为已读`,
   'feed.undo': '撤销',
-  'feed.allCaughtUp': '已全部处理 ✓',
+  'feed.allCaughtUp': [
+    '全部读完，太棒了！',
+    '清空未读，今日份的自律已达成。',
+    '阅读进度 100%，给自己鼓个掌。',
+    '一篇不落，你是阅读达人！',
+    '全部搞定，休息一下吧。',
+    '未读清零，知识满格！',
+  ],
   'feed.nothingHere': '这里还没有内容',
   'feed.emptySourcesTitle': '还没有订阅源',
   'feed.emptySourcesDescription': '添加第一个 RSS 源，开始生成你的阅读流。',
@@ -438,6 +453,7 @@ const zh: MessageMap = {
   'sources.discoveryItemCount': ({ count }) => `${count} 篇`,
   'sources.cancel': '取消',
   'sources.subscribe': '订阅',
+  'sources.subscribing': '订阅中…',
   'sources.dismiss': '关闭',
   'sources.noFeedFoundShort': '没有在这个地址找到订阅源。',
   'sources.importingFile': ({ filename }) => `正在导入 ${filename}`,
@@ -710,7 +726,9 @@ function traditionalize(map: MessageMap): MessageMap {
       key,
       typeof value === 'function'
         ? (params: Record<string, string | number>) => traditionalizeText(value(params))
-        : traditionalizeText(value),
+        : Array.isArray(value)
+          ? value.map(traditionalizeText)
+          : traditionalizeText(value),
     ]),
   );
 }
@@ -833,6 +851,7 @@ for (const [language, messages] of Object.entries(supplementalDictionaries) as A
 export function translate(language: string | null | undefined, key: string, params: Record<string, string | number> = {}) {
   const uiLanguage = getUILanguage(language);
   const value = dictionaries[uiLanguage][key] ?? en[key] ?? key;
+  if (Array.isArray(value)) return value[Math.floor(Math.random() * value.length)];
   return typeof value === 'function' ? value(params) : value;
 }
 

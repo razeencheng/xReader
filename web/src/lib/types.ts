@@ -10,6 +10,7 @@ export interface ArticleItem {
   summary?: string;
   source_title?: string;
   source_icon_url?: string;
+  word_count?: number;
   is_read?: boolean;
   is_starred?: boolean;
 }

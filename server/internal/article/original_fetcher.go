@@ -174,6 +174,21 @@ func readLimited(r io.Reader, max int64) ([]byte, error) {
 	return body, nil
 }
 
+var boilerplateSelectors = strings.Join([]string{
+	"script", "style", "noscript", "svg", "iframe", "form",
+	"nav", "header", "footer", "aside",
+	".author-info", ".author-bio", ".author-card", ".post-author",
+	".share-buttons", ".social-share", ".sharing", ".share-bar",
+	".related-posts", ".related-articles", ".recommended",
+	".comments", ".comment-section", "#comments", "#disqus_thread",
+	".sidebar", ".widget", ".ad", ".advertisement", ".banner",
+	".newsletter", ".subscribe-form", ".cta",
+	".breadcrumb", ".breadcrumbs", ".pagination",
+	".post-meta-bottom", ".post-footer", ".entry-footer", ".article-footer",
+	".post-tags", ".tag-list",
+	"[role='complementary']", "[role='navigation']", "[role='banner']",
+}, ", ")
+
 func extractReadableContent(body []byte) (OriginalContent, error) {
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
 	if err != nil {
@@ -181,10 +196,11 @@ func extractReadableContent(body []byte) (OriginalContent, error) {
 	}
 
 	title := strings.TrimSpace(doc.Find("title").First().Text())
-	doc.Find("script, style, noscript, svg, iframe, form, nav, header, footer, aside").Remove()
+	doc.Find(boilerplateSelectors).Remove()
 
 	container := bestContentContainer(doc)
-	container.Find("script, style, noscript, svg, iframe, form, nav, header, footer, aside").Remove()
+	container.Find(boilerplateSelectors).Remove()
+	removeBoilerplateByAttr(container)
 	stripPresentationAttrs(container)
 	container.Find("a").Each(func(_ int, sel *goquery.Selection) {
 		sel.RemoveAttr("href")
@@ -209,13 +225,20 @@ func extractReadableContent(body []byte) (OriginalContent, error) {
 
 func bestContentContainer(doc *goquery.Document) *goquery.Selection {
 	candidates := []string{
+		"article .content",
+		"article .post-body",
+		"article .article-body",
+		"article .entry-content",
+		".post-content",
+		".entry-content",
+		".article-content",
+		".article-body",
+		".post-body",
 		"article",
 		"main article",
 		"main",
 		"[role='main']",
-		".post-content",
-		".entry-content",
-		".article-content",
+		"[itemprop='articleBody']",
 		".content",
 	}
 
@@ -235,6 +258,27 @@ func bestContentContainer(doc *goquery.Document) *goquery.Selection {
 		return best
 	}
 	return doc.Find("body").First()
+}
+
+var boilerplateAttrPatterns = []string{
+	"author", "share", "social", "comment", "related",
+	"sidebar", "widget", "footer", "nav", "breadcrumb",
+	"subscribe", "newsletter", "recommend", "ad-",
+	"follow", "tag-list", "post-meta",
+}
+
+func removeBoilerplateByAttr(container *goquery.Selection) {
+	container.Find("div, section, span").Each(func(_ int, sel *goquery.Selection) {
+		cls, _ := sel.Attr("class")
+		id, _ := sel.Attr("id")
+		combined := strings.ToLower(cls + " " + id)
+		for _, pattern := range boilerplateAttrPatterns {
+			if strings.Contains(combined, pattern) {
+				sel.Remove()
+				return
+			}
+		}
+	})
 }
 
 func stripPresentationAttrs(container *goquery.Selection) {

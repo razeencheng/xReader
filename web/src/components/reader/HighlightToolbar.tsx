@@ -83,12 +83,12 @@ export function HighlightToolbar({ articleId, onHighlightCreated }: Props) {
           initial={{ opacity: 0, y: 10, scale: 0.9 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 10, scale: 0.9 }}
-          className="fixed z-[100] flex items-center gap-1 rounded-full border border-[var(--border)] bg-[color-mix(in_oklch,var(--bg-panel)_85%,transparent)] p-1 shadow-2xl backdrop-blur-xl"
+          className="fixed z-[100] flex items-center gap-1 rounded-[10px] border border-[var(--border)] bg-[color-mix(in_oklch,var(--bg-panel)_85%,transparent)] p-1 shadow-2xl backdrop-blur-xl"
           style={{ top: position.top, left: position.left, transform: 'translateX(-50%)' }}
         >
           <button
             onClick={() => save()}
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-3 text-[var(--accent)] transition-colors hover:bg-[var(--accent-bg)]"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] p-3 text-[var(--accent)] transition-colors hover:bg-[var(--accent-bg)]"
             title={t('reader.highlight')}
             aria-label={t('reader.highlight')}
           >
@@ -100,7 +100,7 @@ export function HighlightToolbar({ articleId, onHighlightCreated }: Props) {
               setNoteDraft('');
               setIsNoteEditorOpen(true);
             }}
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-3 text-[var(--accent)] transition-colors hover:bg-[var(--accent-bg)]"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] p-3 text-[var(--accent)] transition-colors hover:bg-[var(--accent-bg)]"
             title={t('reader.highlightWithNote')}
             aria-label={t('reader.highlightWithNote')}
           >

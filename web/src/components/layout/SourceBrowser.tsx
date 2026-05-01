@@ -8,7 +8,7 @@ import { apiFetch } from '@/lib/api-client';
 import { useI18n } from '@/lib/i18n';
 import { getSourceColor, orderSourceGroups } from '@/lib/source-meta';
 import type { Source } from '@/lib/types';
-import { motion } from 'framer-motion';
+
 
 function UnreadBadge({ count }: { count?: number }) {
   if (!count) return null;
@@ -90,10 +90,7 @@ export function SourceBrowser() {
   }
 
   return (
-    <motion.section
-      initial={{ opacity: 0, x: -8 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.18, ease: 'easeOut' }}
+    <section
       className="flex h-full w-full flex-col overflow-hidden bg-[var(--bg)] lg:w-[300px] lg:border-r lg:border-[var(--border)]"
     >
       <header className="shrink-0 border-b border-[var(--border-light)] px-4 pb-[10px] pt-[11px]">
@@ -137,6 +134,6 @@ export function SourceBrowser() {
           </section>
         ))}
       </div>
-    </motion.section>
+    </section>
   );
 }

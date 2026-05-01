@@ -27,3 +27,13 @@ func TestLanguageDetect_ShortTextNoFallback(t *testing.T) {
 	lang := DetectLanguage("hi", "")
 	require.Equal(t, "unknown", lang)
 }
+
+func TestLanguageDetect_ShortChineseWithLatinPrefix(t *testing.T) {
+	lang := DetectLanguage("R#099 合理休假", "")
+	require.Equal(t, "zh-CN", lang)
+}
+
+func TestLanguageDetect_MixedChineseEnglish(t *testing.T) {
+	lang := DetectLanguage("Gadget System Framework（GSF）- 我开发的一个 Windows 10/11 桌面小工具框架", "")
+	require.Equal(t, "zh-CN", lang)
+}

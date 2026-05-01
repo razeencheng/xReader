@@ -53,6 +53,44 @@ func (q *Queries) GetArticleAI(ctx context.Context, arg GetArticleAIParams) (Art
 	return i, err
 }
 
+const listArticlesMissingAI = `-- name: ListArticlesMissingAI :many
+SELECT a.id
+FROM articles a
+WHERE NOT EXISTS (
+  SELECT 1 FROM article_ai ai
+  WHERE ai.article_id = a.id AND ai.target_language = $1
+    AND ai.title_translated IS NOT NULL AND ai.title_translated != ''
+    AND ai.summary_status IN ('done', 'skipped')
+)
+ORDER BY a.published_at DESC
+LIMIT $2
+`
+
+type ListArticlesMissingAIParams struct {
+	TargetLanguage string `json:"target_language"`
+	Limit          int32  `json:"limit"`
+}
+
+func (q *Queries) ListArticlesMissingAI(ctx context.Context, arg ListArticlesMissingAIParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listArticlesMissingAI, arg.TargetLanguage, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const resetBodyTranslation = `-- name: ResetBodyTranslation :exec
 UPDATE article_ai
 SET body_translation_content = NULL, body_translation_status = 'none', updated_at = now()

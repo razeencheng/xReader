@@ -125,12 +125,18 @@ export function ArticleReader({
 
     const scrollHeight = element.scrollHeight - element.clientHeight;
     if (scrollHeight <= 0) {
-      setProgressState({ articleId: id, value: 0 });
+      setProgressState({ articleId: id, value: 1 });
       return;
     }
 
     setProgressState({ articleId: id, value: Math.min(1, element.scrollTop / scrollHeight) });
   }, [id]);
+
+  useEffect(() => {
+    if (!article) return;
+    const frame = requestAnimationFrame(() => handleScroll());
+    return () => cancelAnimationFrame(frame);
+  }, [article, handleScroll]);
 
   // Auto-mark as read at 75% scroll
   useEffect(() => {
@@ -310,11 +316,11 @@ export function ArticleReader({
         ref={scrollRef}
         data-reader-scroll="true"
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto overflow-x-hidden overscroll-x-none touch-pan-y"
+        className="flex-1 overflow-y-auto overflow-x-hidden overscroll-none touch-pan-y"
         {...touchHandlers}
       >
         <HighlightLayer articleId={Number(id)}>
-          <div className={`pb-20 pt-[44px] ${activeLayout === 'wide' ? 'px-7 md:px-14' : 'px-7 md:px-7'}`}>
+          <div className={`pb-12 pt-[44px] ${activeLayout === 'wide' ? 'px-7 md:px-14' : 'px-7 md:px-7'}`}>
             <article className={activeLayout === 'wide' ? 'mx-auto max-w-[960px]' : 'mx-auto max-w-[680px]'}>
               {titleLoading ? (
                 <div className="mb-3 inline-flex items-center gap-2 font-serif text-[18px] text-[var(--text-3)]">

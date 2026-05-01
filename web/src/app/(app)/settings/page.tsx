@@ -35,7 +35,7 @@ export default function SettingsPage() {
   const [feverMessage, setFeverMessage] = useState('');
   const [feverCopied, setFeverCopied] = useState<'key' | 'url' | null>(null);
 
-  const { data: aiSettings } = useQuery({
+  const { data: aiSettings, error: aiSettingsError } = useQuery({
     queryKey: ['ai-settings'],
     queryFn: () => apiFetch<AISettings>('/api/ai/settings'),
   });
@@ -70,7 +70,7 @@ export default function SettingsPage() {
       setAPIKey('');
       setMessage(t('settings.aiSaved'));
     },
-    onError: () => setMessage(t('settings.aiSaveError')),
+    onError: (err: Error) => setMessage(`${t('settings.aiSaveError')} ${err.message}`),
   });
 
   const generateFeverKey = useMutation({
@@ -118,13 +118,19 @@ export default function SettingsPage() {
             <p className="mt-2 font-[system-ui] text-sm leading-6 text-[var(--text-muted)]">{t('settings.aiDescription')}</p>
           </div>
 
+          {aiSettingsError ? (
+            <p className="mb-4 rounded-[7px] border border-[var(--bg-highlight-error)] bg-[var(--bg-highlight-error)]/30 px-3 py-2 font-[system-ui] text-xs text-[var(--text-body)]">
+              {(aiSettingsError as Error).message}
+            </p>
+          ) : null}
+
           <div className="space-y-4 font-[system-ui]">
             <label className="block text-sm font-medium text-[var(--text-body)]">
               {t('settings.aiEndpoint')}
               <input
-                className="mt-2 w-full rounded-[7px] border border-[var(--border-light)] bg-[var(--bg-body)] px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--accent)]"
+                className={`mt-2 w-full rounded-[7px] border border-[var(--border-light)] px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--accent)] ${isAdmin ? 'bg-[var(--bg-body)]' : 'cursor-not-allowed bg-[var(--bg-panel)] text-[var(--text-muted)]'}`}
                 value={endpoint}
-                disabled={!isAdmin}
+                readOnly={!isAdmin}
                 onChange={(event) => setEndpoint(event.target.value)}
               />
             </label>
@@ -132,18 +138,20 @@ export default function SettingsPage() {
             <label className="block text-sm font-medium text-[var(--text-body)]">
               {t('settings.aiModel')}
               <input
-                list="ai-model-options"
-                className="mt-2 w-full rounded-[7px] border border-[var(--border-light)] bg-[var(--bg-body)] px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--accent)]"
+                list={isAdmin ? 'ai-model-options' : undefined}
+                className={`mt-2 w-full rounded-[7px] border border-[var(--border-light)] px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--accent)] ${isAdmin ? 'bg-[var(--bg-body)]' : 'cursor-not-allowed bg-[var(--bg-panel)] text-[var(--text-muted)]'}`}
                 value={model}
-                disabled={!isAdmin}
+                readOnly={!isAdmin}
                 onChange={(event) => setModel(event.target.value)}
               />
-              <datalist id="ai-model-options">
-                <option value="qwen-turbo" />
-                <option value="deepseek-chat" />
-                <option value="gpt-4o-mini" />
-                <option value="gpt-4.1-mini" />
-              </datalist>
+              {isAdmin ? (
+                <datalist id="ai-model-options">
+                  <option value="qwen-turbo" />
+                  <option value="deepseek-chat" />
+                  <option value="gpt-4o-mini" />
+                  <option value="gpt-4.1-mini" />
+                </datalist>
+              ) : null}
             </label>
 
             <label className="block text-sm font-medium text-[var(--text-body)]">
@@ -151,10 +159,10 @@ export default function SettingsPage() {
               <input
                 type="password"
                 autoComplete="new-password"
-                placeholder={t('settings.aiApiKeyPlaceholder')}
-                className="mt-2 w-full rounded-[7px] border border-[var(--border-light)] bg-[var(--bg-body)] px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--accent)]"
+                placeholder={isAdmin ? t('settings.aiApiKeyPlaceholder') : ''}
+                className={`mt-2 w-full rounded-[7px] border border-[var(--border-light)] px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--accent)] ${isAdmin ? 'bg-[var(--bg-body)]' : 'cursor-not-allowed bg-[var(--bg-panel)] text-[var(--text-muted)]'}`}
                 value={apiKey}
-                disabled={!isAdmin}
+                readOnly={!isAdmin}
                 onChange={(event) => setAPIKey(event.target.value)}
               />
             </label>
@@ -170,7 +178,7 @@ export default function SettingsPage() {
               {isAdmin ? (
                 <button
                   type="button"
-                  onClick={() => saveAISettings.mutate()}
+                  onClick={() => { setMessage(''); saveAISettings.mutate(); }}
                   disabled={saveAISettings.isPending}
                   className="rounded-[7px] bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-60"
                 >

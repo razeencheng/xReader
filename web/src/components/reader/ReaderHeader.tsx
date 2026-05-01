@@ -42,7 +42,7 @@ export function ReaderHeader({
   const showReadState = progress > 0.75 || article.is_read;
 
   return (
-    <div className="flex shrink-0 items-center gap-3 border-b border-[var(--border-light)] bg-[var(--bg)] px-5 py-[9px]">
+    <div className="flex shrink-0 items-center gap-3 bg-[var(--bg)] px-5 py-[9px] border-b border-[var(--border-light)]">
       {onBack ? (
         <button
           type="button"
