@@ -13,8 +13,9 @@ interface Props {
 }
 
 function buildHref(articleId: number, searchParams: URLSearchParams) {
-  const query = searchParams.toString();
-  return query ? `/read/${articleId}?${query}` : `/read/${articleId}`;
+  const params = new URLSearchParams(searchParams.toString());
+  params.set('article', String(articleId));
+  return `/?${params.toString()}`;
 }
 
 function langLabel(lang?: string) {

@@ -43,5 +43,5 @@ test('clicking card marks current article read before navigation', async () => {
   await userEvent.click(screen.getByRole('button', { name: /翻译后的标题/i }));
 
   expect(markRead).toHaveBeenCalledWith(2);
-  expect(push).toHaveBeenCalledWith('/read/3?ctx=today');
+  expect(push).toHaveBeenCalledWith('/?ctx=today&article=3');
 });

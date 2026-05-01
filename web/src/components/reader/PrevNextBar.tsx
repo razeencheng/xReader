@@ -18,8 +18,9 @@ interface Props {
 type SearchParamsLike = { toString(): string };
 
 function buildHref(articleId: number, searchParams: SearchParamsLike) {
-  const query = searchParams.toString();
-  return query ? `/read/${articleId}?${query}` : `/read/${articleId}`;
+  const params = new URLSearchParams(searchParams.toString());
+  params.set('article', String(articleId));
+  return `/?${params.toString()}`;
 }
 
 function NavCard({

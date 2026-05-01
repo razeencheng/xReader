@@ -29,7 +29,7 @@ test('renders highlights from the API items envelope and links back to the artic
   render(<HighlightsList />);
 
   const link = await screen.findByRole('link', { name: /Original article/i });
-  expect(link).toHaveAttribute('href', '/read/7#highlight-12');
+  expect(link).toHaveAttribute('href', '/?article=7#highlight-12');
   expect(screen.getByText(/important quote/)).toBeInTheDocument();
   expect(screen.getByText(/review later/)).toBeInTheDocument();
 });

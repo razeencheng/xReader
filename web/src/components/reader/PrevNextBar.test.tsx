@@ -27,7 +27,7 @@ test('clicking 下一篇 calls markRead with current article id', async () => {
   await userEvent.click(screen.getByRole('button', { name: /下一篇/i }));
 
   expect(markRead).toHaveBeenCalledWith(2);
-  expect(push).toHaveBeenCalledWith('/read/3?ctx=today');
+  expect(push).toHaveBeenCalledWith('/?ctx=today&article=3');
 });
 
 test('renders source labels for previous and next articles', () => {

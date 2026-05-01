@@ -73,7 +73,7 @@ export function HighlightsList() {
           {highlights.map((h) => (
             <a
               key={h.id}
-              href={`/read/${h.article_id}#highlight-${h.id}`}
+              href={`/?article=${h.article_id}#highlight-${h.id}`}
               className="block py-4 hover:bg-[var(--bg-badge-starred)] -mx-4 px-4 rounded"
             >
               <div className="mb-1 text-xs text-[var(--text-muted)]">

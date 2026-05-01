@@ -64,8 +64,8 @@ test('MobileTopBar links to the highlights and notes page from tools', async () 
   expect(push).toHaveBeenCalledWith('/highlights');
 });
 
-test('MobileTopBar hides primary navigation on reader pages', () => {
-  usePathname.mockReturnValue('/read/123');
+test('MobileTopBar shows normal navigation on non-list pages (e.g. /settings)', () => {
+  usePathname.mockReturnValue('/settings');
 
   render(<MobileTopBar focusMode={false} />);
 
