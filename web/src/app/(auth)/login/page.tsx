@@ -1,9 +1,32 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useI18n } from '@/lib/i18n';
 
 export default function LoginPage() {
   const { t } = useI18n();
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/setup/status')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.needs_setup) {
+          window.location.href = '/setup';
+        } else {
+          setReady(true);
+        }
+      })
+      .catch(() => setReady(true));
+  }, []);
+
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center">
