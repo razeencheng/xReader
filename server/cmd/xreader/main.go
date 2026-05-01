@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,6 +12,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jin/xreader-web/internal/admin"
 	"github.com/jin/xreader-web/internal/ai"
@@ -46,6 +50,11 @@ func main() {
 		log.Fatalf("connect to database: %v", err)
 	}
 	defer pool.Close()
+
+	if err := runMigrations(dbURL); err != nil {
+		log.Fatalf("migration failed: %v", err)
+	}
+	log.Println("migrations: up to date")
 
 	// Start worker in background goroutine
 	go func() {
@@ -118,4 +127,21 @@ func runSeedAdmin(args []string) {
 	}
 
 	fmt.Printf("Seeded admin: %s\n", username)
+}
+
+func runMigrations(dbURL string) error {
+	// Try /migrations first (Docker), then db/migrations (local dev)
+	source := "file:///migrations"
+	if _, err := os.Stat("/migrations"); os.IsNotExist(err) {
+		source = "file://db/migrations"
+	}
+	m, err := migrate.New(source, dbURL)
+	if err != nil {
+		return fmt.Errorf("migration init: %w", err)
+	}
+	defer m.Close()
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		return fmt.Errorf("migration up: %w", err)
+	}
+	return nil
 }
