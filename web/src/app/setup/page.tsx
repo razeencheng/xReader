@@ -16,18 +16,15 @@ export default function SetupPage() {
   const [setupToken, setSetupToken] = useState('');
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
-  const [callbackUrl, setCallbackUrl] = useState('');
+  const [callbackUrl, setCallbackUrl] = useState(
+    typeof window !== 'undefined' ? window.location.origin + '/api/auth/callback' : '',
+  );
   const [aiEndpoint, setAiEndpoint] = useState('');
   const [aiModel, setAiModel] = useState('');
   const [aiApiKey, setAiApiKey] = useState('');
   const [adminUsername, setAdminUsername] = useState('');
 
   useEffect(() => {
-    // Auto-fill callback URL
-    if (typeof window !== 'undefined') {
-      setCallbackUrl(window.location.origin + '/api/auth/callback');
-    }
-
     // Check if setup is needed
     fetch('/api/setup/status')
       .then((res) => res.json())
