@@ -15,64 +15,21 @@ services:
       timeout: 3s
       retries: 5
 
-  redis:
-    image: redis:7
-    ports:
-      - "6379:6379"
-    volumes:
-      - redisdata:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  api:
+  xreader:
     build: ./server
-    command: ["/app/api"]
-    ports:
-      - "8080:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgres://xreader:xreader@postgres:5432/xreader?sslmode=disable}
-      REDIS_URL: ${REDIS_URL_DOCKER:-redis://redis:6379}
-      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
-      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
-      GITHUB_CALLBACK_URL: ${GITHUB_CALLBACK_URL:-http://localhost:3000/api/auth/callback}
-      SESSION_SECRET: ${SESSION_SECRET}
-
-  worker:
-    build: ./server
-    command: ["/app/worker"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgres://xreader:xreader@postgres:5432/xreader?sslmode=disable}
-      REDIS_URL: ${REDIS_URL_DOCKER:-redis://redis:6379}
-      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
-      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
-      GITHUB_CALLBACK_URL: ${GITHUB_CALLBACK_URL:-http://localhost:3000/api/auth/callback}
-      SESSION_SECRET: ${SESSION_SECRET}
-
-  web:
-    build:
-      context: ./web
-      args:
-        API_PROXY_TARGET: "http://api:8080"
+    command: ["/app/xreader"]
     ports:
       - "3000:3000"
-    environment:
-      NEXT_PUBLIC_API_BASE: ""
     depends_on:
-      - api
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgres://xreader:xreader@postgres:5432/xreader?sslmode=disable}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      GITHUB_CALLBACK_URL: ${GITHUB_CALLBACK_URL:-http://localhost:3000/api/auth/callback}
+      SESSION_SECRET: ${SESSION_SECRET:-change-me}
+      PORT: "3000"
 
 volumes:
   pgdata: {}
-  redisdata: {}

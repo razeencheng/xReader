@@ -7,7 +7,10 @@ down:
 	docker compose down
 
 build:
-	cd server && go build ./... && cd ../web && pnpm build
+	cd web && pnpm build
+	rm -rf server/cmd/xreader/static
+	cp -r web/out server/cmd/xreader/static
+	cd server && go build -o bin/xreader ./cmd/xreader
 
 test: test-server test-web
 
@@ -30,4 +33,4 @@ lint:
 	cd server && go vet ./... && cd ../web && pnpm lint
 
 seed-admin:
-	cd server && go run ./cmd/api seed-admin --github-username=$${GH_USER}
+	cd server && go run ./cmd/xreader seed-admin --github-username=$${GH_USER}
