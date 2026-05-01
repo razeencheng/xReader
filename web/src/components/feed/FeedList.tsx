@@ -149,7 +149,7 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
                     aria-expanded={isBulkConfirmOpen}
                     onClick={() => setOpenBulkConfirmScope((scope) => (scope === bulkScope?.scope ? null : (bulkScope?.scope ?? null)))}
                     disabled={isBulkUpdating}
-                    className="ui-pill-neutral min-h-11 px-2.5 py-[3px] text-[11px] font-semibold shadow-[0_1px_0_rgba(65,52,35,0.04)]"
+                    className="ui-pill-neutral min-h-11 px-2.5 py-[3px] text-[11px] font-semibold shadow-[0_1px_0_rgba(65,52,35,0.04)] md:min-h-0"
                   >
                     {t('feed.allRead')}
                   </button>

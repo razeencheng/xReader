@@ -280,7 +280,9 @@ test('can batch mark the current view read and undo it', async () => {
   render(<FeedList />, { wrapper });
 
   expect(screen.queryByRole('button', { name: '整理未读' })).not.toBeInTheDocument();
-  expect(await screen.findByRole('button', { name: '全部已读' })).toBeInTheDocument();
+  const bulkReadButton = await screen.findByRole('button', { name: '全部已读' });
+  expect(bulkReadButton).toBeInTheDocument();
+  expect(bulkReadButton).toHaveClass('min-h-11', 'md:min-h-0');
 
   await userEvent.click(screen.getByRole('button', { name: '全部2' }));
   expect(screen.queryByRole('button', { name: '全部已读' })).not.toBeInTheDocument();

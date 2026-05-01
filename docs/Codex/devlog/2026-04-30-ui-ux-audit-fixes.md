@@ -17,3 +17,9 @@
 - `pnpm exec playwright test e2e/mobile-reader-overflow.spec.ts e2e/login.spec.ts`
 - Restarted Next dev on `http://localhost:3000`.
 - Ran a temporary Playwright smoke test for `/admin` date formatting and mobile `/read/1?ctx=today` prev/next visibility.
+
+## Review follow-up
+
+- Restored desktop compactness for the `全部已读` pill with `md:min-h-0`.
+- Tightened the login E2E assertion to the current localized label `使用 GitHub 登录`.
+- Verified `AllowlistEntry` does not include `role`: the backend allowlist response and design spec expose `github_username`, `added_by_user_id`, `added_at`, and `note`; this checkout does not contain `server/api/openapi.yaml`.
