@@ -2,15 +2,9 @@ package ai
 
 import (
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/rand"
-	"crypto/sha256"
 	"errors"
 	"fmt"
-	"io"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -19,16 +13,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jin/xreader-web/db/gen"
+	"github.com/jin/xreader-web/internal/crypto"
 )
-
-const defaultEncryptionPassphrase = "xreader-local-ai-settings-v1"
-
-func aiSettingsEncryptionPassphrase() string {
-	if v := os.Getenv("XREADER_AI_ENCRYPTION_KEY"); v != "" {
-		return v
-	}
-	return defaultEncryptionPassphrase
-}
 
 type SettingsSnapshot struct {
 	Endpoint   string `json:"endpoint"`
@@ -99,7 +85,7 @@ func (r *PostgresSettingsRepository) LoadAISettings(ctx context.Context) (settin
 	}
 	apiKey := ""
 	if len(row.ApiKeyCiphertext) > 0 && len(row.ApiKeyNonce) > 0 {
-		apiKey, err = decryptAPIKey(row.ApiKeyCiphertext, row.ApiKeyNonce)
+		apiKey, err = crypto.DecryptSecret(row.ApiKeyCiphertext, row.ApiKeyNonce)
 		if err != nil {
 			return settingsOverrides{}, fmt.Errorf("decrypt api key: %w", err)
 		}
@@ -115,7 +101,7 @@ func (r *PostgresSettingsRepository) SaveAISettings(ctx context.Context, setting
 	if r == nil || r.queries == nil {
 		return nil
 	}
-	ciphertext, nonce, err := encryptAPIKey(settings.APIKey)
+	ciphertext, nonce, err := crypto.EncryptSecret(settings.APIKey)
 	if err != nil {
 		return fmt.Errorf("encrypt api key: %w", err)
 	}
@@ -256,39 +242,3 @@ func maskAPIKey(key string) string {
 	return trimmed[:3] + "..." + trimmed[len(trimmed)-4:]
 }
 
-func encryptAPIKey(apiKey string) ([]byte, []byte, error) {
-	trimmed := strings.TrimSpace(apiKey)
-	if trimmed == "" {
-		return nil, nil, nil
-	}
-	gcm, err := apiKeyCipher()
-	if err != nil {
-		return nil, nil, err
-	}
-	nonce := make([]byte, gcm.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, nil, err
-	}
-	return gcm.Seal(nil, nonce, []byte(trimmed), nil), nonce, nil
-}
-
-func decryptAPIKey(ciphertext, nonce []byte) (string, error) {
-	gcm, err := apiKeyCipher()
-	if err != nil {
-		return "", err
-	}
-	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
-	if err != nil {
-		return "", err
-	}
-	return string(plaintext), nil
-}
-
-func apiKeyCipher() (cipher.AEAD, error) {
-	key := sha256.Sum256([]byte(aiSettingsEncryptionPassphrase()))
-	block, err := aes.NewCipher(key[:])
-	if err != nil {
-		return nil, err
-	}
-	return cipher.NewGCM(block)
-}
