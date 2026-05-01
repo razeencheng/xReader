@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -56,6 +58,27 @@ func main() {
 	}
 	log.Println("migrations: up to date")
 
+	// Check if setup is needed and generate/display setup token
+	var adminCount int
+	if err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM auth_allowlist").Scan(&adminCount); err != nil {
+		log.Fatalf("check admin count: %v", err)
+	}
+	setupToken := ""
+	if adminCount == 0 {
+		setupToken = os.Getenv("SETUP_TOKEN")
+		if setupToken == "" {
+			b := make([]byte, 24)
+			if _, err := rand.Read(b); err != nil {
+				log.Fatalf("generate setup token: %v", err)
+			}
+			setupToken = hex.EncodeToString(b)
+		}
+		log.Printf("\n==================================================")
+		log.Printf("  SETUP TOKEN: %s", setupToken)
+		log.Printf("  Open http://localhost:%s/setup to complete setup", port)
+		log.Printf("==================================================\n")
+	}
+
 	// Start worker in background goroutine
 	go func() {
 		log.Println("worker: starting fetch loop")
@@ -73,6 +96,7 @@ func main() {
 		Pool:          pool,
 		SessionSecret: sessionSecret,
 		StaticFS:      staticFS,
+		SetupToken:    setupToken,
 	})
 
 	srv := &http.Server{

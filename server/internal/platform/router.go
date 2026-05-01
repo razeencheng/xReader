@@ -1,8 +1,8 @@
 package platform
 
 import (
+	"context"
 	"io/fs"
-	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -12,6 +12,7 @@ import (
 	"github.com/jin/xreader-web/internal/auth"
 	"github.com/jin/xreader-web/internal/highlight"
 	"github.com/jin/xreader-web/internal/middleware"
+	"github.com/jin/xreader-web/internal/setup"
 	"github.com/jin/xreader-web/internal/source"
 	"github.com/jin/xreader-web/internal/user"
 )
@@ -20,6 +21,7 @@ type RouterDeps struct {
 	Pool          *pgxpool.Pool
 	SessionSecret string
 	StaticFS      fs.FS
+	SetupToken    string
 }
 
 func NewRouter(deps RouterDeps) *gin.Engine {
@@ -28,11 +30,18 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 
 	r.GET("/health", healthHandler)
 
-	// Auth deps
+	// Setup wizard routes (before auth middleware)
+	setupH := setup.NewHandler(deps.Pool, deps.SetupToken)
+	r.GET("/api/setup/status", setupH.Status)
+	r.POST("/api/setup/complete", setupH.Complete)
+
+	// Auth deps — resolve config from env first, DB second
+	cfg := NewConfigResolver(deps.Pool)
+	ctx := context.Background()
 	ghClient := auth.NewGitHubClient(
-		os.Getenv("GITHUB_CLIENT_ID"),
-		os.Getenv("GITHUB_CLIENT_SECRET"),
-		os.Getenv("GITHUB_CALLBACK_URL"),
+		cfg.Get(ctx, "GITHUB_CLIENT_ID", "github_client_id"),
+		cfg.GetEncryptedSecret(ctx, "GITHUB_CLIENT_SECRET", "github_client_secret"),
+		cfg.Get(ctx, "GITHUB_CALLBACK_URL", "github_callback_url"),
 	)
 	sessions := auth.NewPgSessionStore(deps.Pool)
 	cookieState := auth.NewCookieState([]byte(deps.SessionSecret))
