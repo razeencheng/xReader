@@ -164,8 +164,8 @@ func (s *ArticleService) ListBySource(ctx context.Context, userID, sourceID int6
 
 func (s *ArticleService) Search(ctx context.Context, userID int64, query string) ([]gen.Article, error) {
 	rows, err := s.queries.SearchArticles(ctx, gen.SearchArticlesParams{
-		UserID:         userID,
-		PlaintoTsquery: strings.TrimSpace(query),
+		UserID: userID,
+		Q:      strings.TrimSpace(query),
 	})
 	if err != nil {
 		return nil, err

@@ -47,13 +47,15 @@ RETURNING *;
 
 -- name: SearchArticles :many
 SELECT a.id, a.source_id, a.title, a.link, a.language, a.published_at,
-       ts_headline('simple', a.title || ' ' || a.content_text, plainto_tsquery('simple', $2), 'MaxWords=20, MinWords=6') AS headline
+       ts_headline('simple', a.title || ' ' || COALESCE(a.content_text, ''),
+                   plainto_tsquery('simple', @q) || cjk_tsquery(@q),
+                   'MaxWords=20, MinWords=6') AS headline
 FROM articles a
 JOIN sources s ON a.source_id = s.id
-WHERE s.user_id = $1
+WHERE s.user_id = @user_id
   AND s.deleted_at IS NULL
-  AND a.search_vec @@ plainto_tsquery('simple', $2)
-ORDER BY ts_rank(a.search_vec, plainto_tsquery('simple', $2)) DESC
+  AND a.search_vec @@ (plainto_tsquery('simple', @q) || cjk_tsquery(@q))
+ORDER BY ts_rank(a.search_vec, plainto_tsquery('simple', @q) || cjk_tsquery(@q)) DESC
 LIMIT 100;
 
 -- name: ListArticlesToday :many
