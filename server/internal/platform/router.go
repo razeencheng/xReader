@@ -10,6 +10,7 @@ import (
 	"github.com/jin/xreader-web/internal/ai"
 	"github.com/jin/xreader-web/internal/article"
 	"github.com/jin/xreader-web/internal/auth"
+	"github.com/jin/xreader-web/internal/fever"
 	"github.com/jin/xreader-web/internal/highlight"
 	"github.com/jin/xreader-web/internal/middleware"
 	"github.com/jin/xreader-web/internal/setup"
@@ -58,6 +59,10 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 	authH := auth.NewHandler(authSvc, sessions)
 	aiSettings := ai.NewSettingsService(ai.NewPostgresSettingsRepository(deps.Pool))
 
+	// Fever API (public — uses its own api_key auth, not session cookies)
+	feverH := fever.NewHandler(deps.Pool)
+	r.POST("/fever/", feverH.Handle)
+
 	// Public auth routes
 	r.GET("/api/auth/github", authH.BeginLogin)
 	r.GET("/api/auth/callback", authH.HandleCallback)
@@ -75,6 +80,9 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		userH := user.NewHandler(deps.Pool)
 		authed.GET("/users/me", userH.GetMe)
 		authed.PATCH("/users/me", userH.UpdateMe)
+
+		// Fever password setup (reuses feverH from above)
+		authed.POST("/users/me/fever", feverH.SetFeverPassword)
 
 		// Sources
 		sourceSvc := source.NewSourceService(deps.Pool, source.NewRSSAdapter())
