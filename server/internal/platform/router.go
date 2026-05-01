@@ -36,14 +36,17 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 	r.GET("/api/setup/status", setupH.Status)
 	r.POST("/api/setup/complete", setupH.Complete)
 
-	// Auth deps — resolve config from env first, DB second
+	// Auth deps — OAuth config resolved dynamically on each request so
+	// Setup Wizard changes take effect without a server restart.
 	cfg := NewConfigResolver(deps.Pool)
-	ctx := context.Background()
-	ghClient := auth.NewGitHubClient(
-		cfg.Get(ctx, "GITHUB_CLIENT_ID", "github_client_id"),
-		cfg.GetEncryptedSecret(ctx, "GITHUB_CLIENT_SECRET", "github_client_secret"),
-		cfg.Get(ctx, "GITHUB_CALLBACK_URL", "github_callback_url"),
-	)
+	ghClient := auth.NewGitHubClient(func() auth.OAuthConfig {
+		ctx := context.Background()
+		return auth.OAuthConfig{
+			ClientID:     cfg.Get(ctx, "GITHUB_CLIENT_ID", "github_client_id"),
+			ClientSecret: cfg.GetEncryptedSecret(ctx, "GITHUB_CLIENT_SECRET", "github_client_secret"),
+			CallbackURL:  cfg.Get(ctx, "GITHUB_CALLBACK_URL", "github_callback_url"),
+		}
+	})
 	sessions := auth.NewPgSessionStore(deps.Pool)
 	cookieState := auth.NewCookieState([]byte(deps.SessionSecret))
 	allowSvc := admin.NewAllowlistService(deps.Pool)

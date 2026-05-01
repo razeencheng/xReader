@@ -10,28 +10,43 @@ import (
 	oauthgithub "golang.org/x/oauth2/github"
 )
 
-type RealGitHubClient struct {
-	config *oauth2.Config
+// OAuthConfig provides GitHub OAuth credentials. Resolved on each call
+// so that Setup Wizard changes take effect without a server restart.
+type OAuthConfig struct {
+	ClientID     string
+	ClientSecret string
+	CallbackURL  string
 }
 
-func NewGitHubClient(clientID, clientSecret, callbackURL string) *RealGitHubClient {
-	return &RealGitHubClient{
-		config: &oauth2.Config{
-			ClientID:     clientID,
-			ClientSecret: clientSecret,
-			RedirectURL:  callbackURL,
-			Endpoint:     oauthgithub.Endpoint,
-			Scopes:       []string{"read:user"},
-		},
+// OAuthConfigProvider returns the current OAuth configuration.
+// The router wires this to ConfigResolver so it reads env-first, DB-fallback.
+type OAuthConfigProvider func() OAuthConfig
+
+type RealGitHubClient struct {
+	configProvider OAuthConfigProvider
+}
+
+func NewGitHubClient(provider OAuthConfigProvider) *RealGitHubClient {
+	return &RealGitHubClient{configProvider: provider}
+}
+
+func (c *RealGitHubClient) oauthConfig() *oauth2.Config {
+	cfg := c.configProvider()
+	return &oauth2.Config{
+		ClientID:     cfg.ClientID,
+		ClientSecret: cfg.ClientSecret,
+		RedirectURL:  cfg.CallbackURL,
+		Endpoint:     oauthgithub.Endpoint,
+		Scopes:       []string{"read:user"},
 	}
 }
 
 func (c *RealGitHubClient) AuthCodeURL(state string) string {
-	return c.config.AuthCodeURL(state)
+	return c.oauthConfig().AuthCodeURL(state)
 }
 
 func (c *RealGitHubClient) ExchangeCode(ctx context.Context, code string) (string, error) {
-	token, err := c.config.Exchange(ctx, code)
+	token, err := c.oauthConfig().Exchange(ctx, code)
 	if err != nil {
 		return "", fmt.Errorf("exchange code: %w", err)
 	}

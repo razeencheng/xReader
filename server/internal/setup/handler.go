@@ -58,6 +58,20 @@ func (h *Handler) Complete(c *gin.Context) {
 		return
 	}
 
+	// Validate admin username: must be non-empty after trim, alphanumeric + hyphens (GitHub format)
+	adminUsername := strings.TrimSpace(req.AdminGitHubUsername)
+	if adminUsername == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "admin_github_username is required"})
+		return
+	}
+	for _, ch := range adminUsername {
+		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-') {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "admin_github_username must contain only letters, numbers, and hyphens"})
+			return
+		}
+	}
+	req.AdminGitHubUsername = adminUsername
+
 	// Check if setup is still needed
 	var count int
 	if err := h.pool.QueryRow(ctx, "SELECT COUNT(*) FROM auth_allowlist").Scan(&count); err != nil {

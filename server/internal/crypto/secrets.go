@@ -10,16 +10,19 @@ import (
 	"strings"
 )
 
-const defaultEncryptionPassphrase = "xreader-local-ai-settings-v1"
-
 // encryptionPassphrase returns the passphrase used for AES-256-GCM key
-// derivation. It reads XREADER_AI_ENCRYPTION_KEY from the environment,
-// falling back to a built-in default suitable for local development.
+// derivation. Priority: XREADER_AI_ENCRYPTION_KEY → SESSION_SECRET →
+// built-in default (local dev only). SESSION_SECRET is always set in
+// production (required by the session store), making the encryption
+// key deployment-unique without extra configuration.
 func encryptionPassphrase() string {
 	if v := os.Getenv("XREADER_AI_ENCRYPTION_KEY"); v != "" {
 		return v
 	}
-	return defaultEncryptionPassphrase
+	if v := os.Getenv("SESSION_SECRET"); v != "" {
+		return "xreader-encrypt:" + v
+	}
+	return "xreader-local-ai-settings-v1"
 }
 
 // secretCipher builds an AES-256-GCM AEAD from the derived key.

@@ -201,6 +201,10 @@ function FeedPageContent() {
                 onPrev={currentIndex > 0 ? () => selectArticleAtIndex(currentIndex - 1) : undefined}
                 onNotFound={handleArticleNotFound}
                 className="h-full"
+                prev={currentIndex > 0 ? filteredItems[currentIndex - 1] : null}
+                next={currentIndex >= 0 && currentIndex < filteredItems.length - 1 ? filteredItems[currentIndex + 1] : null}
+                position={currentIndex >= 0 ? currentIndex + 1 : undefined}
+                total={filteredItems.length}
               />
             </motion.div>
           ) : (
