@@ -14,6 +14,12 @@ interface AISettings {
   api_key_hint?: string;
 }
 
+interface FeverKeyResponse {
+  api_key: string;
+  fever_url: string;
+  username: string;
+}
+
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { t } = useI18n();
@@ -22,6 +28,12 @@ export default function SettingsPage() {
   const [model, setModel] = useState('');
   const [apiKey, setAPIKey] = useState('');
   const [message, setMessage] = useState('');
+
+  // Fever API state
+  const [feverPassword, setFeverPassword] = useState('');
+  const [feverResult, setFeverResult] = useState<FeverKeyResponse | null>(null);
+  const [feverMessage, setFeverMessage] = useState('');
+  const [feverCopied, setFeverCopied] = useState<'key' | 'url' | null>(null);
 
   const { data: aiSettings } = useQuery({
     queryKey: ['ai-settings'],
@@ -60,6 +72,26 @@ export default function SettingsPage() {
     },
     onError: () => setMessage(t('settings.aiSaveError')),
   });
+
+  const generateFeverKey = useMutation({
+    mutationFn: () =>
+      apiFetch<FeverKeyResponse>('/api/users/me/fever', {
+        method: 'POST',
+        body: JSON.stringify({ password: feverPassword }),
+      }),
+    onSuccess: (result) => {
+      setFeverResult(result);
+      setFeverPassword('');
+      setFeverMessage(t('settings.feverGenerated'));
+    },
+    onError: () => setFeverMessage(t('settings.feverError')),
+  });
+
+  const copyToClipboard = async (text: string, kind: 'key' | 'url') => {
+    await navigator.clipboard.writeText(text);
+    setFeverCopied(kind);
+    setTimeout(() => setFeverCopied(null), 2000);
+  };
 
   return (
     <main className="h-full overflow-y-auto bg-[var(--bg-body)] pb-[env(safe-area-inset-bottom)] text-[var(--text-body)]">
@@ -147,6 +179,89 @@ export default function SettingsPage() {
               ) : null}
               {message ? <span className="text-sm text-[var(--text-muted)]">{message}</span> : null}
             </div>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-[8px] border border-[var(--border-light)] bg-[var(--bg)] p-5 shadow-[0_18px_40px_rgba(65,52,35,0.06)]">
+          <div className="mb-5">
+            <h2 className="font-serif text-2xl font-semibold text-[var(--text-body)]">{t('settings.feverTitle')}</h2>
+            <p className="mt-2 font-[system-ui] text-sm leading-6 text-[var(--text-muted)]">{t('settings.feverDescription')}</p>
+          </div>
+
+          <div className="space-y-4 font-[system-ui]">
+            {!feverResult ? (
+              <>
+                <label className="block text-sm font-medium text-[var(--text-body)]">
+                  {t('settings.feverPassword')}
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder={t('settings.feverPasswordPlaceholder')}
+                    className="mt-2 w-full rounded-[7px] border border-[var(--border-light)] bg-[var(--bg-body)] px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--accent)]"
+                    value={feverPassword}
+                    onChange={(event) => setFeverPassword(event.target.value)}
+                  />
+                </label>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => generateFeverKey.mutate()}
+                    disabled={generateFeverKey.isPending || feverPassword.length < 6}
+                    className="rounded-[7px] bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-60"
+                  >
+                    {generateFeverKey.isPending ? t('settings.saving') : t('settings.feverGenerate')}
+                  </button>
+                  {feverMessage && !feverResult ? <span className="text-sm text-[var(--text-muted)]">{feverMessage}</span> : null}
+                </div>
+              </>
+            ) : (
+              <div className="space-y-3">
+                <div className="rounded-[7px] border border-[var(--border-light)] bg-[var(--bg-body)] p-4">
+                  <div className="mb-3 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">{t('settings.feverUrlLabel')}</div>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 break-all text-sm text-[var(--text-body)]">
+                      {`${typeof window !== 'undefined' ? window.location.origin : ''}/fever/`}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(`${window.location.origin}/fever/`, 'url')}
+                      className="shrink-0 rounded-[5px] border border-[var(--border-light)] px-2 py-1 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text-body)]"
+                    >
+                      {feverCopied === 'url' ? t('settings.feverCopied') : t('settings.feverCopy')}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-[7px] border border-[var(--border-light)] bg-[var(--bg-body)] p-4">
+                  <div className="mb-3 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">{t('settings.feverApiKeyLabel')}</div>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 break-all font-mono text-sm text-[var(--text-body)]">{feverResult.api_key}</code>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(feverResult.api_key, 'key')}
+                      className="shrink-0 rounded-[5px] border border-[var(--border-light)] px-2 py-1 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text-body)]"
+                    >
+                      {feverCopied === 'key' ? t('settings.feverCopied') : t('settings.feverCopy')}
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-xs text-[var(--text-muted)]">{t('settings.feverKeyNote')}</p>
+                <p className="text-xs text-[var(--text-muted)]">{t('settings.feverInstructions')}</p>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFeverResult(null);
+                    setFeverMessage('');
+                  }}
+                  className="text-sm text-[var(--accent)] hover:underline"
+                >
+                  {t('settings.feverRegenerate')}
+                </button>
+              </div>
+            )}
           </div>
         </section>
       </div>
