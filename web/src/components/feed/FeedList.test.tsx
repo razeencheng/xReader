@@ -136,6 +136,48 @@ test('renders read filters as a segmented control', async () => {
   expect(container.querySelector('.read-filter-segment-active')).toBe(unread);
 });
 
+test('requests server-side unread filtering and renders durable server counts', async () => {
+  useUIStore.setState({
+    currentView: 'all',
+    selectedSourceId: null,
+    readFilter: 'unread',
+    density: 'comfortable',
+    nativeLanguage: 'zh-CN',
+  });
+  vi.mocked(apiFetch).mockImplementation(async (path) => {
+    if (String(path).startsWith('/api/sources')) {
+      return [{ id: 1, title: 'Imported Feed', category: 'General', unread_count: 707, icon_url: null }];
+    }
+
+    if (String(path).startsWith('/api/articles?')) {
+      return {
+        items: [
+          {
+            id: 707,
+            source_id: 1,
+            title: 'Imported unread article',
+            link: 'https://example.com/707',
+            language: 'en',
+            is_read: false,
+          },
+        ],
+        counts: { unread: 707, all: 757, read: 50 },
+        next_cursor: null,
+      };
+    }
+
+    return {};
+  });
+
+  render(<FeedList />, { wrapper });
+
+  expect(await screen.findByText('Imported unread article')).toBeInTheDocument();
+  expect(vi.mocked(apiFetch)).toHaveBeenCalledWith('/api/articles?tab=stream&filter=unread');
+  expect(screen.getByRole('button', { name: '未读707' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '全部757' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '已读50' })).toBeInTheDocument();
+});
+
 test('FeedList aligns the aggregate sources title with the source browser title', async () => {
   useUIStore.setState({
     currentView: 'sources',

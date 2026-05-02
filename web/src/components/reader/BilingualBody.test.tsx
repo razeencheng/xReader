@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 
 const sse = vi.hoisted(() => {
   type ClientRecord = {
@@ -178,15 +178,40 @@ test('proxies external reader images and reserves their aspect ratio', () => {
   );
 
   const image = container.querySelector('img');
+  const frame = container.querySelector('[data-reader-image-frame]');
+  expect(frame).toBeInTheDocument();
+  expect(frame?.getAttribute('style')).toContain('aspect-ratio: 640 / 417');
+  expect(frame?.getAttribute('style')).toContain('max-width: 640px');
   expect(image).toBeInTheDocument();
+  expect(frame).toContainElement(image);
   expect(image?.getAttribute('src')).toBe(
     '/api/images/proxy?url=https%3A%2F%2Fst.deepzz.cn%2Fblog%2Fimg%2Fsingle-open-double-charged.jpg',
   );
   expect(image?.getAttribute('data-original-src')).toBe('https://st.deepzz.cn/blog/img/single-open-double-charged.jpg');
-  expect(image?.getAttribute('style')).toContain('aspect-ratio: 640 / 417');
-  expect(image?.getAttribute('style')).toContain('max-width: 640px');
-  expect(image).toHaveAttribute('loading', 'lazy');
+  expect(image).toHaveAttribute('data-reader-image', 'true');
+  expect(image).toHaveAttribute('loading', 'eager');
   expect(image).toHaveAttribute('decoding', 'async');
+});
+
+test('keeps failed reader images in a stable frame with an explicit error state', () => {
+  const { container } = render(
+    <BilingualBody
+      articleId={1}
+      contentHtml='<p><img src="https://static.example.com/missing.jpg" alt="Article visual"/></p>'
+      language="zh-CN"
+      nativeLanguage="zh"
+    />,
+  );
+
+  const image = container.querySelector('img');
+  const frame = container.querySelector('[data-reader-image-frame]');
+  expect(frame).toBeInTheDocument();
+  expect(frame?.getAttribute('style')).toContain('aspect-ratio: 16 / 9');
+
+  fireEvent.error(image as HTMLImageElement);
+
+  expect(frame).toHaveAttribute('data-image-state', 'error');
+  expect(image).toHaveAttribute('aria-hidden', 'true');
 });
 
 test('marks semantic article blocks so the reader stylesheet can preserve hierarchy', () => {
@@ -331,12 +356,13 @@ test('stabilizes external images without dimensions and suppresses filename-like
   );
 
   const image = container.querySelector('img');
+  const frame = container.querySelector('[data-reader-image-frame]');
   expect(image).toBeInTheDocument();
+  expect(frame).toContainElement(image);
   expect(image?.getAttribute('src')).toBe(
     '/api/images/proxy?url=https%3A%2F%2Fst.razeen.me%2Fimg%2F2025%2Fimage-20250412165248283.webp',
   );
   expect(image).toHaveAttribute('data-original-alt', 'image-20250412165248283');
   expect(image).toHaveAttribute('alt', '');
-  expect(image?.getAttribute('style')).toContain('aspect-ratio: 16 / 9');
-  expect(image?.getAttribute('style')).toContain('min-height: 12rem');
+  expect(frame?.getAttribute('style')).toContain('aspect-ratio: 16 / 9');
 });

@@ -66,7 +66,8 @@ function FeedPageContent() {
   }, [focusMode, layout, setFocusMode, setLayout]);
 
   const showSourceBrowser = currentView === 'sources' && selectedSourceId === null;
-  const { data } = useArticles(tab, currentView === 'sources' ? selectedSourceId : null, undefined, {
+  const articleReadFilter = currentView !== 'starred' && readFilter !== 'all' ? readFilter : undefined;
+  const { data } = useArticles(tab, currentView === 'sources' ? selectedSourceId : null, articleReadFilter, {
     enabled: !showSourceBrowser,
   });
   const items = useMemo(() => data?.pages.flatMap((page) => page.items) ?? [], [data]);

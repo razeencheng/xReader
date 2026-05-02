@@ -100,6 +100,11 @@ LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
 WHERE s.user_id = $1
   AND s.deleted_at IS NULL
   AND a.published_at >= now() - interval '24 hours'
+  AND (
+    @read_filter::text = 'all'
+    OR (@read_filter::text = 'unread' AND COALESCE(st.is_read, false) = false)
+    OR (@read_filter::text = 'read' AND COALESCE(st.is_read, false) = true)
+  )
 ORDER BY a.published_at DESC
 LIMIT 100;
 
@@ -117,6 +122,11 @@ LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
 WHERE s.user_id = $1
   AND s.deleted_at IS NULL
   AND ($2::timestamptz IS NULL OR a.published_at < $2)
+  AND (
+    @read_filter::text = 'all'
+    OR (@read_filter::text = 'unread' AND COALESCE(st.is_read, false) = false)
+    OR (@read_filter::text = 'read' AND COALESCE(st.is_read, false) = true)
+  )
 ORDER BY a.published_at DESC, a.id DESC
 LIMIT $4;
 
@@ -149,7 +159,45 @@ JOIN sources s ON a.source_id = s.id AND s.user_id = @user_id AND s.deleted_at I
 LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = @target_language
 LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = @user_id
 WHERE a.source_id = @source_id
+  AND (
+    @read_filter::text = 'all'
+    OR (@read_filter::text = 'unread' AND COALESCE(st.is_read, false) = false)
+    OR (@read_filter::text = 'read' AND COALESCE(st.is_read, false) = true)
+  )
 ORDER BY a.published_at DESC;
+
+-- name: CountArticlesTodayByReadState :one
+SELECT
+  COUNT(*) AS all_count,
+  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = false) AS unread_count,
+  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = true) AS read_count
+FROM articles a
+JOIN sources s ON a.source_id = s.id
+LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+WHERE s.user_id = $1
+  AND s.deleted_at IS NULL
+  AND a.published_at >= now() - interval '24 hours';
+
+-- name: CountArticlesStreamByReadState :one
+SELECT
+  COUNT(*) AS all_count,
+  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = false) AS unread_count,
+  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = true) AS read_count
+FROM articles a
+JOIN sources s ON a.source_id = s.id
+LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+WHERE s.user_id = $1
+  AND s.deleted_at IS NULL;
+
+-- name: CountArticlesBySourceReadState :one
+SELECT
+  COUNT(*) AS all_count,
+  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = false) AS unread_count,
+  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = true) AS read_count
+FROM articles a
+JOIN sources s ON a.source_id = s.id AND s.user_id = @user_id AND s.deleted_at IS NULL
+LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = @user_id
+WHERE a.source_id = @source_id;
 
 -- name: ListUnreadArticlesEnriched :many
 SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,

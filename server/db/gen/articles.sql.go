@@ -30,6 +30,86 @@ func (q *Queries) ArticleExistsByNormalizedLink(ctx context.Context, arg Article
 	return exists, err
 }
 
+const countArticlesBySourceReadState = `-- name: CountArticlesBySourceReadState :one
+SELECT
+  COUNT(*) AS all_count,
+  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = false) AS unread_count,
+  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = true) AS read_count
+FROM articles a
+JOIN sources s ON a.source_id = s.id AND s.user_id = $1 AND s.deleted_at IS NULL
+LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+WHERE a.source_id = $2
+`
+
+type CountArticlesBySourceReadStateParams struct {
+	UserID   int64 `json:"user_id"`
+	SourceID int64 `json:"source_id"`
+}
+
+type CountArticlesBySourceReadStateRow struct {
+	AllCount    int64 `json:"all_count"`
+	UnreadCount int64 `json:"unread_count"`
+	ReadCount   int64 `json:"read_count"`
+}
+
+func (q *Queries) CountArticlesBySourceReadState(ctx context.Context, arg CountArticlesBySourceReadStateParams) (CountArticlesBySourceReadStateRow, error) {
+	row := q.db.QueryRow(ctx, countArticlesBySourceReadState, arg.UserID, arg.SourceID)
+	var i CountArticlesBySourceReadStateRow
+	err := row.Scan(&i.AllCount, &i.UnreadCount, &i.ReadCount)
+	return i, err
+}
+
+const countArticlesStreamByReadState = `-- name: CountArticlesStreamByReadState :one
+SELECT
+  COUNT(*) AS all_count,
+  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = false) AS unread_count,
+  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = true) AS read_count
+FROM articles a
+JOIN sources s ON a.source_id = s.id
+LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+WHERE s.user_id = $1
+  AND s.deleted_at IS NULL
+`
+
+type CountArticlesStreamByReadStateRow struct {
+	AllCount    int64 `json:"all_count"`
+	UnreadCount int64 `json:"unread_count"`
+	ReadCount   int64 `json:"read_count"`
+}
+
+func (q *Queries) CountArticlesStreamByReadState(ctx context.Context, userID int64) (CountArticlesStreamByReadStateRow, error) {
+	row := q.db.QueryRow(ctx, countArticlesStreamByReadState, userID)
+	var i CountArticlesStreamByReadStateRow
+	err := row.Scan(&i.AllCount, &i.UnreadCount, &i.ReadCount)
+	return i, err
+}
+
+const countArticlesTodayByReadState = `-- name: CountArticlesTodayByReadState :one
+SELECT
+  COUNT(*) AS all_count,
+  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = false) AS unread_count,
+  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = true) AS read_count
+FROM articles a
+JOIN sources s ON a.source_id = s.id
+LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+WHERE s.user_id = $1
+  AND s.deleted_at IS NULL
+  AND a.published_at >= now() - interval '24 hours'
+`
+
+type CountArticlesTodayByReadStateRow struct {
+	AllCount    int64 `json:"all_count"`
+	UnreadCount int64 `json:"unread_count"`
+	ReadCount   int64 `json:"read_count"`
+}
+
+func (q *Queries) CountArticlesTodayByReadState(ctx context.Context, userID int64) (CountArticlesTodayByReadStateRow, error) {
+	row := q.db.QueryRow(ctx, countArticlesTodayByReadState, userID)
+	var i CountArticlesTodayByReadStateRow
+	err := row.Scan(&i.AllCount, &i.UnreadCount, &i.ReadCount)
+	return i, err
+}
+
 const createArticle = `-- name: CreateArticle :one
 INSERT INTO articles (
     source_id, external_id, link, normalized_link, title, language,
@@ -169,6 +249,11 @@ JOIN sources s ON a.source_id = s.id AND s.user_id = $1 AND s.deleted_at IS NULL
 LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
 LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
 WHERE a.source_id = $3
+  AND (
+    $4::text = 'all'
+    OR ($4::text = 'unread' AND COALESCE(st.is_read, false) = false)
+    OR ($4::text = 'read' AND COALESCE(st.is_read, false) = true)
+  )
 ORDER BY a.published_at DESC
 `
 
@@ -176,6 +261,7 @@ type ListArticlesBySourceEnrichedParams struct {
 	UserID         int64  `json:"user_id"`
 	TargetLanguage string `json:"target_language"`
 	SourceID       int64  `json:"source_id"`
+	ReadFilter     string `json:"read_filter"`
 }
 
 type ListArticlesBySourceEnrichedRow struct {
@@ -195,7 +281,12 @@ type ListArticlesBySourceEnrichedRow struct {
 }
 
 func (q *Queries) ListArticlesBySourceEnriched(ctx context.Context, arg ListArticlesBySourceEnrichedParams) ([]ListArticlesBySourceEnrichedRow, error) {
-	rows, err := q.db.Query(ctx, listArticlesBySourceEnriched, arg.UserID, arg.TargetLanguage, arg.SourceID)
+	rows, err := q.db.Query(ctx, listArticlesBySourceEnriched,
+		arg.UserID,
+		arg.TargetLanguage,
+		arg.SourceID,
+		arg.ReadFilter,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -410,6 +501,11 @@ LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
 WHERE s.user_id = $1
   AND s.deleted_at IS NULL
   AND ($2::timestamptz IS NULL OR a.published_at < $2)
+  AND (
+    $5::text = 'all'
+    OR ($5::text = 'unread' AND COALESCE(st.is_read, false) = false)
+    OR ($5::text = 'read' AND COALESCE(st.is_read, false) = true)
+  )
 ORDER BY a.published_at DESC, a.id DESC
 LIMIT $4
 `
@@ -419,6 +515,7 @@ type ListArticlesStreamEnrichedParams struct {
 	Column2        pgtype.Timestamptz `json:"column_2"`
 	TargetLanguage string             `json:"target_language"`
 	Limit          int32              `json:"limit"`
+	ReadFilter     string             `json:"read_filter"`
 }
 
 type ListArticlesStreamEnrichedRow struct {
@@ -443,6 +540,7 @@ func (q *Queries) ListArticlesStreamEnriched(ctx context.Context, arg ListArticl
 		arg.Column2,
 		arg.TargetLanguage,
 		arg.Limit,
+		arg.ReadFilter,
 	)
 	if err != nil {
 		return nil, err
@@ -534,6 +632,11 @@ LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
 WHERE s.user_id = $1
   AND s.deleted_at IS NULL
   AND a.published_at >= now() - interval '24 hours'
+  AND (
+    $3::text = 'all'
+    OR ($3::text = 'unread' AND COALESCE(st.is_read, false) = false)
+    OR ($3::text = 'read' AND COALESCE(st.is_read, false) = true)
+  )
 ORDER BY a.published_at DESC
 LIMIT 100
 `
@@ -541,6 +644,7 @@ LIMIT 100
 type ListArticlesTodayEnrichedParams struct {
 	UserID         int64  `json:"user_id"`
 	TargetLanguage string `json:"target_language"`
+	ReadFilter     string `json:"read_filter"`
 }
 
 type ListArticlesTodayEnrichedRow struct {
@@ -560,7 +664,7 @@ type ListArticlesTodayEnrichedRow struct {
 }
 
 func (q *Queries) ListArticlesTodayEnriched(ctx context.Context, arg ListArticlesTodayEnrichedParams) ([]ListArticlesTodayEnrichedRow, error) {
-	rows, err := q.db.Query(ctx, listArticlesTodayEnriched, arg.UserID, arg.TargetLanguage)
+	rows, err := q.db.Query(ctx, listArticlesTodayEnriched, arg.UserID, arg.TargetLanguage, arg.ReadFilter)
 	if err != nil {
 		return nil, err
 	}

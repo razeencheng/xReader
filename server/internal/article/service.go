@@ -41,13 +41,19 @@ type EnrichedArticle struct {
 	IsStarred       bool
 }
 
+type ArticleReadCounts struct {
+	Unread int64
+	All    int64
+	Read   int64
+}
+
 func (s *ArticleService) ListToday(ctx context.Context, userID int64) ([]gen.Article, error) {
 	return s.queries.ListArticlesToday(ctx, userID)
 }
 
-func (s *ArticleService) ListTodayEnriched(ctx context.Context, userID int64, lang string) ([]EnrichedArticle, error) {
+func (s *ArticleService) ListTodayEnriched(ctx context.Context, userID int64, lang string, readFilter string) ([]EnrichedArticle, error) {
 	rows, err := s.queries.ListArticlesTodayEnriched(ctx, gen.ListArticlesTodayEnrichedParams{
-		UserID: userID, TargetLanguage: lang,
+		UserID: userID, TargetLanguage: lang, ReadFilter: normalizeReadFilter(readFilter),
 	})
 	if err != nil {
 		return nil, err
@@ -73,9 +79,9 @@ func (s *ArticleService) ListStream(ctx context.Context, userID int64, cursor *t
 	})
 }
 
-func (s *ArticleService) ListStreamEnriched(ctx context.Context, userID int64, cursor *time.Time, limit int32, lang string) ([]EnrichedArticle, error) {
+func (s *ArticleService) ListStreamEnriched(ctx context.Context, userID int64, cursor *time.Time, limit int32, lang string, readFilter string) ([]EnrichedArticle, error) {
 	rows, err := s.queries.ListArticlesStreamEnriched(ctx, gen.ListArticlesStreamEnrichedParams{
-		UserID: userID, Column2: timestamptzOrNull(cursor), TargetLanguage: lang, Limit: clampLimit(limit),
+		UserID: userID, Column2: timestamptzOrNull(cursor), TargetLanguage: lang, Limit: clampLimit(limit), ReadFilter: normalizeReadFilter(readFilter),
 	})
 	if err != nil {
 		return nil, err
@@ -117,9 +123,9 @@ func (s *ArticleService) ListStarredEnriched(ctx context.Context, userID int64, 
 	return out, nil
 }
 
-func (s *ArticleService) ListBySourceEnriched(ctx context.Context, userID, sourceID int64, lang string) ([]EnrichedArticle, error) {
+func (s *ArticleService) ListBySourceEnriched(ctx context.Context, userID, sourceID int64, lang string, readFilter string) ([]EnrichedArticle, error) {
 	rows, err := s.queries.ListArticlesBySourceEnriched(ctx, gen.ListArticlesBySourceEnrichedParams{
-		UserID: userID, SourceID: sourceID, TargetLanguage: lang,
+		UserID: userID, SourceID: sourceID, TargetLanguage: lang, ReadFilter: normalizeReadFilter(readFilter),
 	})
 	if err != nil {
 		return nil, err
@@ -243,6 +249,33 @@ func (s *ArticleService) BatchSetRead(ctx context.Context, userID int64, scope s
 	return nil, fmt.Errorf("unknown scope: %s", scope)
 }
 
+func (s *ArticleService) CountTodayByReadState(ctx context.Context, userID int64) (ArticleReadCounts, error) {
+	row, err := s.queries.CountArticlesTodayByReadState(ctx, userID)
+	if err != nil {
+		return ArticleReadCounts{}, err
+	}
+	return ArticleReadCounts{Unread: row.UnreadCount, All: row.AllCount, Read: row.ReadCount}, nil
+}
+
+func (s *ArticleService) CountStreamByReadState(ctx context.Context, userID int64) (ArticleReadCounts, error) {
+	row, err := s.queries.CountArticlesStreamByReadState(ctx, userID)
+	if err != nil {
+		return ArticleReadCounts{}, err
+	}
+	return ArticleReadCounts{Unread: row.UnreadCount, All: row.AllCount, Read: row.ReadCount}, nil
+}
+
+func (s *ArticleService) CountBySourceReadState(ctx context.Context, userID, sourceID int64) (ArticleReadCounts, error) {
+	row, err := s.queries.CountArticlesBySourceReadState(ctx, gen.CountArticlesBySourceReadStateParams{
+		UserID:   userID,
+		SourceID: sourceID,
+	})
+	if err != nil {
+		return ArticleReadCounts{}, err
+	}
+	return ArticleReadCounts{Unread: row.UnreadCount, All: row.AllCount, Read: row.ReadCount}, nil
+}
+
 func (s *ArticleService) ListChanges(ctx context.Context, userID int64, since time.Time) ([]gen.ListStateChangesSinceRow, error) {
 	return s.queries.ListStateChangesSince(ctx, gen.ListStateChangesSinceParams{
 		UserID:    userID,
@@ -296,6 +329,16 @@ func clampLimit(limit int32) int32 {
 		return 100
 	}
 	return limit
+}
+
+func normalizeReadFilter(filter string) string {
+	normalized := strings.TrimSpace(strings.ToLower(filter))
+	switch normalized {
+	case "unread", "read":
+		return normalized
+	default:
+		return "all"
+	}
 }
 
 func timestamptzOrNull(t *time.Time) pgtype.Timestamptz {

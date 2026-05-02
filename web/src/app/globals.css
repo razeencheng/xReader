@@ -440,6 +440,44 @@ a {
   object-fit: contain;
 }
 
+.reader-content [data-reader-image-frame] {
+  display: block;
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  margin-inline: auto;
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+  border-radius: 0.8rem;
+  background: var(--bg-panel);
+}
+
+.reader-content [data-reader-image-frame] > img {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  margin: 0 auto;
+  object-fit: contain;
+}
+
+.reader-content [data-reader-image-frame][data-image-state='error'] > img {
+  visibility: hidden;
+}
+
+.reader-content [data-reader-image-frame][data-image-state='error']::after {
+  content: "图片无法加载";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  color: var(--text-3);
+  font-family: var(--font-ui);
+  font-size: 0.82em;
+  text-align: center;
+}
+
 .reader-content :is(video, canvas, svg, iframe) {
   max-width: 100% !important;
 }

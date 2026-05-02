@@ -33,6 +33,11 @@ export interface Source {
 export interface ArticleListResponse {
   items: ArticleItem[];
   next_cursor?: string;
+  counts?: {
+    unread: number;
+    all: number;
+    read: number;
+  };
 }
 
 export type ArticleTab = 'today' | 'stream' | 'starred';

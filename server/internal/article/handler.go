@@ -24,8 +24,9 @@ func NewArticleHandler(svc *ArticleService) *ArticleHandler {
 }
 
 type articleListResponse struct {
-	Items      []articleResponse `json:"items"`
-	NextCursor string            `json:"next_cursor,omitempty"`
+	Items      []articleResponse  `json:"items"`
+	NextCursor string             `json:"next_cursor,omitempty"`
+	Counts     *articleReadCounts `json:"counts,omitempty"`
 }
 
 type articleDetailResponse struct {
@@ -51,6 +52,12 @@ type articleResponse struct {
 	WordCount       int     `json:"word_count,omitempty"`
 	IsRead          bool    `json:"is_read"`
 	IsStarred       bool    `json:"is_starred"`
+}
+
+type articleReadCounts struct {
+	Unread int64 `json:"unread"`
+	All    int64 `json:"all"`
+	Read   int64 `json:"read"`
 }
 
 type articleChangeResponse struct {
@@ -103,6 +110,12 @@ func (h *ArticleHandler) List(c *gin.Context) {
 	}
 
 	resp := articleListResponse{Items: items}
+	if counts, err := h.countsForList(ctx, user.ID, tab, q, sourceIDRaw); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	} else if counts != nil {
+		resp.Counts = counts
+	}
 	if tab == "stream" && len(items) == int(clampListLimit(limit)) {
 		if last := items[len(items)-1]; last.PublishedAt != nil {
 			resp.NextCursor = *last.PublishedAt
@@ -318,20 +331,12 @@ func (h *ArticleHandler) itemsForList(ctx context.Context, userID int64, lang, t
 		return toArticleResponses(rows, false), nil
 	}
 
-	if filter == "unread" {
-		rows, err := h.Service.ListUnreadEnriched(ctx, userID, lang)
-		if err != nil {
-			return nil, err
-		}
-		return enrichedToArticleResponses(rows), nil
-	}
-
 	if strings.TrimSpace(sourceIDRaw) != "" {
 		sourceID, err := strconv.ParseInt(sourceIDRaw, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("invalid source_id")
 		}
-		rows, err := h.Service.ListBySourceEnriched(ctx, userID, sourceID, lang)
+		rows, err := h.Service.ListBySourceEnriched(ctx, userID, sourceID, lang, filter)
 		if err != nil {
 			return nil, err
 		}
@@ -340,7 +345,7 @@ func (h *ArticleHandler) itemsForList(ctx context.Context, userID int64, lang, t
 
 	switch tab {
 	case "", "today":
-		rows, err := h.Service.ListTodayEnriched(ctx, userID, lang)
+		rows, err := h.Service.ListTodayEnriched(ctx, userID, lang, filter)
 		if err != nil {
 			return nil, err
 		}
@@ -356,7 +361,7 @@ func (h *ArticleHandler) itemsForList(ctx context.Context, userID int64, lang, t
 		if err != nil {
 			return nil, fmt.Errorf("invalid cursor")
 		}
-		rows, err := h.Service.ListStreamEnriched(ctx, userID, cursor, clampListLimit(limit), lang)
+		rows, err := h.Service.ListStreamEnriched(ctx, userID, cursor, clampListLimit(limit), lang, filter)
 		if err != nil {
 			return nil, err
 		}
@@ -364,6 +369,37 @@ func (h *ArticleHandler) itemsForList(ctx context.Context, userID int64, lang, t
 	default:
 		return nil, fmt.Errorf("invalid tab")
 	}
+}
+
+func (h *ArticleHandler) countsForList(ctx context.Context, userID int64, tab, query, sourceIDRaw string) (*articleReadCounts, error) {
+	if strings.TrimSpace(query) != "" {
+		return nil, nil
+	}
+
+	var counts ArticleReadCounts
+	var err error
+	if strings.TrimSpace(sourceIDRaw) != "" {
+		sourceID, parseErr := strconv.ParseInt(sourceIDRaw, 10, 64)
+		if parseErr != nil {
+			return nil, fmt.Errorf("invalid source_id")
+		}
+		counts, err = h.Service.CountBySourceReadState(ctx, userID, sourceID)
+	} else {
+		switch tab {
+		case "", "today":
+			counts, err = h.Service.CountTodayByReadState(ctx, userID)
+		case "stream", "all":
+			counts, err = h.Service.CountStreamByReadState(ctx, userID)
+		case "starred":
+			return nil, nil
+		default:
+			return nil, fmt.Errorf("invalid tab")
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &articleReadCounts{Unread: counts.Unread, All: counts.All, Read: counts.Read}, nil
 }
 
 func toArticleResponses(items []gen.Article, detail bool) []articleResponse {

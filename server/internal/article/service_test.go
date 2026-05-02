@@ -98,7 +98,7 @@ func TestListTodayEnrichedExcludesDeletedSources(t *testing.T) {
 	insertArticleForTest(t, queries, ctx, deletedSource.ID, "hidden-today", time.Now().Add(-time.Hour))
 	require.NoError(t, queries.SoftDeleteSource(ctx, deletedSource.ID))
 
-	items, err := svc.ListTodayEnriched(ctx, userID, "zh-CN")
+	items, err := svc.ListTodayEnriched(ctx, userID, "zh-CN", "all")
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 	require.Equal(t, visible.ID, items[0].ID)

@@ -38,9 +38,11 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
 
   const tab: ArticleTab = currentView === 'starred' ? 'starred' : currentView === 'today' ? 'today' : 'stream';
 
+  const articleReadFilter = currentView !== 'starred' && readFilter !== 'all' ? readFilter : undefined;
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useArticles(
     tab,
     currentView === 'sources' ? selectedSourceId : null,
+    articleReadFilter,
   );
 
   const { data: sourceData, isLoading: isSourceListLoading } = useQuery<Source[]>({
@@ -75,14 +77,18 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
     void fetchNextPage();
   }, [fetchNextPage, hasNextPage, inView, isFetchingNextPage]);
 
-  const counts = useMemo(
-    () => ({
+  const counts = useMemo(() => {
+    const serverCounts = data?.pages[0]?.counts;
+    if (serverCounts) {
+      return serverCounts;
+    }
+
+    return {
       unread: items.filter((item) => !item.is_read).length,
       read: items.filter((item) => item.is_read).length,
       all: items.length,
-    }),
-    [items],
-  );
+    };
+  }, [data?.pages, items]);
 
   const filteredItems = useMemo(() => {
     if (currentView === 'starred') return items;

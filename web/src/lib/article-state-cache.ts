@@ -64,10 +64,32 @@ function updateArticleListData(
     return existing;
   }
 
+  const previousItem =
+    existing.pages.flatMap((page) => page.items).find((item) => item.id === change.articleId) ??
+    articleDetail;
+  const shouldAdjustReadCounts =
+    change.is_read !== undefined &&
+    previousItem?.is_read !== undefined &&
+    Boolean(previousItem.is_read) !== change.is_read;
+  const readDelta = shouldAdjustReadCounts ? (change.is_read ? 1 : -1) : 0;
+
   const pages = existing.pages.map((page) => updateArticlePage(page, change, tab, articleDetail));
   return {
     ...existing,
-    pages,
+    pages: pages.map((page) => {
+      if (!page.counts || !shouldAdjustReadCounts) {
+        return page;
+      }
+
+      return {
+        ...page,
+        counts: {
+          all: page.counts.all,
+          unread: Math.max(0, page.counts.unread - readDelta),
+          read: Math.max(0, page.counts.read + readDelta),
+        },
+      };
+    }),
   };
 }
 

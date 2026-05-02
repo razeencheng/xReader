@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
 import DOMPurify from 'dompurify';
 import { createSSEClient, type SSEClient } from '@/lib/sse-client';
 import { fontForLang } from '@/lib/langFonts';
@@ -95,19 +95,30 @@ function normalizeReaderImages(root: HTMLElement) {
       image.setAttribute('src', `/api/images/proxy?url=${encodeURIComponent(src)}`);
     }
 
-    image.setAttribute('loading', 'lazy');
+    image.setAttribute('data-reader-image', 'true');
+    image.setAttribute('loading', 'eager');
     image.setAttribute('decoding', 'async');
 
     const width = Number.parseInt(image.getAttribute('width') ?? '', 10);
     const height = Number.parseInt(image.getAttribute('height') ?? '', 10);
+    const frame = image.ownerDocument.createElement('span');
+    const frameStyles = width > 0 && height > 0
+      ? [`aspect-ratio: ${width} / ${height}`, `max-width: ${width}px`]
+      : ['aspect-ratio: 16 / 9'];
+    frame.setAttribute('data-reader-image-frame', 'true');
+    frame.setAttribute('data-image-state', 'idle');
+    frame.setAttribute('style', frameStyles.join('; '));
+
+    image.removeAttribute('style');
+    image.parentNode?.insertBefore(frame, image);
+    frame.appendChild(image);
+
     if (width > 0 && height > 0) {
-      const existingStyle = image.getAttribute('style')?.trim();
-      const stableStyle = `aspect-ratio: ${width} / ${height}; max-width: ${width}px !important;`;
-      image.setAttribute('style', existingStyle ? `${existingStyle}; ${stableStyle}` : stableStyle);
+      image.setAttribute('width', String(width));
+      image.setAttribute('height', String(height));
     } else {
-      const existingStyle = image.getAttribute('style')?.trim();
-      const stableStyle = 'aspect-ratio: 16 / 9; min-height: 12rem;';
-      image.setAttribute('style', existingStyle ? `${existingStyle}; ${stableStyle}` : stableStyle);
+      image.removeAttribute('width');
+      image.removeAttribute('height');
     }
 
     const alt = image.getAttribute('alt')?.trim() ?? '';
@@ -392,8 +403,29 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
     };
   }, [requestTranslationRange, shouldTranslate, translatableCount]);
 
+  const updateReaderImageState = useCallback((event: SyntheticEvent<HTMLDivElement>) => {
+    const image = event.target;
+    if (!(image instanceof HTMLImageElement) || image.dataset.readerImage !== 'true') {
+      return;
+    }
+
+    const frame = image.closest('[data-reader-image-frame]');
+    if (!(frame instanceof HTMLElement)) {
+      return;
+    }
+
+    if (event.type === 'error') {
+      frame.dataset.imageState = 'error';
+      image.setAttribute('aria-hidden', 'true');
+      return;
+    }
+
+    frame.dataset.imageState = 'loaded';
+    image.removeAttribute('aria-hidden');
+  }, []);
+
   return (
-    <div className="reader-content">
+    <div className="reader-content" onLoadCapture={updateReaderImageState} onErrorCapture={updateReaderImageState}>
       {blocks.map((block, index) => {
         const blockTag = block.blockTag ?? primaryTagFromHtml(block.html);
         const isCode = blockTag === 'pre';

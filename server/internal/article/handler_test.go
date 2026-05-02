@@ -108,6 +108,43 @@ func TestArticleHandler_ListAndDetail(t *testing.T) {
 	require.Equal(t, "<p>hello world</p>", detailResp["content_html"])
 }
 
+func TestArticleHandler_ListReadFilterIsScopedAndReturnsDurableCounts(t *testing.T) {
+	r, handler, queries, _, userID, sourceID, cleanup := setupArticleHandlerTest(t)
+	t.Cleanup(cleanup)
+	ctx := context.Background()
+
+	readArticle := insertHandlerArticle(t, queries, ctx, sourceID, "already-read", time.Now().Add(-time.Minute))
+	require.NoError(t, queries.SetArticleRead(ctx, gen.SetArticleReadParams{UserID: userID, ArticleID: readArticle.ID, IsRead: true}))
+
+	otherSource, err := queries.CreateSource(ctx, gen.CreateSourceParams{
+		UserID:        userID,
+		Kind:          "rss",
+		Url:           "https://other.example/feed.xml",
+		NormalizedUrl: "https://other.example/feed.xml",
+		Title:         "Other Feed",
+		Health:        "unknown",
+	})
+	require.NoError(t, err)
+	insertHandlerArticle(t, queries, ctx, otherSource.ID, "other-unread", time.Now())
+
+	r.Use(withArticleUser(userID))
+	r.GET("/api/articles", handler.List)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/articles?tab=stream&source_id=%d&filter=unread", sourceID), nil)
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	require.Empty(t, resp["items"].([]any))
+
+	counts := resp["counts"].(map[string]any)
+	require.Equal(t, float64(0), counts["unread"])
+	require.Equal(t, float64(1), counts["all"])
+	require.Equal(t, float64(1), counts["read"])
+}
+
 func TestArticleHandler_DetailIncludesNativeLanguageAI(t *testing.T) {
 	r, handler, queries, _, userID, sourceID, cleanup := setupArticleHandlerTest(t)
 	t.Cleanup(cleanup)
