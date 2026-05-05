@@ -106,7 +106,7 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		authed.PUT("/sources/:id", middleware.GuestReadOnly(), sourceH.Rename)
 		authed.PATCH("/sources/:id/category", middleware.GuestReadOnly(), sourceH.UpdateCategory)
 		authed.DELETE("/sources/:id", middleware.GuestReadOnly(), sourceH.Delete)
-		authed.POST("/sources/:id/refresh", sourceH.Refresh)
+		authed.POST("/sources/:id/refresh", middleware.GuestReadOnly(), sourceH.Refresh)
 		authed.POST("/sources/import", middleware.GuestReadOnly(), sourceH.ImportOPML)
 		authed.GET("/sources/export", sourceH.ExportOPML)
 		authed.GET("/sources/jobs/:jobID", sourceH.GetJob)

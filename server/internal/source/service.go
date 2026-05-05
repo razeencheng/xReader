@@ -51,12 +51,23 @@ func (s *SourceService) SetAIClient(client ai.AIClient) {
 }
 
 func (s *SourceService) List(ctx context.Context, userID int64) ([]SourceListItem, error) {
-	sources, err := s.queries.ListSourcesByUser(ctx, userID)
+	return s.listWithStateOwner(ctx, userID, userID)
+}
+
+// GuestList returns the source list owned by contentOwnerID (the admin) but
+// with unread counts computed against stateOwnerID (the guest), so guests see
+// their own read state rather than the admin's.
+func (s *SourceService) GuestList(ctx context.Context, contentOwnerID, stateOwnerID int64) ([]SourceListItem, error) {
+	return s.listWithStateOwner(ctx, contentOwnerID, stateOwnerID)
+}
+
+func (s *SourceService) listWithStateOwner(ctx context.Context, contentOwnerID, stateOwnerID int64) ([]SourceListItem, error) {
+	sources, err := s.queries.ListSourcesByUser(ctx, contentOwnerID)
 	if err != nil {
 		return nil, err
 	}
 
-	counts, err := s.listUnreadCounts(ctx, userID)
+	counts, err := s.listUnreadCountsFor(ctx, contentOwnerID, stateOwnerID)
 	if err != nil {
 		return nil, err
 	}
@@ -209,16 +220,23 @@ func (s *SourceService) runEagerAI(ctx context.Context, articleIDs []int64) {
 }
 
 func (s *SourceService) listUnreadCounts(ctx context.Context, userID int64) (map[int64]int64, error) {
+	return s.listUnreadCountsFor(ctx, userID, userID)
+}
+
+// listUnreadCountsFor returns unread counts for sources owned by contentOwnerID,
+// where read state is looked up for stateOwnerID. This allows guests (stateOwnerID)
+// to see their own read progress against the admin's source list (contentOwnerID).
+func (s *SourceService) listUnreadCountsFor(ctx context.Context, contentOwnerID, stateOwnerID int64) (map[int64]int64, error) {
 	const query = `
 		SELECT s.id, COUNT(a.id) FILTER (WHERE st.is_read IS NULL OR st.is_read = false) AS unread_count
 		FROM sources s
 		LEFT JOIN articles a ON a.source_id = s.id
-		LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+		LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $2
 		WHERE s.user_id = $1 AND s.deleted_at IS NULL
 		GROUP BY s.id
 	`
 
-	rows, err := s.pool.Query(ctx, query, userID)
+	rows, err := s.pool.Query(ctx, query, contentOwnerID, stateOwnerID)
 	if err != nil {
 		return nil, err
 	}

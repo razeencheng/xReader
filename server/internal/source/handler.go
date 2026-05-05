@@ -27,13 +27,20 @@ func NewSourceHandler(svc *SourceService, jobStore JobStore) *SourceHandler {
 
 func (h *SourceHandler) List(c *gin.Context) {
 	user := middleware.GetUser(c)
-	ownerID := user.ID
 	if user.Role == "guest" && h.ContentOwnerID != nil {
-		if id, err := h.ContentOwnerID(c.Request.Context()); err == nil {
-			ownerID = id
+		if adminID, err := h.ContentOwnerID(c.Request.Context()); err == nil {
+			// Fetch sources owned by the admin but compute unread counts against
+			// the guest's own article_states so guests see their read progress.
+			sources, err := h.Service.GuestList(c.Request.Context(), adminID, user.ID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list sources"})
+				return
+			}
+			c.JSON(http.StatusOK, sources)
+			return
 		}
 	}
-	sources, err := h.Service.List(c.Request.Context(), ownerID)
+	sources, err := h.Service.List(c.Request.Context(), user.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list sources"})
 		return
@@ -139,13 +146,7 @@ func (h *SourceHandler) Refresh(c *gin.Context) {
 	}
 
 	user := middleware.GetUser(c)
-	ownerID := user.ID
-	if user.Role == "guest" && h.ContentOwnerID != nil {
-		if id, err := h.ContentOwnerID(c.Request.Context()); err == nil {
-			ownerID = id
-		}
-	}
-	inserted, err := h.Service.Refresh(c.Request.Context(), ownerID, id)
+	inserted, err := h.Service.Refresh(c.Request.Context(), user.ID, id)
 	if err != nil {
 		if errors.Is(err, ErrSourceNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "source not found"})
