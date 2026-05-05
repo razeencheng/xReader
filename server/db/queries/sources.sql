@@ -72,3 +72,9 @@ ORDER BY last_fetched_at ASC NULLS FIRST;
 UPDATE sources
 SET category = $2
 WHERE id = $1;
+
+-- name: GuestListSources :many
+SELECT id, title, url, icon_url, language_hint, last_fetched_at, health, category, created_at
+FROM sources
+WHERE user_id = @content_owner_id AND deleted_at IS NULL
+ORDER BY LOWER(title);

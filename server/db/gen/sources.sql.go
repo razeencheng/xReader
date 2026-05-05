@@ -116,6 +116,55 @@ func (q *Queries) GetSourceByID(ctx context.Context, id int64) (Source, error) {
 	return i, err
 }
 
+const guestListSources = `-- name: GuestListSources :many
+SELECT id, title, url, icon_url, language_hint, last_fetched_at, health, category, created_at
+FROM sources
+WHERE user_id = $1 AND deleted_at IS NULL
+ORDER BY LOWER(title)
+`
+
+type GuestListSourcesRow struct {
+	ID            int64              `json:"id"`
+	Title         string             `json:"title"`
+	Url           string             `json:"url"`
+	IconUrl       pgtype.Text        `json:"icon_url"`
+	LanguageHint  pgtype.Text        `json:"language_hint"`
+	LastFetchedAt pgtype.Timestamptz `json:"last_fetched_at"`
+	Health        string             `json:"health"`
+	Category      string             `json:"category"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) GuestListSources(ctx context.Context, contentOwnerID int64) ([]GuestListSourcesRow, error) {
+	rows, err := q.db.Query(ctx, guestListSources, contentOwnerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GuestListSourcesRow{}
+	for rows.Next() {
+		var i GuestListSourcesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Url,
+			&i.IconUrl,
+			&i.LanguageHint,
+			&i.LastFetchedAt,
+			&i.Health,
+			&i.Category,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSourcesByUser = `-- name: ListSourcesByUser :many
 SELECT id, user_id, kind, url, normalized_url, title, icon_url, language_hint, last_fetched_at, last_success_at, consecutive_fails, health, created_at, deleted_at, category FROM sources
 WHERE user_id = $1 AND deleted_at IS NULL

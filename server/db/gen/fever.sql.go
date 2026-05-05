@@ -285,9 +285,22 @@ SELECT id, github_id, github_username, avatar_url, native_language, role, densit
 FROM users WHERE fever_api_key = $1
 `
 
-func (q *Queries) GetUserByFeverAPIKey(ctx context.Context, feverApiKey pgtype.Text) (User, error) {
+type GetUserByFeverAPIKeyRow struct {
+	ID             int64              `json:"id"`
+	GithubID       pgtype.Int8        `json:"github_id"`
+	GithubUsername string             `json:"github_username"`
+	AvatarUrl      pgtype.Text        `json:"avatar_url"`
+	NativeLanguage string             `json:"native_language"`
+	Role           string             `json:"role"`
+	DensityPref    string             `json:"density_pref"`
+	ThemePref      string             `json:"theme_pref"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	FeverApiKey    pgtype.Text        `json:"fever_api_key"`
+}
+
+func (q *Queries) GetUserByFeverAPIKey(ctx context.Context, feverApiKey pgtype.Text) (GetUserByFeverAPIKeyRow, error) {
 	row := q.db.QueryRow(ctx, getUserByFeverAPIKey, feverApiKey)
-	var i User
+	var i GetUserByFeverAPIKeyRow
 	err := row.Scan(
 		&i.ID,
 		&i.GithubID,
