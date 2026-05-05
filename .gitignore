@@ -6,6 +6,7 @@
 .env.local
 .DS_Store
 .playwright-mcp/
+docs/
 
 *.log
 
