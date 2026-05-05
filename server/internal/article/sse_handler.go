@@ -17,10 +17,11 @@ import (
 )
 
 type SSEHandler struct {
-	pool      *pgxpool.Pool
-	queries   *gen.Queries
-	aiClient  ai.AIClient
-	batchSize int
+	pool           *pgxpool.Pool
+	queries        *gen.Queries
+	aiClient       ai.AIClient
+	batchSize      int
+	ContentOwnerID func(ctx context.Context) (int64, error)
 }
 
 func NewSSEHandler(pool *pgxpool.Pool, aiClient ai.AIClient, batchSize int) *SSEHandler {
@@ -61,8 +62,14 @@ func (h *SSEHandler) BodyTranslation(c *gin.Context) {
 		return
 	}
 	// Verify article ownership via its source
+	contentOwnerID := user.ID
+	if user.Role == "guest" && h.ContentOwnerID != nil {
+		if id, err := h.ContentOwnerID(ctx); err == nil {
+			contentOwnerID = id
+		}
+	}
 	source, err := h.queries.GetSourceByID(ctx, article.SourceID)
-	if err != nil || source.UserID != user.ID {
+	if err != nil || source.UserID != contentOwnerID {
 		c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
 		return
 	}

@@ -1,6 +1,7 @@
 package source
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,8 +13,9 @@ import (
 )
 
 type SourceHandler struct {
-	Service  *SourceService
-	JobStore JobStore
+	Service         *SourceService
+	JobStore        JobStore
+	ContentOwnerID  func(ctx context.Context) (int64, error)
 }
 
 func NewSourceHandler(svc *SourceService, jobStore JobStore) *SourceHandler {
@@ -25,7 +27,13 @@ func NewSourceHandler(svc *SourceService, jobStore JobStore) *SourceHandler {
 
 func (h *SourceHandler) List(c *gin.Context) {
 	user := middleware.GetUser(c)
-	sources, err := h.Service.List(c.Request.Context(), user.ID)
+	ownerID := user.ID
+	if user.Role == "guest" && h.ContentOwnerID != nil {
+		if id, err := h.ContentOwnerID(c.Request.Context()); err == nil {
+			ownerID = id
+		}
+	}
+	sources, err := h.Service.List(c.Request.Context(), ownerID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list sources"})
 		return
@@ -131,7 +139,13 @@ func (h *SourceHandler) Refresh(c *gin.Context) {
 	}
 
 	user := middleware.GetUser(c)
-	inserted, err := h.Service.Refresh(c.Request.Context(), user.ID, id)
+	ownerID := user.ID
+	if user.Role == "guest" && h.ContentOwnerID != nil {
+		if id, err := h.ContentOwnerID(c.Request.Context()); err == nil {
+			ownerID = id
+		}
+	}
+	inserted, err := h.Service.Refresh(c.Request.Context(), ownerID, id)
 	if err != nil {
 		if errors.Is(err, ErrSourceNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "source not found"})
@@ -191,7 +205,13 @@ func (h *SourceHandler) ExportOPML(c *gin.Context) {
 		return
 	}
 
-	data, err := h.Service.ExportOPML(c.Request.Context(), user.ID, "xReader Export")
+	ownerID := user.ID
+	if user.Role == "guest" && h.ContentOwnerID != nil {
+		if id, err := h.ContentOwnerID(c.Request.Context()); err == nil {
+			ownerID = id
+		}
+	}
+	data, err := h.Service.ExportOPML(c.Request.Context(), ownerID, "xReader Export")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate OPML"})
 		return
