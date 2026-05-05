@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { ApiError, apiFetch } from '@/lib/api-client';
 import { useI18n } from '@/lib/i18n';
+import { useIsGuest } from '@/stores/useAuthStore';
 import {
   useCreateSource,
   useDeleteSource,
@@ -195,6 +196,7 @@ function SourceRow({
   refreshing,
   onRefresh,
   onDelete,
+  isGuest,
   t,
 }: {
   source: SourceViewModel;
@@ -202,6 +204,7 @@ function SourceRow({
   refreshing: boolean;
   onRefresh: (source: SourceViewModel) => void;
   onDelete: (source: SourceViewModel) => void;
+  isGuest: boolean;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -241,7 +244,7 @@ function SourceRow({
         >
           <RefreshCw size={14} strokeWidth={1.5} />
         </button>
-        {confirmingDelete ? (
+        {!isGuest && (confirmingDelete ? (
           <span className={styles.confirmPop}>
             <button
               type="button"
@@ -272,7 +275,7 @@ function SourceRow({
           >
             <Trash2 size={14} strokeWidth={1.5} />
           </button>
-        )}
+        ))}
       </div>
 
       {source.status === 'error' ? (
@@ -292,12 +295,14 @@ function SourceCard({
   refreshing,
   onRefresh,
   onDelete,
+  isGuest,
   t,
 }: {
   source: SourceViewModel;
   refreshing: boolean;
   onRefresh: (source: SourceViewModel) => void;
   onDelete: (source: SourceViewModel) => void;
+  isGuest: boolean;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -333,7 +338,7 @@ function SourceCard({
         >
           <ExternalLink size={14} strokeWidth={1.5} />
         </button>
-        {confirmingDelete ? (
+        {!isGuest && (confirmingDelete ? (
           <>
             <button
               type="button"
@@ -364,7 +369,7 @@ function SourceCard({
           >
             <Trash2 size={14} strokeWidth={1.5} />
           </button>
-        )}
+        ))}
       </div>
     </article>
   );
@@ -394,6 +399,7 @@ function SegmentButton<T extends string>({
 
 export function SourcesPage() {
   const { t } = useI18n();
+  const isGuest = useIsGuest();
   const { data: sources, isLoading } = useSources();
   const createSource = useCreateSource();
   const deleteSource = useDeleteSource();
@@ -695,7 +701,7 @@ export function SourcesPage() {
           </div>
         </header>
 
-        <section className={styles.addbar} aria-label={t('sources.addTitle')}>
+        {!isGuest && <section className={styles.addbar} aria-label={t('sources.addTitle')}>
           <div className={addbarClassName}>
             <Search className={styles.addbarIcon} size={18} strokeWidth={1.5} />
             <input
@@ -783,7 +789,7 @@ export function SourcesPage() {
               </button>
             </div>
           ) : null}
-        </section>
+        </section>}
 
         {importRunning ? (
           <section className={styles.importSheet}>
@@ -913,6 +919,7 @@ export function SourcesPage() {
                 refreshing={refreshingIds.has(source.id)}
                 onRefresh={(target) => void refreshOne(target)}
                 onDelete={(target) => void handleDelete(target)}
+                isGuest={!!isGuest}
                 t={t}
               />
             ))}
@@ -927,6 +934,7 @@ export function SourcesPage() {
                 refreshing={refreshingIds.has(source.id)}
                 onRefresh={(target) => void refreshOne(target)}
                 onDelete={(target) => void handleDelete(target)}
+                isGuest={!!isGuest}
                 t={t}
               />
             ))}

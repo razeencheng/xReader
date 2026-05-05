@@ -24,6 +24,7 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { t } = useI18n();
   const isAdmin = useAuthStore((state) => state.user?.role === 'admin');
+  const isGuest = useAuthStore((state) => state.user?.role === 'guest');
   const [endpoint, setEndpoint] = useState('');
   const [model, setModel] = useState('');
   const [apiKey, setAPIKey] = useState('');
@@ -190,7 +191,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="mt-6 rounded-[8px] border border-[var(--border-light)] bg-[var(--bg)] p-5 shadow-[0_18px_40px_rgba(65,52,35,0.06)]">
+        {!isGuest && <section className="mt-6 rounded-[8px] border border-[var(--border-light)] bg-[var(--bg)] p-5 shadow-[0_18px_40px_rgba(65,52,35,0.06)]">
           <div className="mb-5">
             <h2 className="font-serif text-2xl font-semibold text-[var(--text-body)]">{t('settings.feverTitle')}</h2>
             <p className="mt-2 font-[system-ui] text-sm leading-6 text-[var(--text-muted)]">{t('settings.feverDescription')}</p>
@@ -271,7 +272,7 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
-        </section>
+        </section>}
       </div>
     </main>
   );

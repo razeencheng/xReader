@@ -35,6 +35,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       await apiFetch('/api/auth/logout', { method: 'POST' });
     } finally {
       set({ user: null });
+      window.location.href = '/login';
     }
   },
 }));
+
+export const useIsGuest = () => useAuthStore((s) => s.user?.role === 'guest');

@@ -382,6 +382,9 @@ const en: MessageMap = {
   'setup.submitting': 'Setting up…',
   'setup.submit': 'Complete Setup',
   'setup.statusError': 'Failed to check setup status',
+
+  'guest.banner': 'Guest Mode · Data expires in 24h',
+  'guest.signIn': 'Sign in with GitHub',
 };
 
 const zh: MessageMap = {
@@ -747,6 +750,9 @@ const zh: MessageMap = {
   'setup.submitting': '正在初始化…',
   'setup.submit': '完成初始化',
   'setup.statusError': '无法检查初始化状态',
+
+  'guest.banner': '访客模式 · 数据 24 小时后清除',
+  'guest.signIn': '使用 GitHub 登录',
 };
 
 function withOverrides(overrides: MessageMap): MessageMap {
