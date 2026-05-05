@@ -1,7 +1,8 @@
 -- Allow guest users to have NULL github_id
 ALTER TABLE users ALTER COLUMN github_id DROP NOT NULL;
 
--- Replace absolute unique with partial unique (only non-null values)
+-- Replace absolute unique constraint with partial unique index (only non-null values)
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_github_id_key;
 DROP INDEX IF EXISTS users_github_id_key;
 CREATE UNIQUE INDEX users_github_id_key ON users (github_id) WHERE github_id IS NOT NULL;
 
