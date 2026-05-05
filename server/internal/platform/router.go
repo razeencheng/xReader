@@ -11,6 +11,7 @@ import (
 	"github.com/razeencheng/xreader/internal/article"
 	"github.com/razeencheng/xreader/internal/auth"
 	"github.com/razeencheng/xreader/internal/fever"
+	"github.com/razeencheng/xreader/internal/guest"
 	"github.com/razeencheng/xreader/internal/highlight"
 	"github.com/razeencheng/xreader/internal/middleware"
 	"github.com/razeencheng/xreader/internal/setup"
@@ -67,13 +68,20 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 	feverH := fever.NewHandler(deps.Pool)
 	r.POST("/fever/", feverH.Handle)
 
+	// Guest mode
+	guestSvc := guest.NewService(deps.Pool)
+	guestH := guest.NewHandler(guestSvc)
+
 	// Public auth routes
 	r.GET("/api/auth/github", authH.BeginLogin)
 	r.GET("/api/auth/callback", authH.HandleCallback)
 
-	// Auth-protected routes
+	// Public guest status endpoint
+	r.GET("/api/guest/status", guestH.Status)
+
+	// Auth-protected routes (OptionalAuth allows guests when guest mode is enabled)
 	authed := r.Group("/api")
-	authed.Use(middleware.RequireAuth(sessions, deps.Pool))
+	authed.Use(middleware.OptionalAuth(sessions, deps.Pool, guestSvc))
 	authed.Use(middleware.RequireCSRF())
 	{
 		// Auth
@@ -86,25 +94,27 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		authed.PATCH("/users/me", userH.UpdateMe)
 
 		// Fever password setup (reuses feverH from above)
-		authed.POST("/users/me/fever", feverH.SetFeverPassword)
+		authed.POST("/users/me/fever", middleware.GuestReadOnly(), feverH.SetFeverPassword)
 
 		// Sources
 		sourceSvc := source.NewSourceService(deps.Pool, source.NewRSSAdapter())
 		sourceSvc.SetAIClient(ai.NewDynamicClient(aiSettings))
 		sourceH := source.NewSourceHandler(sourceSvc, nil)
+		sourceH.ContentOwnerID = guestSvc.ContentOwnerID
 		authed.GET("/sources", sourceH.List)
-		authed.POST("/sources", sourceH.Create)
-		authed.PUT("/sources/:id", sourceH.Rename)
-		authed.PATCH("/sources/:id/category", sourceH.UpdateCategory)
-		authed.DELETE("/sources/:id", sourceH.Delete)
+		authed.POST("/sources", middleware.GuestReadOnly(), sourceH.Create)
+		authed.PUT("/sources/:id", middleware.GuestReadOnly(), sourceH.Rename)
+		authed.PATCH("/sources/:id/category", middleware.GuestReadOnly(), sourceH.UpdateCategory)
+		authed.DELETE("/sources/:id", middleware.GuestReadOnly(), sourceH.Delete)
 		authed.POST("/sources/:id/refresh", sourceH.Refresh)
-		authed.POST("/sources/import", sourceH.ImportOPML)
+		authed.POST("/sources/import", middleware.GuestReadOnly(), sourceH.ImportOPML)
 		authed.GET("/sources/export", sourceH.ExportOPML)
 		authed.GET("/sources/jobs/:jobID", sourceH.GetJob)
 
 		// Articles
 		articleSvc := article.NewArticleService(deps.Pool)
 		articleH := article.NewArticleHandler(articleSvc)
+		articleH.ContentOwnerID = guestSvc.ContentOwnerID
 		imageProxyH := article.NewImageProxyHandler()
 		authed.GET("/articles", articleH.List)
 		authed.GET("/articles/:id", articleH.GetByID)
@@ -120,13 +130,16 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		authed.GET("/articles/:id/ai", aiH.GetArticleAI)
 		// Article SSE + body retry
 		sseH := article.NewSSEHandler(deps.Pool, ai.NewDynamicClient(aiSettings), 3)
+		sseH.ContentOwnerID = guestSvc.ContentOwnerID
 		authed.GET("/articles/:id/body-translation", sseH.BodyTranslation)
 		bodyRetryH := article.NewBodyRetryHandler(deps.Pool)
+		bodyRetryH.ContentOwnerID = guestSvc.ContentOwnerID
 		authed.POST("/articles/:id/body-translation/retry", bodyRetryH.Retry)
 
 		// Highlights
 		highlightSvc := highlight.NewHighlightService(deps.Pool)
 		highlightH := highlight.NewHighlightHandler(highlightSvc)
+		highlightH.ContentOwnerID = guestSvc.ContentOwnerID
 		authed.POST("/highlights", highlightH.Create)
 		authed.GET("/highlights", highlightH.ListByUser)
 		authed.GET("/articles/:id/highlights", highlightH.ListByArticle)
@@ -147,6 +160,9 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 			adminGroup.DELETE("/admin/allowlist/:username", allowH.Remove)
 
 			adminGroup.PATCH("/ai/settings", aiSettingsH.Update)
+
+			adminGroup.GET("/settings/guest", guestH.GetSettings)
+			adminGroup.PATCH("/settings/guest", guestH.UpdateSettings)
 		}
 	}
 

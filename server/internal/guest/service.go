@@ -60,6 +60,18 @@ func (s *Service) ContentOwnerID(ctx context.Context) (int64, error) {
 	return id, nil
 }
 
+func (s *Service) SetEnabled(ctx context.Context, enabled bool) error {
+	val := "false"
+	if enabled {
+		val = "true"
+	}
+	_, err := s.pool.Exec(ctx,
+		"INSERT INTO settings (key, value) VALUES ('guest_mode_enabled', $1) ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = now()",
+		val,
+	)
+	return err
+}
+
 func (s *Service) CreateGuest(ctx context.Context) (*GuestUser, error) {
 	username := "guest-" + randomHex(8)
 	expiresAt := time.Now().Add(GuestTTL)

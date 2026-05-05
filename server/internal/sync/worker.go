@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/razeencheng/xreader/db/gen"
 	"github.com/razeencheng/xreader/internal/ai"
+	"github.com/razeencheng/xreader/internal/guest"
 	"github.com/razeencheng/xreader/internal/source"
 )
 
@@ -35,6 +36,7 @@ func NewWorker(pool *pgxpool.Pool, adapter source.SourceAdapter, aiClient ai.AIC
 func (w *Worker) Run(ctx context.Context) error {
 	log.Println("worker: starting fetch loop")
 	go w.catchUpAI(ctx)
+	go w.guestCleanupLoop(ctx)
 	w.tick(ctx)
 	ticker := time.NewTicker(w.interval)
 	defer ticker.Stop()
@@ -152,4 +154,23 @@ func (w *Worker) catchUpAI(ctx context.Context) {
 		}
 	}
 	log.Println("worker: AI catch-up complete")
+}
+
+func (w *Worker) guestCleanupLoop(ctx context.Context) {
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			guestSvc := guest.NewService(w.pool)
+			cleaned, err := guestSvc.CleanupExpired(ctx)
+			if err != nil {
+				log.Printf("worker: guest cleanup error: %v", err)
+			} else if cleaned > 0 {
+				log.Printf("worker: cleaned up %d expired guest users", cleaned)
+			}
+		}
+	}
 }
