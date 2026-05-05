@@ -24,8 +24,10 @@ func TestDiscoverFeed_AcceptsBareHostAndFindsAlternateFeed(t *testing.T) {
 	}))
 	defer ts.Close()
 
+	// Use a plain HTTP client for test (bypasses SSRF protection for localhost test server)
+	testClient := &http.Client{Timeout: feedCandidateTimeout}
 	hostOnly := strings.TrimPrefix(ts.URL, "http://")
-	feed, err := discoverFeed(context.Background(), hostOnly, NewRSSAdapter())
+	feed, err := discoverFeedWithClient(context.Background(), hostOnly, NewRSSAdapter(WithHTTPClient(testClient)), testClient)
 
 	require.NoError(t, err)
 	require.Equal(t, ts.URL+"/atom.xml", feed.URL)
@@ -46,7 +48,8 @@ func TestDiscoverFeed_FallsBackToCommonFeedPath(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	feed, err := discoverFeed(context.Background(), ts.URL, NewRSSAdapter())
+	testClient := &http.Client{Timeout: feedCandidateTimeout}
+	feed, err := discoverFeedWithClient(context.Background(), ts.URL, NewRSSAdapter(WithHTTPClient(testClient)), testClient)
 
 	require.NoError(t, err)
 	require.Equal(t, ts.URL+"/feed", feed.URL)

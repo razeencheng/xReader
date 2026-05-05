@@ -93,7 +93,7 @@ beforeEach(() => {
 
     if (input === '/api/ai/settings' && (!init || !init.method || init.method === 'GET')) {
       return {
-        endpoint: 'https://newapi.razeen.cn/v1',
+        endpoint: 'https://api.example.com/v1',
         model: 'qwen-turbo',
         api_key_set: true,
         api_key_hint: 'sk-...test',
@@ -131,7 +131,7 @@ test('renders and saves model integration settings', async () => {
   renderPage();
 
   expect(await screen.findByRole('heading', { name: '模型接入设置' })).toBeInTheDocument();
-  expect(await screen.findByDisplayValue('https://newapi.razeen.cn/v1')).toBeInTheDocument();
+  expect(await screen.findByDisplayValue('https://api.example.com/v1')).toBeInTheDocument();
   expect(screen.getByLabelText('模型')).toHaveValue('qwen-turbo');
   expect(screen.getByText('当前 API Key：sk-...test')).toBeInTheDocument();
 
@@ -164,9 +164,9 @@ test('renders model integration settings as read-only for non-admin users', asyn
   };
   renderPage();
 
-  expect(await screen.findByDisplayValue('https://newapi.razeen.cn/v1')).toBeDisabled();
-  expect(screen.getByLabelText('模型')).toBeDisabled();
-  expect(screen.getByLabelText('API Key')).toBeDisabled();
+  expect(await screen.findByDisplayValue('https://api.example.com/v1')).toHaveAttribute('readOnly');
+  expect(screen.getByLabelText('模型')).toHaveAttribute('readOnly');
+  expect(screen.getByLabelText('API Key')).toHaveAttribute('readOnly');
   expect(screen.getByText('仅管理员可以修改模型接入设置。')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '保存模型接入设置' })).not.toBeInTheDocument();
 });

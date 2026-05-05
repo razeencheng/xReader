@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jin/xreader-web/db/gen"
-	"github.com/jin/xreader-web/internal/middleware"
+	"github.com/razeencheng/xreader/db/gen"
+	"github.com/razeencheng/xreader/internal/middleware"
 	"github.com/stretchr/testify/require"
 )
 

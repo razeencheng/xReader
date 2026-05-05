@@ -60,15 +60,21 @@ func (q *Queries) CountArticlesBySourceReadState(ctx context.Context, arg CountA
 }
 
 const countArticlesStreamByReadState = `-- name: CountArticlesStreamByReadState :one
+WITH grouped AS (
+  SELECT a.normalized_link,
+         bool_or(COALESCE(st.is_read, false) = false) AS has_unread
+  FROM articles a
+  JOIN sources s ON a.source_id = s.id
+  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+  WHERE s.user_id = $1
+    AND s.deleted_at IS NULL
+  GROUP BY a.normalized_link
+)
 SELECT
   COUNT(*) AS all_count,
-  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = false) AS unread_count,
-  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = true) AS read_count
-FROM articles a
-JOIN sources s ON a.source_id = s.id
-LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
-WHERE s.user_id = $1
-  AND s.deleted_at IS NULL
+  COUNT(*) FILTER (WHERE has_unread) AS unread_count,
+  COUNT(*) FILTER (WHERE NOT has_unread) AS read_count
+FROM grouped
 `
 
 type CountArticlesStreamByReadStateRow struct {
@@ -85,16 +91,22 @@ func (q *Queries) CountArticlesStreamByReadState(ctx context.Context, userID int
 }
 
 const countArticlesTodayByReadState = `-- name: CountArticlesTodayByReadState :one
+WITH grouped AS (
+  SELECT a.normalized_link,
+         bool_or(COALESCE(st.is_read, false) = false) AS has_unread
+  FROM articles a
+  JOIN sources s ON a.source_id = s.id
+  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+  WHERE s.user_id = $1
+    AND s.deleted_at IS NULL
+    AND a.published_at >= now() - interval '24 hours'
+  GROUP BY a.normalized_link
+)
 SELECT
   COUNT(*) AS all_count,
-  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = false) AS unread_count,
-  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = true) AS read_count
-FROM articles a
-JOIN sources s ON a.source_id = s.id
-LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
-WHERE s.user_id = $1
-  AND s.deleted_at IS NULL
-  AND a.published_at >= now() - interval '24 hours'
+  COUNT(*) FILTER (WHERE has_unread) AS unread_count,
+  COUNT(*) FILTER (WHERE NOT has_unread) AS read_count
+FROM grouped
 `
 
 type CountArticlesTodayByReadStateRow struct {
@@ -365,20 +377,27 @@ func (q *Queries) ListArticlesStarred(ctx context.Context, userID int64) ([]Arti
 }
 
 const listArticlesStarredEnriched = `-- name: ListArticlesStarredEnriched :many
-SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
-       COALESCE(ai.title_translated, '') AS title_translated,
-       COALESCE(ai.summary, '') AS summary,
-       s.title AS source_title,
-       st.is_read,
-       st.is_starred
-FROM articles a
-JOIN article_states st ON a.id = st.article_id AND st.user_id = $1
-LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
-JOIN sources s ON a.source_id = s.id
-WHERE s.user_id = $1
-  AND s.deleted_at IS NULL
-  AND st.is_starred = true
-ORDER BY a.published_at DESC
+WITH ranked AS (
+  SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
+         COALESCE(ai.title_translated, '') AS title_translated,
+         COALESCE(ai.summary, '') AS summary,
+         s.title AS source_title,
+         st.is_read,
+         st.is_starred,
+         row_number() OVER (PARTITION BY a.normalized_link ORDER BY a.published_at DESC, a.id DESC) AS rn
+  FROM articles a
+  JOIN article_states st ON a.id = st.article_id AND st.user_id = $1
+  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
+  JOIN sources s ON a.source_id = s.id
+  WHERE s.user_id = $1
+    AND s.deleted_at IS NULL
+    AND st.is_starred = true
+)
+SELECT id, source_id, title, link, language, author, published_at, content_text,
+       title_translated, summary, source_title, is_read, is_starred
+FROM ranked
+WHERE rn = 1
+ORDER BY published_at DESC, id DESC
 LIMIT 100
 `
 
@@ -488,25 +507,32 @@ func (q *Queries) ListArticlesStream(ctx context.Context, arg ListArticlesStream
 }
 
 const listArticlesStreamEnriched = `-- name: ListArticlesStreamEnriched :many
-SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
-       COALESCE(ai.title_translated, '') AS title_translated,
-       COALESCE(ai.summary, '') AS summary,
-       s.title AS source_title,
-       COALESCE(st.is_read, false) AS is_read,
-       COALESCE(st.is_starred, false) AS is_starred
-FROM articles a
-JOIN sources s ON a.source_id = s.id
-LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $3
-LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
-WHERE s.user_id = $1
-  AND s.deleted_at IS NULL
-  AND ($2::timestamptz IS NULL OR a.published_at < $2)
-  AND (
-    $5::text = 'all'
-    OR ($5::text = 'unread' AND COALESCE(st.is_read, false) = false)
-    OR ($5::text = 'read' AND COALESCE(st.is_read, false) = true)
-  )
-ORDER BY a.published_at DESC, a.id DESC
+WITH ranked AS (
+  SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
+         COALESCE(ai.title_translated, '') AS title_translated,
+         COALESCE(ai.summary, '') AS summary,
+         s.title AS source_title,
+         COALESCE(st.is_read, false) AS is_read,
+         COALESCE(st.is_starred, false) AS is_starred,
+         row_number() OVER (PARTITION BY a.normalized_link ORDER BY a.published_at DESC, a.id DESC) AS rn
+  FROM articles a
+  JOIN sources s ON a.source_id = s.id
+  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $3
+  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+  WHERE s.user_id = $1
+    AND s.deleted_at IS NULL
+    AND ($2::timestamptz IS NULL OR a.published_at < $2)
+    AND (
+      $5::text = 'all'
+      OR ($5::text = 'unread' AND COALESCE(st.is_read, false) = false)
+      OR ($5::text = 'read' AND COALESCE(st.is_read, false) = true)
+    )
+)
+SELECT id, source_id, title, link, language, author, published_at, content_text,
+       title_translated, summary, source_title, is_read, is_starred
+FROM ranked
+WHERE rn = 1
+ORDER BY published_at DESC, id DESC
 LIMIT $4
 `
 
@@ -619,25 +645,32 @@ func (q *Queries) ListArticlesToday(ctx context.Context, userID int64) ([]Articl
 }
 
 const listArticlesTodayEnriched = `-- name: ListArticlesTodayEnriched :many
-SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
-       COALESCE(ai.title_translated, '') AS title_translated,
-       COALESCE(ai.summary, '') AS summary,
-       s.title AS source_title,
-       COALESCE(st.is_read, false) AS is_read,
-       COALESCE(st.is_starred, false) AS is_starred
-FROM articles a
-JOIN sources s ON a.source_id = s.id
-LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
-LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
-WHERE s.user_id = $1
-  AND s.deleted_at IS NULL
-  AND a.published_at >= now() - interval '24 hours'
-  AND (
-    $3::text = 'all'
-    OR ($3::text = 'unread' AND COALESCE(st.is_read, false) = false)
-    OR ($3::text = 'read' AND COALESCE(st.is_read, false) = true)
-  )
-ORDER BY a.published_at DESC
+WITH ranked AS (
+  SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
+         COALESCE(ai.title_translated, '') AS title_translated,
+         COALESCE(ai.summary, '') AS summary,
+         s.title AS source_title,
+         COALESCE(st.is_read, false) AS is_read,
+         COALESCE(st.is_starred, false) AS is_starred,
+         row_number() OVER (PARTITION BY a.normalized_link ORDER BY a.published_at DESC, a.id DESC) AS rn
+  FROM articles a
+  JOIN sources s ON a.source_id = s.id
+  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
+  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+  WHERE s.user_id = $1
+    AND s.deleted_at IS NULL
+    AND a.published_at >= now() - interval '24 hours'
+    AND (
+      $3::text = 'all'
+      OR ($3::text = 'unread' AND COALESCE(st.is_read, false) = false)
+      OR ($3::text = 'read' AND COALESCE(st.is_read, false) = true)
+    )
+)
+SELECT id, source_id, title, link, language, author, published_at, content_text,
+       title_translated, summary, source_title, is_read, is_starred
+FROM ranked
+WHERE rn = 1
+ORDER BY published_at DESC, id DESC
 LIMIT 100
 `
 
@@ -672,79 +705,6 @@ func (q *Queries) ListArticlesTodayEnriched(ctx context.Context, arg ListArticle
 	items := []ListArticlesTodayEnrichedRow{}
 	for rows.Next() {
 		var i ListArticlesTodayEnrichedRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.SourceID,
-			&i.Title,
-			&i.Link,
-			&i.Language,
-			&i.Author,
-			&i.PublishedAt,
-			&i.ContentText,
-			&i.TitleTranslated,
-			&i.Summary,
-			&i.SourceTitle,
-			&i.IsRead,
-			&i.IsStarred,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listUnreadArticlesEnriched = `-- name: ListUnreadArticlesEnriched :many
-SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
-       COALESCE(ai.title_translated, '') AS title_translated,
-       COALESCE(ai.summary, '') AS summary,
-       s.title AS source_title,
-       COALESCE(st.is_read, false) AS is_read,
-       COALESCE(st.is_starred, false) AS is_starred
-FROM articles a
-JOIN sources s ON a.source_id = s.id
-LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
-LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
-WHERE s.user_id = $1
-  AND s.deleted_at IS NULL
-  AND (st.is_read IS NULL OR st.is_read = false)
-ORDER BY a.published_at DESC
-LIMIT 200
-`
-
-type ListUnreadArticlesEnrichedParams struct {
-	UserID         int64  `json:"user_id"`
-	TargetLanguage string `json:"target_language"`
-}
-
-type ListUnreadArticlesEnrichedRow struct {
-	ID              int64              `json:"id"`
-	SourceID        int64              `json:"source_id"`
-	Title           string             `json:"title"`
-	Link            string             `json:"link"`
-	Language        string             `json:"language"`
-	Author          pgtype.Text        `json:"author"`
-	PublishedAt     pgtype.Timestamptz `json:"published_at"`
-	ContentText     string             `json:"content_text"`
-	TitleTranslated string             `json:"title_translated"`
-	Summary         string             `json:"summary"`
-	SourceTitle     string             `json:"source_title"`
-	IsRead          bool               `json:"is_read"`
-	IsStarred       bool               `json:"is_starred"`
-}
-
-func (q *Queries) ListUnreadArticlesEnriched(ctx context.Context, arg ListUnreadArticlesEnrichedParams) ([]ListUnreadArticlesEnrichedRow, error) {
-	rows, err := q.db.Query(ctx, listUnreadArticlesEnriched, arg.UserID, arg.TargetLanguage)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListUnreadArticlesEnrichedRow{}
-	for rows.Next() {
-		var i ListUnreadArticlesEnrichedRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.SourceID,

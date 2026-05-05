@@ -6,17 +6,16 @@ import (
 
     "github.com/gin-gonic/gin"
     "github.com/jackc/pgx/v5/pgxpool"
-    "github.com/jin/xreader-web/db/gen"
-    "github.com/jin/xreader-web/internal/middleware"
+    "github.com/razeencheng/xreader/db/gen"
+    "github.com/razeencheng/xreader/internal/middleware"
 )
 
 type BodyRetryHandler struct {
-    pool    *pgxpool.Pool
     queries *gen.Queries
 }
 
 func NewBodyRetryHandler(pool *pgxpool.Pool) *BodyRetryHandler {
-    return &BodyRetryHandler{pool: pool, queries: gen.New(pool)}
+    return &BodyRetryHandler{queries: gen.New(pool)}
 }
 
 func (h *BodyRetryHandler) Retry(c *gin.Context) {

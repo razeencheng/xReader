@@ -30,6 +30,13 @@ vi.mock('@/lib/queries/sources', () => ({
 
 vi.mock('@/lib/api-client', () => ({
   apiFetch: vi.fn(),
+  ApiError: class ApiError extends Error {
+    status: number;
+    constructor(message: string, status: number) {
+      super(message);
+      this.status = status;
+    }
+  },
 }));
 
 import { SourcesPage } from '@/app/(app)/sources/page';
@@ -96,7 +103,7 @@ test('SourcesPage debounces URL discovery and subscribes from the preview', asyn
 
   await user.click(screen.getByRole('button', { name: /订阅/ }));
 
-  expect(queryState.createSource.mutateAsync).toHaveBeenCalledWith('example.com');
+  expect(queryState.createSource.mutateAsync).toHaveBeenCalledWith('https://example.com/feed.xml');
   expect(await screen.findByText('已订阅 Example')).toBeInTheDocument();
 });
 

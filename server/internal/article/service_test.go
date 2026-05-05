@@ -8,8 +8,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jin/xreader-web/db/gen"
-	"github.com/jin/xreader-web/internal/testutil"
+	"github.com/razeencheng/xreader/db/gen"
+	"github.com/razeencheng/xreader/internal/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -102,6 +102,35 @@ func TestListTodayEnrichedExcludesDeletedSources(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 	require.Equal(t, visible.ID, items[0].ID)
+}
+
+func TestListEnrichedDeduplicatesGlobalFeedsByNormalizedLink(t *testing.T) {
+	svc, queries, _, userID, sourceID, cleanup := setupArticleServiceTest(t)
+	t.Cleanup(cleanup)
+	ctx := context.Background()
+
+	otherSource := createSourceForTest(t, queries, ctx, userID, "https://other.example/feed.xml", "Other Feed")
+	newer := insertArticleForTest(t, queries, ctx, sourceID, "shared-newer", time.Now().Add(-time.Hour))
+	older := insertArticleForTest(t, queries, ctx, otherSource.ID, "shared-older", time.Now().Add(-2*time.Hour))
+
+	_, err := svc.pool.Exec(ctx,
+		"UPDATE articles SET link = $1, normalized_link = $2 WHERE id IN ($3, $4)",
+		"https://v2ex.com/t/1210035#reply5",
+		"https://v2ex.com/t/1210035",
+		newer.ID,
+		older.ID,
+	)
+	require.NoError(t, err)
+
+	today, err := svc.ListTodayEnriched(ctx, userID, "zh-CN", "all")
+	require.NoError(t, err)
+	require.Len(t, today, 1)
+	require.Equal(t, newer.ID, today[0].ID)
+
+	stream, err := svc.ListStreamEnriched(ctx, userID, nil, 50, "zh-CN", "all")
+	require.NoError(t, err)
+	require.Len(t, stream, 1)
+	require.Equal(t, newer.ID, stream[0].ID)
 }
 
 func TestListStream_CursorPagination(t *testing.T) {

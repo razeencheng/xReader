@@ -17,7 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jin/xreader-web/internal/middleware"
+	"github.com/razeencheng/xreader/internal/middleware"
 )
 
 // Handler implements the Fever API compatibility endpoint.
@@ -179,6 +179,9 @@ func (h *Handler) handleFeedsAndGroups(c *gin.Context, user *feverUser, base gin
 		}
 		groupSet[category] = append(groupSet[category], id)
 	}
+	if err := rows.Err(); err != nil {
+		return
+	}
 
 	type feedsGroup struct {
 		GroupID int64  `json:"group_id"`
@@ -289,6 +292,9 @@ func (h *Handler) handleItems(c *gin.Context, user *feverUser, base gin.H) {
 			if err == nil {
 				defer rows.Close()
 				scanItems(rows)
+				if err := rows.Err(); err != nil {
+					return
+				}
 			}
 		}
 	} else {
@@ -308,6 +314,9 @@ func (h *Handler) handleItems(c *gin.Context, user *feverUser, base gin.H) {
 		if err == nil {
 			defer rows.Close()
 			scanItems(rows)
+			if err := rows.Err(); err != nil {
+				return
+			}
 		}
 	}
 
@@ -339,6 +348,10 @@ func (h *Handler) handleUnreadIDs(c *gin.Context, user *feverUser, base gin.H) {
 			ids = append(ids, strconv.FormatInt(id, 10))
 		}
 	}
+	if err := rows.Err(); err != nil {
+		base["unread_item_ids"] = ""
+		return
+	}
 	base["unread_item_ids"] = strings.Join(ids, ",")
 }
 
@@ -366,6 +379,10 @@ func (h *Handler) handleSavedIDs(c *gin.Context, user *feverUser, base gin.H) {
 			ids = append(ids, strconv.FormatInt(id, 10))
 		}
 	}
+	if err := rows.Err(); err != nil {
+		base["saved_item_ids"] = ""
+		return
+	}
 	base["saved_item_ids"] = strings.Join(ids, ",")
 }
 
@@ -383,28 +400,36 @@ func (h *Handler) handleMark(c *gin.Context, user *feverUser, mark, as string) {
 		case "read":
 			_, _ = h.pool.Exec(ctx,
 				`INSERT INTO article_states (user_id, article_id, is_read, last_read_at)
-				 VALUES ($1, $2, true, now())
+				 SELECT $1, a.id, true, now()
+				 FROM articles a JOIN sources s ON a.source_id = s.id
+				 WHERE a.id = $2 AND s.user_id = $1 AND s.deleted_at IS NULL
 				 ON CONFLICT (user_id, article_id) DO UPDATE SET is_read = true, last_read_at = now()`,
 				user.ID, articleID,
 			)
 		case "unread":
 			_, _ = h.pool.Exec(ctx,
 				`INSERT INTO article_states (user_id, article_id, is_read)
-				 VALUES ($1, $2, false)
+				 SELECT $1, a.id, false
+				 FROM articles a JOIN sources s ON a.source_id = s.id
+				 WHERE a.id = $2 AND s.user_id = $1 AND s.deleted_at IS NULL
 				 ON CONFLICT (user_id, article_id) DO UPDATE SET is_read = false`,
 				user.ID, articleID,
 			)
 		case "saved":
 			_, _ = h.pool.Exec(ctx,
 				`INSERT INTO article_states (user_id, article_id, is_starred)
-				 VALUES ($1, $2, true)
+				 SELECT $1, a.id, true
+				 FROM articles a JOIN sources s ON a.source_id = s.id
+				 WHERE a.id = $2 AND s.user_id = $1 AND s.deleted_at IS NULL
 				 ON CONFLICT (user_id, article_id) DO UPDATE SET is_starred = true`,
 				user.ID, articleID,
 			)
 		case "unsaved":
 			_, _ = h.pool.Exec(ctx,
 				`INSERT INTO article_states (user_id, article_id, is_starred)
-				 VALUES ($1, $2, false)
+				 SELECT $1, a.id, false
+				 FROM articles a JOIN sources s ON a.source_id = s.id
+				 WHERE a.id = $2 AND s.user_id = $1 AND s.deleted_at IS NULL
 				 ON CONFLICT (user_id, article_id) DO UPDATE SET is_starred = false`,
 				user.ID, articleID,
 			)

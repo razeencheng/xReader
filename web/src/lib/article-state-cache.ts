@@ -74,23 +74,19 @@ function updateArticleListData(
   const readDelta = shouldAdjustReadCounts ? (change.is_read ? 1 : -1) : 0;
 
   const pages = existing.pages.map((page) => updateArticlePage(page, change, tab, articleDetail));
-  return {
-    ...existing,
-    pages: pages.map((page) => {
-      if (!page.counts || !shouldAdjustReadCounts) {
-        return page;
-      }
 
-      return {
-        ...page,
-        counts: {
-          all: page.counts.all,
-          unread: Math.max(0, page.counts.unread - readDelta),
-          read: Math.max(0, page.counts.read + readDelta),
-        },
-      };
-    }),
-  };
+  if (shouldAdjustReadCounts && pages[0]?.counts) {
+    pages[0] = {
+      ...pages[0],
+      counts: {
+        all: pages[0].counts.all,
+        unread: Math.max(0, pages[0].counts.unread - readDelta),
+        read: Math.max(0, pages[0].counts.read + readDelta),
+      },
+    };
+  }
+
+  return { ...existing, pages };
 }
 
 export function applyArticleStateChange(queryClient: QueryClient, change: ArticleStateChange) {

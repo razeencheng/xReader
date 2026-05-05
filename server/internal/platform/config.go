@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jin/xreader-web/internal/crypto"
+	"github.com/razeencheng/xreader/internal/crypto"
 )
 
 // ConfigResolver checks environment variables first, then falls back to

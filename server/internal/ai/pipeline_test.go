@@ -8,8 +8,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jin/xreader-web/db/gen"
-	"github.com/jin/xreader-web/internal/testutil"
+	"github.com/razeencheng/xreader/db/gen"
+	"github.com/razeencheng/xreader/internal/testutil"
 	"github.com/stretchr/testify/require"
 )
 

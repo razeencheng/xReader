@@ -18,10 +18,8 @@ mkdir -p "$BACKUP_DIR"
 TIMESTAMP="$(date +%F-%H%M%S)"
 BACKUP_FILE="$BACKUP_DIR/xreader-$TIMESTAMP.sql.gz"
 
-source /etc/xreader/.env
-
-docker compose -f /data/xreader/xreader-web/docker-compose.prod.yml exec -T postgres \
-  pg_dump -U "${POSTGRES_USER:-xreader}" -d "${POSTGRES_DB:-xreader}" \
+docker compose -f /data/xreader/deploy/docker-compose.yml exec -T postgres \
+  pg_dump -U xreader -d xreader \
   | gzip > "$BACKUP_FILE"
 ```
 
@@ -51,36 +49,40 @@ Verify that the backup job is still working every day:
 
 When you need to restore the database:
 
-1. Stop the application services so nothing writes during restore:
+1. Stop the xreader service so nothing writes during restore:
 
    ```bash
-   docker compose -f docker-compose.prod.yml stop api worker web
+   docker compose stop xreader
    ```
 
-2. Create a fresh database or empty the existing one.
+2. Drop and recreate the database:
+
+   ```bash
+   docker compose exec postgres psql -U xreader -c "DROP DATABASE xreader;"
+   docker compose exec postgres psql -U xreader -d postgres -c "CREATE DATABASE xreader OWNER xreader;"
+   ```
+
 3. Restore the backup into PostgreSQL:
 
    ```bash
    gunzip -c /data/xreader/backups/xreader-YYYY-MM-DD-HHMMSS.sql.gz \
-     | docker compose -f docker-compose.prod.yml exec -T postgres \
-       psql -U "${POSTGRES_USER:-xreader}" -d "${POSTGRES_DB:-xreader}"
+     | docker compose exec -T postgres psql -U xreader -d xreader
    ```
 
-4. Run migrations again to ensure the schema matches the current release.
-5. Start the stack back up:
+4. Start xreader again (migrations run automatically on startup):
 
    ```bash
-   docker compose -f docker-compose.prod.yml up -d
+   docker compose start xreader
    ```
 
 ## 4) Post-restore checks
 
 After the restore completes, verify:
 
-- `curl -fsS http://localhost:8080/health` returns `{"status":"ok"}`
-- The API logs show successful database connections
+- `curl -fsS http://localhost:3000/health` returns `{"status":"ok"}`
+- The xreader logs show successful database connection
 - Articles, sources, and admin allowlist rows are present
-- The web app loads and can sign in
+- The web app loads and sign-in works
 
 ## 5) Disaster recovery notes
 

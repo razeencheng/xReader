@@ -6,15 +6,20 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"io"
+	"log"
 	"os"
 	"strings"
+	"sync"
 )
 
+var warnFallbackOnce sync.Once
+
 // encryptionPassphrase returns the passphrase used for AES-256-GCM key
-// derivation. Priority: XREADER_AI_ENCRYPTION_KEY → SESSION_SECRET →
-// built-in default (local dev only). SESSION_SECRET is always set in
-// production (required by the session store), making the encryption
-// key deployment-unique without extra configuration.
+// derivation. Priority: XREADER_AI_ENCRYPTION_KEY → SESSION_SECRET.
+// SESSION_SECRET is required in production (enforced by main), making the
+// encryption key deployment-unique without extra configuration.
+// If neither is set (e.g. during setup wizard before config is complete),
+// a warning is logged and SESSION_SECRET "change-me" dev fallback is used.
 func encryptionPassphrase() string {
 	if v := os.Getenv("XREADER_AI_ENCRYPTION_KEY"); v != "" {
 		return v
@@ -22,7 +27,12 @@ func encryptionPassphrase() string {
 	if v := os.Getenv("SESSION_SECRET"); v != "" {
 		return "xreader-encrypt:" + v
 	}
-	return "xreader-local-ai-settings-v1"
+	warnFallbackOnce.Do(func() {
+		log.Println("WARNING: No XREADER_AI_ENCRYPTION_KEY or SESSION_SECRET set. " +
+			"AI settings encryption is using an insecure default. " +
+			"Set SESSION_SECRET to a strong random value for production use.")
+	})
+	return "xreader-encrypt:change-me"
 }
 
 // secretCipher builds an AES-256-GCM AEAD from the derived key.

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jin/xreader-web/internal/testutil"
+	"github.com/razeencheng/xreader/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

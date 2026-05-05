@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jin/xreader-web/internal/middleware"
+	"github.com/razeencheng/xreader/internal/middleware"
 )
 
 type AllowlistHandler struct {
@@ -53,7 +53,7 @@ func (h *AllowlistHandler) Add(c *gin.Context) {
 }
 
 func (h *AllowlistHandler) Remove(c *gin.Context) {
-	username := c.Param("github_username")
+	username := c.Param("username")
 	if err := h.Service.Remove(c.Request.Context(), username); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return

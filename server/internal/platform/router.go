@@ -6,16 +6,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jin/xreader-web/internal/admin"
-	"github.com/jin/xreader-web/internal/ai"
-	"github.com/jin/xreader-web/internal/article"
-	"github.com/jin/xreader-web/internal/auth"
-	"github.com/jin/xreader-web/internal/fever"
-	"github.com/jin/xreader-web/internal/highlight"
-	"github.com/jin/xreader-web/internal/middleware"
-	"github.com/jin/xreader-web/internal/setup"
-	"github.com/jin/xreader-web/internal/source"
-	"github.com/jin/xreader-web/internal/user"
+	"github.com/razeencheng/xreader/internal/admin"
+	"github.com/razeencheng/xreader/internal/ai"
+	"github.com/razeencheng/xreader/internal/article"
+	"github.com/razeencheng/xreader/internal/auth"
+	"github.com/razeencheng/xreader/internal/fever"
+	"github.com/razeencheng/xreader/internal/highlight"
+	"github.com/razeencheng/xreader/internal/middleware"
+	"github.com/razeencheng/xreader/internal/setup"
+	"github.com/razeencheng/xreader/internal/source"
+	"github.com/razeencheng/xreader/internal/user"
 )
 
 type RouterDeps struct {
@@ -28,6 +28,7 @@ type RouterDeps struct {
 func NewRouter(deps RouterDeps) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
+	r.Use(middleware.SecurityHeaders())
 
 	r.GET("/health", healthHandler)
 

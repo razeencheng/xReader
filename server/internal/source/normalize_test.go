@@ -16,6 +16,10 @@ func TestNormalize(t *testing.T) {
         {"strip utm_medium", "https://example.com/p?utm_medium=email&q=1", "https://example.com/p?q=1"},
         {"strip fbclid", "https://example.com/p?fbclid=abc123", "https://example.com/p"},
         {"no-op clean URL", "https://example.com/clean", "https://example.com/clean"},
+        {"strip www prefix", "https://www.v2ex.com/t/1234567", "https://v2ex.com/t/1234567"},
+        {"strip www and fragment", "https://www.v2ex.com/t/1234567#reply3", "https://v2ex.com/t/1234567"},
+        {"no www stays the same", "https://v2ex.com/t/1234567", "https://v2ex.com/t/1234567"},
+        {"www with port preserved", "https://www.example.com:8080/path", "https://example.com:8080/path"},
         {"root path", "https://example.com/", "https://example.com"},
         {"multiple utm params", "https://example.com/p?utm_source=a&utm_medium=b&utm_campaign=c&real=1", "https://example.com/p?real=1"},
     }

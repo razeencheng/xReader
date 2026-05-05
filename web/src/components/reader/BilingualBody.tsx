@@ -166,9 +166,9 @@ function translationHtmlForBlock(block: ReaderBlock, blockTag: string, translati
 
 function translationClassName(blockTag: string) {
   if (isHeadingTag(blockTag) || blockTag === 'li') {
-    return 'mt-1 text-[var(--text)]';
+    return 'mt-1 text-[var(--text-translation)]';
   }
-  return 'mt-1 text-[0.92em] leading-[1.85] text-[var(--text)]';
+  return 'mt-1 text-[0.92em] leading-[1.85] text-[var(--text-translation)]';
 }
 
 function sanitizeHtml(html: string): string {

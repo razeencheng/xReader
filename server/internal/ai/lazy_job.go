@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jin/xreader-web/db/gen"
+	"github.com/razeencheng/xreader/db/gen"
 )
 
 type TranslatedParagraph struct {
@@ -125,9 +125,6 @@ func (j *LazyJob) translateBatch(ctx context.Context, batch []Paragraph) ([]Tran
 	return ParseParagraphTranslations(batch, resp.Content), nil
 }
 
-func parseBatchTranslation(batch []Paragraph, response string) []TranslatedParagraph {
-	return ParseParagraphTranslations(batch, response)
-}
 
 func ParseParagraphTranslations(batch []Paragraph, response string) []TranslatedParagraph {
 	lines := splitNonEmptyTranslationLines(response)

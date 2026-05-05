@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/jin/xreader-web/internal/source"
+	"github.com/razeencheng/xreader/internal/source"
 )
 
 const (

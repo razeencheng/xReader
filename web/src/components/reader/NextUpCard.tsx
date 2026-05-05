@@ -57,12 +57,9 @@ export function NextUpCard({ next, currentId, markRead }: Props) {
       <button
         type="button"
         onClick={handleClick}
-        className="group flex w-full items-start gap-4 rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-callout)] px-4 py-3 text-left text-sm leading-6 text-[var(--text-secondary)] transition-all hover:-translate-y-[1px] hover:border-[var(--accent)]"
+        className="group w-full rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-callout)] px-4 py-3 text-left text-sm leading-6 text-[var(--text-secondary)] transition-all hover:-translate-y-[1px] hover:border-[var(--accent)]"
       >
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-[var(--bg-nav)] text-lg font-bold text-[var(--text-inverse)] transition-transform group-hover:translate-x-[2px]">
-          J
-        </div>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0">
           <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold tracking-[0.18em] text-[var(--text-3)]">
             <span>{t('reader.nextArticle')}</span>
             <span className="text-[var(--border-strong)]">·</span>
@@ -79,12 +76,6 @@ export function NextUpCard({ next, currentId, markRead }: Props) {
             </span>
             {meta ? <span>{meta}</span> : null}
           </div>
-          {summary ? (
-            <div className="border-t border-[var(--border-light)] pt-3 text-[13px] leading-6 text-[var(--text-2)]">
-              <span className="mr-2 text-[10px] font-semibold tracking-[0.16em] text-[var(--text-3)]">{t('reader.keyPoints')}</span>
-              {summary}
-            </div>
-          ) : null}
         </div>
       </button>
     </div>

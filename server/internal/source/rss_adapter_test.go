@@ -21,11 +21,16 @@ func serveFixture(t *testing.T, path string) http.HandlerFunc {
 	}
 }
 
+func testRSSAdapter(t *testing.T) *RSSAdapter {
+	t.Helper()
+	return NewRSSAdapter(WithHTTPClient(&http.Client{Timeout: feedCandidateTimeout}))
+}
+
 func TestRSSAdapter_FetchesAndParsesAtomFeed(t *testing.T) {
 	ts := httptest.NewServer(serveFixture(t, "testdata/atom_feed.xml"))
 	defer ts.Close()
 
-	a := NewRSSAdapter()
+	a := testRSSAdapter(t)
 	items, err := a.Fetch(context.Background(), Source{URL: ts.URL})
 	require.NoError(t, err)
 	require.Len(t, items, 3)
@@ -36,7 +41,7 @@ func TestRSSAdapter_FetchesRSS2Feed(t *testing.T) {
 	ts := httptest.NewServer(serveFixture(t, "testdata/rss2_feed.xml"))
 	defer ts.Close()
 
-	a := NewRSSAdapter()
+	a := testRSSAdapter(t)
 	items, err := a.Fetch(context.Background(), Source{URL: ts.URL})
 	require.NoError(t, err)
 	require.Len(t, items, 2)
@@ -47,7 +52,7 @@ func TestRSSAdapter_Sanitizes_StripsScripts(t *testing.T) {
 	ts := httptest.NewServer(serveFixture(t, "testdata/script_feed.xml"))
 	defer ts.Close()
 
-	a := NewRSSAdapter()
+	a := testRSSAdapter(t)
 	items, err := a.Fetch(context.Background(), Source{URL: ts.URL})
 	require.NoError(t, err)
 	require.Len(t, items, 1)
@@ -59,7 +64,7 @@ func TestRSSAdapter_MalformedFeed_ReturnsError(t *testing.T) {
 	ts := httptest.NewServer(serveFixture(t, "testdata/malformed_feed.xml"))
 	defer ts.Close()
 
-	a := NewRSSAdapter()
+	a := testRSSAdapter(t)
 	_, err := a.Fetch(context.Background(), Source{URL: ts.URL})
 	require.Error(t, err)
 }
@@ -68,7 +73,7 @@ func TestRSSAdapter_Validate_ReturnsMetadata(t *testing.T) {
 	ts := httptest.NewServer(serveFixture(t, "testdata/atom_feed.xml"))
 	defer ts.Close()
 
-	a := NewRSSAdapter()
+	a := testRSSAdapter(t)
 	meta, err := a.Validate(context.Background(), ts.URL)
 	require.NoError(t, err)
 	require.Equal(t, "Test Atom Feed", meta.Title)

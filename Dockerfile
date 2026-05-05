@@ -18,8 +18,10 @@ RUN CGO_ENABLED=0 GOFLAGS="-trimpath" go build -ldflags="-s -w" -o /xreader ./cm
 
 # Stage 3: Minimal runtime
 FROM alpine:3.20
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata && \
+    adduser -D -H xreader
 COPY --from=backend /xreader /usr/local/bin/xreader
 COPY server/db/migrations /migrations
+USER xreader
 EXPOSE 3000
 ENTRYPOINT ["xreader"]

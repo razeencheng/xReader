@@ -12,8 +12,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jin/xreader-web/db/gen"
-	"github.com/jin/xreader-web/internal/crypto"
+	"github.com/razeencheng/xreader/db/gen"
+	"github.com/razeencheng/xreader/internal/crypto"
 )
 
 type SettingsSnapshot struct {

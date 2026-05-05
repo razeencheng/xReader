@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jin/xreader-web/db/gen"
-	"github.com/jin/xreader-web/internal/ai"
+	"github.com/razeencheng/xreader/db/gen"
+	"github.com/razeencheng/xreader/internal/ai"
 	"github.com/stretchr/testify/require"
 )
 

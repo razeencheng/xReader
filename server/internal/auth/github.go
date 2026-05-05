@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"golang.org/x/oauth2"
 	oauthgithub "golang.org/x/oauth2/github"
@@ -60,7 +61,8 @@ func (c *RealGitHubClient) FetchUser(ctx context.Context, token string) (*GitHub
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}

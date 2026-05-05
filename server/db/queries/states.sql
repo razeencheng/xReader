@@ -1,25 +1,37 @@
--- name: SetArticleRead :exec
+-- name: SetArticleRead :one
 INSERT INTO article_states (user_id, article_id, is_read, last_read_at)
-VALUES ($1, $2, $3, now())
+SELECT $1, a.id, $3, now()
+FROM articles a
+JOIN sources s ON a.source_id = s.id
+WHERE a.id = $2 AND s.user_id = $1 AND s.deleted_at IS NULL
 ON CONFLICT (user_id, article_id) DO UPDATE SET
   is_read = $3,
-  last_read_at = now();
+  last_read_at = now()
+RETURNING article_id;
 
--- name: SetArticleStarred :exec
+-- name: SetArticleStarred :one
 INSERT INTO article_states (user_id, article_id, is_starred)
-VALUES ($1, $2, $3)
+SELECT $1, a.id, $3
+FROM articles a
+JOIN sources s ON a.source_id = s.id
+WHERE a.id = $2 AND s.user_id = $1 AND s.deleted_at IS NULL
 ON CONFLICT (user_id, article_id) DO UPDATE SET
-  is_starred = $3;
+  is_starred = $3
+RETURNING article_id;
 
 -- name: GetArticleState :one
 SELECT * FROM article_states
 WHERE user_id = $1 AND article_id = $2;
 
--- name: UpdateReadingProgress :exec
+-- name: UpdateReadingProgress :one
 INSERT INTO article_states (user_id, article_id, reading_progress)
-VALUES ($1, $2, $3)
+SELECT $1, a.id, $3
+FROM articles a
+JOIN sources s ON a.source_id = s.id
+WHERE a.id = $2 AND s.user_id = $1 AND s.deleted_at IS NULL
 ON CONFLICT (user_id, article_id) DO UPDATE SET
-  reading_progress = $3;
+  reading_progress = $3
+RETURNING article_id;
 
 -- name: RecordStateChange :exec
 INSERT INTO article_state_changes (user_id, article_id)

@@ -1,12 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useI18n } from '@/lib/i18n';
+import { useUIStore } from '@/stores/useUIStore';
+import { LANGUAGE_OPTIONS, isLanguageOptionActive } from '@/components/layout/navigationConfig';
 
 interface SetupStatus {
   needs_setup: boolean;
 }
 
 export default function SetupPage() {
+  const { t } = useI18n();
+  const nativeLanguage = useUIStore((s) => s.nativeLanguage);
+  const setNativeLanguage = useUIStore((s) => s.setNativeLanguage);
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -36,9 +43,10 @@ export default function SetupPage() {
         }
       })
       .catch(() => {
-        setError('Failed to check setup status');
+        setError(t('setup.statusError'));
         setLoading(false);
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -83,7 +91,7 @@ export default function SetupPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-body)]">
-        <p className="text-[var(--text-muted)]">Checking setup status...</p>
+        <p className="text-[var(--text-muted)]">{t('setup.loading')}</p>
       </div>
     );
   }
@@ -93,11 +101,27 @@ export default function SetupPage() {
       <div className="mx-auto w-full max-w-2xl px-4 py-12 sm:px-6">
         <header className="mb-10 text-center">
           <h1 className="font-serif text-4xl font-semibold tracking-tight text-[var(--text-body)]">
-            xReader Setup
+            {t('setup.title')}
           </h1>
           <p className="mt-3 font-[system-ui] text-sm leading-6 text-[var(--text-muted)]">
-            Configure your xReader instance. You can change these settings later.
+            {t('setup.subtitle')}
           </p>
+          <div className="mt-4 flex justify-center gap-1.5">
+            {LANGUAGE_OPTIONS.map((lang) => (
+              <button
+                key={lang.code}
+                type="button"
+                onClick={() => setNativeLanguage(lang.code)}
+                className={`rounded-md px-2 py-1 font-[system-ui] text-xs transition-colors ${
+                  isLanguageOptionActive(nativeLanguage, lang.code)
+                    ? 'bg-[var(--accent)] text-white'
+                    : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
+                }`}
+              >
+                {lang.label}
+              </button>
+            ))}
+          </div>
         </header>
 
         {error ? (
@@ -110,15 +134,15 @@ export default function SetupPage() {
           {/* Section 1: Setup Token */}
           <section className="rounded-[8px] border border-[var(--border-light)] bg-[var(--bg)] p-5 shadow-[0_18px_40px_rgba(65,52,35,0.06)]">
             <h2 className="mb-4 font-serif text-xl font-semibold text-[var(--text-body)]">
-              Setup Token
+              {t('setup.tokenTitle')}
             </h2>
             <p className="mb-4 font-[system-ui] text-sm text-[var(--text-muted)]">
-              Enter the setup token displayed in the server console output.
+              {t('setup.tokenDescription')}
             </p>
             <input
               type="text"
               className="ui-input font-mono"
-              placeholder="Paste setup token from console"
+              placeholder={t('setup.tokenPlaceholder')}
               value={setupToken}
               onChange={(e) => setSetupToken(e.target.value)}
               required
@@ -129,10 +153,10 @@ export default function SetupPage() {
           {/* Section 2: GitHub OAuth */}
           <section className="rounded-[8px] border border-[var(--border-light)] bg-[var(--bg)] p-5 shadow-[0_18px_40px_rgba(65,52,35,0.06)]">
             <h2 className="mb-4 font-serif text-xl font-semibold text-[var(--text-body)]">
-              GitHub OAuth
+              {t('setup.oauthTitle')}
             </h2>
             <p className="mb-4 font-[system-ui] text-sm text-[var(--text-muted)]">
-              Create a GitHub OAuth App at{' '}
+              {t('setup.oauthDescPrefix')}
               <a
                 href="https://github.com/settings/developers"
                 target="_blank"
@@ -140,12 +164,12 @@ export default function SetupPage() {
                 className="text-[var(--accent-text)] underline"
               >
                 github.com/settings/developers
-              </a>{' '}
-              and enter the credentials below.
+              </a>
+              {t('setup.oauthDescSuffix')}
             </p>
             <div className="space-y-4 font-[system-ui]">
               <label className="block text-sm font-medium text-[var(--text-body)]">
-                Client ID
+                {t('setup.clientId')}
                 <input
                   type="text"
                   className="ui-input mt-2"
@@ -156,7 +180,7 @@ export default function SetupPage() {
                 />
               </label>
               <label className="block text-sm font-medium text-[var(--text-body)]">
-                Client Secret
+                {t('setup.clientSecret')}
                 <input
                   type="password"
                   className="ui-input mt-2"
@@ -167,7 +191,7 @@ export default function SetupPage() {
                 />
               </label>
               <label className="block text-sm font-medium text-[var(--text-body)]">
-                Callback URL
+                {t('setup.callbackUrl')}
                 <input
                   type="url"
                   className="ui-input mt-2"
@@ -176,7 +200,7 @@ export default function SetupPage() {
                   required
                 />
                 <span className="mt-1 block text-xs text-[var(--text-muted)]">
-                  This must match the callback URL in your GitHub OAuth App settings.
+                  {t('setup.callbackUrlHint')}
                 </span>
               </label>
             </div>
@@ -186,7 +210,7 @@ export default function SetupPage() {
           <section className="rounded-[8px] border border-[var(--border-light)] bg-[var(--bg)] p-5 shadow-[0_18px_40px_rgba(65,52,35,0.06)]">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-serif text-xl font-semibold text-[var(--text-body)]">
-                AI Service
+                {t('setup.aiTitle')}
               </h2>
               <label className="flex cursor-pointer items-center gap-2 font-[system-ui] text-sm text-[var(--text-muted)]">
                 <input
@@ -195,16 +219,16 @@ export default function SetupPage() {
                   onChange={(e) => setSkipAI(e.target.checked)}
                   className="accent-[var(--accent)]"
                 />
-                Skip for now
+                {t('setup.aiSkip')}
               </label>
             </div>
             <p className="mb-4 font-[system-ui] text-sm text-[var(--text-muted)]">
-              Optional. Configure an OpenAI-compatible API for title translation and article summaries. You can set this up later in Settings.
+              {t('setup.aiDescription')}
             </p>
             {!skipAI ? (
               <div className="space-y-4 font-[system-ui]">
                 <label className="block text-sm font-medium text-[var(--text-body)]">
-                  Endpoint
+                  {t('setup.aiEndpoint')}
                   <input
                     type="url"
                     className="ui-input mt-2"
@@ -215,7 +239,7 @@ export default function SetupPage() {
                   />
                 </label>
                 <label className="block text-sm font-medium text-[var(--text-body)]">
-                  Model
+                  {t('setup.aiModel')}
                   <input
                     type="text"
                     className="ui-input mt-2"
@@ -233,7 +257,7 @@ export default function SetupPage() {
                   </datalist>
                 </label>
                 <label className="block text-sm font-medium text-[var(--text-body)]">
-                  API Key
+                  {t('setup.aiApiKey')}
                   <input
                     type="password"
                     className="ui-input mt-2"
@@ -250,13 +274,13 @@ export default function SetupPage() {
           {/* Section 4: Admin */}
           <section className="rounded-[8px] border border-[var(--border-light)] bg-[var(--bg)] p-5 shadow-[0_18px_40px_rgba(65,52,35,0.06)]">
             <h2 className="mb-4 font-serif text-xl font-semibold text-[var(--text-body)]">
-              Admin Account
+              {t('setup.adminTitle')}
             </h2>
             <p className="mb-4 font-[system-ui] text-sm text-[var(--text-muted)]">
-              Enter your GitHub username. This account will be the first admin user.
+              {t('setup.adminDescription')}
             </p>
             <label className="block font-[system-ui] text-sm font-medium text-[var(--text-body)]">
-              GitHub Username
+              {t('setup.adminUsername')}
               <input
                 type="text"
                 className="ui-input mt-2"
@@ -274,7 +298,7 @@ export default function SetupPage() {
             disabled={submitting}
             className="ui-btn-solid w-full py-3 text-base"
           >
-            {submitting ? 'Setting up...' : 'Complete Setup'}
+            {submitting ? t('setup.submitting') : t('setup.submit')}
           </button>
         </form>
       </div>

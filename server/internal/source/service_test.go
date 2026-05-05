@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jin/xreader-web/db/gen"
-	"github.com/jin/xreader-web/internal/ai"
-	"github.com/jin/xreader-web/internal/testutil"
+	"github.com/razeencheng/xreader/db/gen"
+	"github.com/razeencheng/xreader/internal/ai"
+	"github.com/razeencheng/xreader/internal/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -221,8 +221,7 @@ func TestSourceService_RefreshRunsEagerAIForInsertedArticles(t *testing.T) {
 		},
 	}
 	client := &sequenceAIClient{responses: []ai.ChatResponse{
-		{Content: "手动刷新标题"},
-		{Content: "• 要点一"},
+		{Content: "TITLE: 手动刷新标题\nSUMMARY: 要点摘要内容"},
 	}}
 	svc := NewSourceService(pool, adapter)
 	svc.SetAIClient(client)
@@ -233,7 +232,7 @@ func TestSourceService_RefreshRunsEagerAIForInsertedArticles(t *testing.T) {
 	inserted, err := svc.Refresh(ctx, userID, src.ID)
 	require.NoError(t, err)
 	require.Equal(t, 1, inserted)
-	require.Len(t, client.calls, 2)
+	require.Len(t, client.calls, 1)
 
 	var articleID int64
 	err = pool.QueryRow(ctx, "SELECT id FROM articles WHERE normalized_link = $1", "https://example.com/manual-ai-1").Scan(&articleID)
@@ -245,7 +244,7 @@ func TestSourceService_RefreshRunsEagerAIForInsertedArticles(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, "手动刷新标题", aiRow.TitleTranslated)
-	require.Equal(t, "• 要点一", aiRow.Summary)
+	require.Equal(t, "要点摘要内容", aiRow.Summary)
 	require.Equal(t, "done", aiRow.SummaryStatus)
 }
 

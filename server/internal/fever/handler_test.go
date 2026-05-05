@@ -15,9 +15,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jin/xreader-web/db/gen"
-	"github.com/jin/xreader-web/internal/middleware"
-	"github.com/jin/xreader-web/internal/testutil"
+	"github.com/razeencheng/xreader/db/gen"
+	"github.com/razeencheng/xreader/internal/middleware"
+	"github.com/razeencheng/xreader/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

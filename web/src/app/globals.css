@@ -26,6 +26,7 @@
   --text-primary: var(--text);
   --text-2: oklch(35% 0.012 260);
   --text-secondary: var(--text-2);
+  --text-translation: oklch(45% 0.01 260);
   --text-3: oklch(56% 0.01 260);
   --text-muted: var(--text-3);
   --text-faint: oklch(73% 0.008 260);
@@ -100,6 +101,7 @@ html.theme-dark {
   --text-primary: var(--text);
   --text-2: oklch(78% 0.008 80);
   --text-secondary: var(--text-2);
+  --text-translation: oklch(68% 0.008 80);
   --text-3: oklch(62% 0.008 80);
   --text-muted: var(--text-3);
   --text-faint: oklch(45% 0.008 80);

@@ -1,4 +1,7 @@
-import { ArrowLeft, Maximize2, Minimize2, Share2, Star } from 'lucide-react';
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, EllipsisVertical, Maximize2, Minimize2, Settings, Share2, Star } from 'lucide-react';
 import { estimateReadMinutes } from '@/lib/article-meta';
 import { useI18n } from '@/lib/i18n';
 import { getSourceColor } from '@/lib/source-meta';
@@ -18,6 +21,7 @@ interface Props {
   onToggleStar?: () => void;
   onToggleFocus?: () => void;
   onShare?: () => void;
+  onOpenTweaks?: () => void;
   focusMode?: boolean;
   progress?: number;
   isCompact?: boolean;
@@ -32,6 +36,7 @@ export function ReaderHeader({
   onToggleStar,
   onToggleFocus,
   onShare,
+  onOpenTweaks,
   focusMode = false,
   progress = 0,
 }: Props) {
@@ -40,6 +45,19 @@ export function ReaderHeader({
   const sourceTitle = article.source_title?.trim() || t('common.source');
   const readMinutes = estimateReadMinutes(article);
   const showReadState = progress > 0.75 || article.is_read;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClick = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [menuOpen]);
 
   return (
     <div className="flex shrink-0 items-center gap-3 bg-[var(--bg)] px-5 py-[9px] border-b border-[var(--border-light)]">
@@ -76,8 +94,9 @@ export function ReaderHeader({
         </button>
       ) : null}
 
+      {/* Desktop: show all actions inline */}
       {onShare ? (
-        <button type="button" onClick={onShare} className={iconButtonClass} title={t('reader.share')}>
+        <button type="button" onClick={onShare} className={`${iconButtonClass} hidden md:flex`} title={t('reader.share')}>
           <Share2 size={15} strokeWidth={1.8} />
         </button>
       ) : null}
@@ -86,12 +105,70 @@ export function ReaderHeader({
         <button
           type="button"
           onClick={onToggleFocus}
-          className={`${iconButtonClass} ${focusMode ? 'bg-[var(--accent-bg)] text-[var(--accent)] hover:bg-[var(--accent-bg)] hover:text-[var(--accent)]' : ''}`}
+          className={`${iconButtonClass} hidden md:flex ${focusMode ? 'bg-[var(--accent-bg)] text-[var(--accent)] hover:bg-[var(--accent-bg)] hover:text-[var(--accent)]' : ''}`}
           title={focusMode ? t('reader.exitFocusMode') : t('reader.focusMode')}
         >
           {focusMode ? <Minimize2 size={15} strokeWidth={1.8} /> : <Maximize2 size={15} strokeWidth={1.8} />}
         </button>
       ) : null}
+
+      {onOpenTweaks ? (
+        <button
+          type="button"
+          onClick={onOpenTweaks}
+          className={`${iconButtonClass} hidden md:flex`}
+          title={t('tweaks.open')}
+        >
+          <Settings size={15} strokeWidth={1.8} />
+        </button>
+      ) : null}
+
+      {/* Mobile: overflow menu */}
+      <div ref={menuRef} className="relative md:hidden">
+        <button
+          type="button"
+          onClick={() => setMenuOpen((v) => !v)}
+          className={iconButtonClass}
+          aria-label={t('reader.moreActions')}
+        >
+          <EllipsisVertical size={16} strokeWidth={1.8} />
+        </button>
+
+        {menuOpen ? (
+          <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-[10px] border border-[var(--border)] bg-[var(--bg)] py-1 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
+            {onShare ? (
+              <button
+                type="button"
+                onClick={() => { onShare(); setMenuOpen(false); }}
+                className="flex w-full items-center gap-3 px-4 py-[10px] text-[13px] text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+              >
+                <Share2 size={15} strokeWidth={1.8} />
+                {t('reader.share')}
+              </button>
+            ) : null}
+            {onToggleFocus ? (
+              <button
+                type="button"
+                onClick={() => { onToggleFocus(); setMenuOpen(false); }}
+                className="flex w-full items-center gap-3 px-4 py-[10px] text-[13px] text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+              >
+                {focusMode ? <Minimize2 size={15} strokeWidth={1.8} /> : <Maximize2 size={15} strokeWidth={1.8} />}
+                {focusMode ? t('reader.exitFocusMode') : t('reader.focusMode')}
+              </button>
+            ) : null}
+            {onOpenTweaks ? (
+              <button
+                type="button"
+                onClick={() => { onOpenTweaks(); setMenuOpen(false); }}
+                className="flex w-full items-center gap-3 px-4 py-[10px] text-[13px] text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+              >
+                <Settings size={15} strokeWidth={1.8} />
+                {t('tweaks.open')}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

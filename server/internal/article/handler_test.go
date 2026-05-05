@@ -13,9 +13,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jin/xreader-web/db/gen"
-	"github.com/jin/xreader-web/internal/middleware"
-	"github.com/jin/xreader-web/internal/testutil"
+	"github.com/razeencheng/xreader/db/gen"
+	"github.com/razeencheng/xreader/internal/middleware"
+	"github.com/razeencheng/xreader/internal/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -76,7 +76,8 @@ func TestArticleHandler_ListAndDetail(t *testing.T) {
 	ctx := context.Background()
 
 	article := insertHandlerArticle(t, queries, ctx, sourceID, "hello world", time.Now())
-	require.NoError(t, gen.New(pool).SetArticleRead(ctx, gen.SetArticleReadParams{UserID: userID, ArticleID: article.ID, IsRead: true}))
+	_, err := gen.New(pool).SetArticleRead(ctx, gen.SetArticleReadParams{UserID: userID, ID: article.ID, IsRead: true})
+	require.NoError(t, err)
 
 	r.Use(withArticleUser(userID))
 	r.GET("/api/articles", handler.List)
@@ -114,7 +115,8 @@ func TestArticleHandler_ListReadFilterIsScopedAndReturnsDurableCounts(t *testing
 	ctx := context.Background()
 
 	readArticle := insertHandlerArticle(t, queries, ctx, sourceID, "already-read", time.Now().Add(-time.Minute))
-	require.NoError(t, queries.SetArticleRead(ctx, gen.SetArticleReadParams{UserID: userID, ArticleID: readArticle.ID, IsRead: true}))
+	_, markErr := queries.SetArticleRead(ctx, gen.SetArticleReadParams{UserID: userID, ID: readArticle.ID, IsRead: true})
+	require.NoError(t, markErr)
 
 	otherSource, err := queries.CreateSource(ctx, gen.CreateSourceParams{
 		UserID:        userID,

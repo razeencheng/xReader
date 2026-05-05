@@ -18,11 +18,11 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jin/xreader-web/internal/admin"
-	"github.com/jin/xreader-web/internal/ai"
-	"github.com/jin/xreader-web/internal/platform"
-	"github.com/jin/xreader-web/internal/source"
-	syncpkg "github.com/jin/xreader-web/internal/sync"
+	"github.com/razeencheng/xreader/internal/admin"
+	"github.com/razeencheng/xreader/internal/ai"
+	"github.com/razeencheng/xreader/internal/platform"
+	"github.com/razeencheng/xreader/internal/source"
+	syncpkg "github.com/razeencheng/xreader/internal/sync"
 )
 
 func main() {
@@ -36,8 +36,15 @@ func main() {
 		log.Fatal("DATABASE_URL not set")
 	}
 	sessionSecret := os.Getenv("SESSION_SECRET")
-	if sessionSecret == "" {
-		sessionSecret = "change-me"
+	if sessionSecret == "" || sessionSecret == "change-me" {
+		if os.Getenv("XREADER_DEV_MODE") != "true" {
+			log.Fatal("SESSION_SECRET is missing or insecure. " +
+				"Set a strong random value (e.g. `openssl rand -hex 32`). " +
+				"To bypass in local development, set XREADER_DEV_MODE=true.")
+		}
+		if sessionSecret == "" {
+			sessionSecret = "change-me"
+		}
 	}
 	port := os.Getenv("PORT")
 	if port == "" {

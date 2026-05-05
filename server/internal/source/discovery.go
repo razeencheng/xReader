@@ -3,12 +3,13 @@ package source
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/razeencheng/xreader/internal/safenet"
 )
 
 const feedDiscoveryMaxBytes = 1 << 20
@@ -20,7 +21,22 @@ type discoveredFeed struct {
 	Metadata SourceMetadata
 }
 
+// newDiscoveryClient creates the default SSRF-safe HTTP client for feed discovery.
+func newDiscoveryClient() *http.Client {
+	return safenet.NewClient(safenet.Options{
+		Timeout:          feedDiscoveryTimeout,
+		DialTimeout:      3 * time.Second,
+		MaxRedirects:     5,
+		MaxResponseBytes: feedDiscoveryMaxBytes,
+		UserAgent:        "xReader feed discovery",
+	})
+}
+
 func discoverFeed(ctx context.Context, input string, adapter SourceAdapter) (discoveredFeed, error) {
+	return discoverFeedWithClient(ctx, input, adapter, newDiscoveryClient())
+}
+
+func discoverFeedWithClient(ctx context.Context, input string, adapter SourceAdapter, client *http.Client) (discoveredFeed, error) {
 	ctx, cancel := context.WithTimeout(ctx, feedDiscoveryTimeout)
 	defer cancel()
 
@@ -36,7 +52,6 @@ func discoverFeed(ctx context.Context, input string, adapter SourceAdapter) (dis
 		}
 	}
 
-	client := &http.Client{Timeout: feedCandidateTimeout}
 	for _, pageURL := range candidates {
 		for _, candidate := range discoverFeedLinksFromPage(ctx, client, pageURL) {
 			if feed, ok := tryValidateFeed(ctx, adapter, candidate, seen); ok {
@@ -125,7 +140,7 @@ func discoverFeedLinksFromPage(ctx context.Context, client *http.Client, pageURL
 		return nil
 	}
 
-	body, err := io.ReadAll(io.LimitReader(res.Body, feedDiscoveryMaxBytes))
+	body, err := safenet.ReadLimited(res.Body, feedDiscoveryMaxBytes)
 	if err != nil {
 		return nil
 	}

@@ -7,6 +7,12 @@ const READ_FILTERS: Array<{ id: ReadFilter; labelKey: string }> = [
   { id: 'read', labelKey: 'feed.read' },
 ];
 
+function compactCount(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 10000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+  return `${Math.round(n / 1000)}k`;
+}
+
 interface ReadFilterSegmentedControlProps {
   value: ReadFilter;
   counts: Record<ReadFilter, number>;
@@ -33,14 +39,14 @@ export function ReadFilterSegmentedControl({ value, counts, onChange, fullWidth 
             type="button"
             aria-pressed={active}
             onClick={() => onChange(id)}
-            className={`inline-flex min-h-11 min-w-[58px] items-center justify-center gap-[5px] rounded-[8px] px-2.5 font-semibold transition-[background,color,box-shadow] duration-150 ${fullWidth ? 'flex-1 md:flex-initial' : ''} ${
+            className={`inline-flex min-h-11 items-center justify-center gap-[5px] whitespace-nowrap rounded-[8px] px-2.5 font-semibold transition-[background,color,box-shadow] duration-150 ${fullWidth ? 'flex-1 md:flex-initial' : ''} ${
               active
                 ? 'read-filter-segment-active bg-[var(--bg-elevated)] text-[var(--text)] shadow-[0_1px_2px_rgba(30,24,16,0.10),0_5px_14px_rgba(30,24,16,0.06)]'
                 : 'text-[var(--text-3)] hover:text-[var(--text-2)]'
             }`}
           >
             <span>{t(labelKey)}</span>
-            <span className={active ? 'text-[var(--text-3)]' : 'text-[var(--text-faint)]'}>{counts[id]}</span>
+            <span className={active ? 'text-[var(--text-3)]' : 'text-[var(--text-faint)]'}>{compactCount(counts[id])}</span>
           </button>
         );
       })}

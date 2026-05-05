@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jin/xreader-web/internal/middleware"
-	"github.com/jin/xreader-web/internal/testutil"
+	"github.com/razeencheng/xreader/internal/middleware"
+	"github.com/razeencheng/xreader/internal/testutil"
 	"github.com/stretchr/testify/require"
 )
 

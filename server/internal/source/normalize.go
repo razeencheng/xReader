@@ -14,7 +14,7 @@ func Normalize(raw string) (string, error) {
     }
 
     parsed.Scheme = strings.ToLower(parsed.Scheme)
-    parsed.Host = strings.ToLower(parsed.Host)
+    parsed.Host = strings.TrimPrefix(strings.ToLower(parsed.Host), "www.")
     parsed.Fragment = ""
     parsed.Path = normalizePath(parsed.Path)
     parsed.RawQuery = normalizeQuery(parsed.Query())

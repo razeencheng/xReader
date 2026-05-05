@@ -1,11 +1,6 @@
 package auth
 
-import (
-	"context"
-	"time"
-)
-
-const sessionTTL = 30 * 24 * time.Hour
+import "context"
 
 type SessionStore interface {
 	Create(ctx context.Context, userID int64, userAgent string) (sessionID string, err error)

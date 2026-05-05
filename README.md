@@ -10,6 +10,10 @@
 
 </div>
 
+![Feed List](docs/screenshots/feed-list.png)
+
+![Article Reader](docs/screenshots/reader.png)
+
 ---
 
 ## Features

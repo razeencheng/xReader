@@ -3,17 +3,49 @@ package source
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/mmcdole/gofeed"
+	"github.com/razeencheng/xreader/internal/safenet"
 )
 
+const feedMaxResponseBytes = 10 * 1024 * 1024 // 10 MB
+
 type RSSAdapter struct {
-	parser *gofeed.Parser
+	parser     *gofeed.Parser
+	safeClient *http.Client
 }
 
-func NewRSSAdapter() *RSSAdapter {
-	return &RSSAdapter{parser: gofeed.NewParser()}
+// NewRSSAdapter creates an RSS adapter with SSRF-safe HTTP client.
+// An optional *http.Client may be provided (for testing); if nil, a safe
+// client that blocks private/reserved IP addresses is used.
+func NewRSSAdapter(opts ...func(*RSSAdapter)) *RSSAdapter {
+	client := safenet.NewClient(safenet.Options{
+		Timeout:          15 * time.Second,
+		DialTimeout:      5 * time.Second,
+		MaxRedirects:     5,
+		MaxResponseBytes: feedMaxResponseBytes,
+		UserAgent:        "xReader feed fetcher",
+	})
+
+	p := gofeed.NewParser()
+	p.Client = client
+	p.UserAgent = "xReader feed fetcher"
+
+	a := &RSSAdapter{parser: p, safeClient: client}
+	for _, o := range opts {
+		o(a)
+	}
+	return a
+}
+
+// WithHTTPClient overrides the default SSRF-safe client (for testing only).
+func WithHTTPClient(c *http.Client) func(*RSSAdapter) {
+	return func(a *RSSAdapter) {
+		a.parser.Client = c
+		a.safeClient = c
+	}
 }
 
 func (a *RSSAdapter) Kind() string { return "rss" }

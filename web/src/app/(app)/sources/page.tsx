@@ -541,12 +541,7 @@ export function SourcesPage() {
 
   function alreadySubscribed(candidate: Discovery) {
     const candidateUrl = normalizeComparableUrl(candidate.url);
-    const candidateHost = getHostFromUrl(candidate.url);
-
-    return visibleSources.some((source) => {
-      const sourceHost = getHostFromUrl(source.url);
-      return normalizeComparableUrl(source.url) === candidateUrl || sourceHost === candidateHost;
-    });
+    return visibleSources.some((source) => normalizeComparableUrl(source.url) === candidateUrl);
   }
 
   async function subscribe(candidate: Discovery) {

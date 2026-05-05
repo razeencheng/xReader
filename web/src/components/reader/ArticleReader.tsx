@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Languages } from 'lucide-react';
 import { ApiError, apiFetch } from '@/lib/api-client';
 import { applyArticleStateChange } from '@/lib/article-state-cache';
 import { broadcast } from '@/lib/broadcast';
@@ -81,6 +80,7 @@ export function ArticleReader({
   const [originalContentState, setOriginalContentState] = useState<{ articleId: string; content: OriginalContent } | null>(null);
   const [loadingOriginalId, setLoadingOriginalId] = useState<string | null>(null);
   const [originalErrorState, setOriginalErrorState] = useState<{ articleId: string; message: string } | null>(null);
+  const [tweaksOpen, setTweaksOpen] = useState(false);
 
   const nativeLanguage = useUIStore((state) => state.nativeLanguage);
   const fontSize = useUIStore((state) => state.fontSize);
@@ -246,32 +246,18 @@ export function ArticleReader({
     if (!article) return [] as Array<{ key: string; content: React.ReactNode }>;
 
     const items: Array<{ key: string; content: React.ReactNode }> = [];
+    if (article.source_title) {
+      items.push({ key: 'source', content: <span>{article.source_title}</span> });
+    }
     if (relativeTime) {
       items.push({ key: 'age', content: <span>{t('article.ago', { time: relativeTime })}</span> });
     }
     if (readMinutes) {
       items.push({ key: 'time', content: <span>{t('article.minRead', { count: readMinutes })}</span> });
     }
-    if (article.source_title) {
-      items.push({
-        key: 'source',
-        content: <span className="rounded-[5px] bg-[var(--bg-hover)] px-[7px] py-[1px]">{article.source_title}</span>,
-      });
-    }
-    if (titleNeedsTranslation) {
-      items.push({
-        key: 'translation',
-        content: (
-          <span className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[var(--accent)]">
-            <Languages size={11} />
-            {t('reader.translationLabel', { language: nativeLanguage })}
-          </span>
-        ),
-      });
-    }
 
     return items;
-  }, [article, nativeLanguage, readMinutes, relativeTime, titleNeedsTranslation, t]);
+  }, [article, readMinutes, relativeTime, t]);
 
   if (isLoading) {
     return (
@@ -308,6 +294,7 @@ export function ArticleReader({
         onToggleStar={handleToggleStar}
         onToggleFocus={handleToggleFocus}
         onShare={handleShare}
+        onOpenTweaks={() => setTweaksOpen((v) => !v)}
       />
 
       <ReaderGestureHint hint={gestureHint} />
@@ -361,7 +348,6 @@ export function ArticleReader({
                 <SourceExcerptNotice
                   error={originalError}
                   isLoading={isLoadingOriginal}
-                  link={article.link}
                   onLoadOriginal={handleLoadOriginal}
                 />
               ) : null}
@@ -386,7 +372,7 @@ export function ArticleReader({
       </div>
 
       {afterScroll}
-      <TweaksPanel />
+      <TweaksPanel externalOpen={tweaksOpen} onExternalClose={() => setTweaksOpen(false)} />
     </div>
   );
 }

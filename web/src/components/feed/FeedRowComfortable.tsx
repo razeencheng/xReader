@@ -1,6 +1,6 @@
 'use client';
 
-import { Star } from 'lucide-react';
+import { CircleCheck, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { estimateReadMinutes, formatRelativeTime, getDisplayTitle, getOriginalTitle } from '@/lib/article-meta';
 import { useI18n } from '@/lib/i18n';
@@ -96,9 +96,9 @@ export function FeedRowComfortable({
                 event.stopPropagation();
                 onMarkRead();
               }}
-              className="mr-1 inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] px-3 py-2 text-[10.5px] font-medium text-[var(--text-3)] opacity-100 transition-[background,color,opacity] hover:bg-[var(--accent-bg)] hover:text-[var(--accent)] md:min-h-0 md:min-w-0 md:px-2 md:py-[3px] md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
+              className="mr-1 inline-flex min-h-11 min-w-11 items-center justify-center rounded p-[3px] text-[var(--text-3)] opacity-100 transition-[color,opacity] hover:text-[var(--accent)] md:min-h-0 md:min-w-0 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
             >
-              {t('feed.markRead')}
+              <CircleCheck size={15} strokeWidth={1.5} />
             </button>
           ) : null}
           {onStar ? (

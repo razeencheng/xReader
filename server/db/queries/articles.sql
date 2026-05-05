@@ -87,64 +87,85 @@ ORDER BY a.published_at DESC
 LIMIT 100;
 
 -- name: ListArticlesTodayEnriched :many
-SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
-       COALESCE(ai.title_translated, '') AS title_translated,
-       COALESCE(ai.summary, '') AS summary,
-       s.title AS source_title,
-       COALESCE(st.is_read, false) AS is_read,
-       COALESCE(st.is_starred, false) AS is_starred
-FROM articles a
-JOIN sources s ON a.source_id = s.id
-LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
-LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
-WHERE s.user_id = $1
-  AND s.deleted_at IS NULL
-  AND a.published_at >= now() - interval '24 hours'
-  AND (
-    @read_filter::text = 'all'
-    OR (@read_filter::text = 'unread' AND COALESCE(st.is_read, false) = false)
-    OR (@read_filter::text = 'read' AND COALESCE(st.is_read, false) = true)
-  )
-ORDER BY a.published_at DESC
+WITH ranked AS (
+  SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
+         COALESCE(ai.title_translated, '') AS title_translated,
+         COALESCE(ai.summary, '') AS summary,
+         s.title AS source_title,
+         COALESCE(st.is_read, false) AS is_read,
+         COALESCE(st.is_starred, false) AS is_starred,
+         row_number() OVER (PARTITION BY a.normalized_link ORDER BY a.published_at DESC, a.id DESC) AS rn
+  FROM articles a
+  JOIN sources s ON a.source_id = s.id
+  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
+  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+  WHERE s.user_id = $1
+    AND s.deleted_at IS NULL
+    AND a.published_at >= now() - interval '24 hours'
+    AND (
+      @read_filter::text = 'all'
+      OR (@read_filter::text = 'unread' AND COALESCE(st.is_read, false) = false)
+      OR (@read_filter::text = 'read' AND COALESCE(st.is_read, false) = true)
+    )
+)
+SELECT id, source_id, title, link, language, author, published_at, content_text,
+       title_translated, summary, source_title, is_read, is_starred
+FROM ranked
+WHERE rn = 1
+ORDER BY published_at DESC, id DESC
 LIMIT 100;
 
 -- name: ListArticlesStreamEnriched :many
-SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
-       COALESCE(ai.title_translated, '') AS title_translated,
-       COALESCE(ai.summary, '') AS summary,
-       s.title AS source_title,
-       COALESCE(st.is_read, false) AS is_read,
-       COALESCE(st.is_starred, false) AS is_starred
-FROM articles a
-JOIN sources s ON a.source_id = s.id
-LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $3
-LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
-WHERE s.user_id = $1
-  AND s.deleted_at IS NULL
-  AND ($2::timestamptz IS NULL OR a.published_at < $2)
-  AND (
-    @read_filter::text = 'all'
-    OR (@read_filter::text = 'unread' AND COALESCE(st.is_read, false) = false)
-    OR (@read_filter::text = 'read' AND COALESCE(st.is_read, false) = true)
-  )
-ORDER BY a.published_at DESC, a.id DESC
+WITH ranked AS (
+  SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
+         COALESCE(ai.title_translated, '') AS title_translated,
+         COALESCE(ai.summary, '') AS summary,
+         s.title AS source_title,
+         COALESCE(st.is_read, false) AS is_read,
+         COALESCE(st.is_starred, false) AS is_starred,
+         row_number() OVER (PARTITION BY a.normalized_link ORDER BY a.published_at DESC, a.id DESC) AS rn
+  FROM articles a
+  JOIN sources s ON a.source_id = s.id
+  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $3
+  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+  WHERE s.user_id = $1
+    AND s.deleted_at IS NULL
+    AND ($2::timestamptz IS NULL OR a.published_at < $2)
+    AND (
+      @read_filter::text = 'all'
+      OR (@read_filter::text = 'unread' AND COALESCE(st.is_read, false) = false)
+      OR (@read_filter::text = 'read' AND COALESCE(st.is_read, false) = true)
+    )
+)
+SELECT id, source_id, title, link, language, author, published_at, content_text,
+       title_translated, summary, source_title, is_read, is_starred
+FROM ranked
+WHERE rn = 1
+ORDER BY published_at DESC, id DESC
 LIMIT $4;
 
 -- name: ListArticlesStarredEnriched :many
-SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
-       COALESCE(ai.title_translated, '') AS title_translated,
-       COALESCE(ai.summary, '') AS summary,
-       s.title AS source_title,
-       st.is_read,
-       st.is_starred
-FROM articles a
-JOIN article_states st ON a.id = st.article_id AND st.user_id = $1
-LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
-JOIN sources s ON a.source_id = s.id
-WHERE s.user_id = $1
-  AND s.deleted_at IS NULL
-  AND st.is_starred = true
-ORDER BY a.published_at DESC
+WITH ranked AS (
+  SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
+         COALESCE(ai.title_translated, '') AS title_translated,
+         COALESCE(ai.summary, '') AS summary,
+         s.title AS source_title,
+         st.is_read,
+         st.is_starred,
+         row_number() OVER (PARTITION BY a.normalized_link ORDER BY a.published_at DESC, a.id DESC) AS rn
+  FROM articles a
+  JOIN article_states st ON a.id = st.article_id AND st.user_id = $1
+  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
+  JOIN sources s ON a.source_id = s.id
+  WHERE s.user_id = $1
+    AND s.deleted_at IS NULL
+    AND st.is_starred = true
+)
+SELECT id, source_id, title, link, language, author, published_at, content_text,
+       title_translated, summary, source_title, is_read, is_starred
+FROM ranked
+WHERE rn = 1
+ORDER BY published_at DESC, id DESC
 LIMIT 100;
 
 -- name: ListArticlesBySourceEnriched :many
@@ -167,27 +188,39 @@ WHERE a.source_id = @source_id
 ORDER BY a.published_at DESC;
 
 -- name: CountArticlesTodayByReadState :one
+WITH grouped AS (
+  SELECT a.normalized_link,
+         bool_or(COALESCE(st.is_read, false) = false) AS has_unread
+  FROM articles a
+  JOIN sources s ON a.source_id = s.id
+  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+  WHERE s.user_id = $1
+    AND s.deleted_at IS NULL
+    AND a.published_at >= now() - interval '24 hours'
+  GROUP BY a.normalized_link
+)
 SELECT
   COUNT(*) AS all_count,
-  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = false) AS unread_count,
-  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = true) AS read_count
-FROM articles a
-JOIN sources s ON a.source_id = s.id
-LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
-WHERE s.user_id = $1
-  AND s.deleted_at IS NULL
-  AND a.published_at >= now() - interval '24 hours';
+  COUNT(*) FILTER (WHERE has_unread) AS unread_count,
+  COUNT(*) FILTER (WHERE NOT has_unread) AS read_count
+FROM grouped;
 
 -- name: CountArticlesStreamByReadState :one
+WITH grouped AS (
+  SELECT a.normalized_link,
+         bool_or(COALESCE(st.is_read, false) = false) AS has_unread
+  FROM articles a
+  JOIN sources s ON a.source_id = s.id
+  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
+  WHERE s.user_id = $1
+    AND s.deleted_at IS NULL
+  GROUP BY a.normalized_link
+)
 SELECT
   COUNT(*) AS all_count,
-  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = false) AS unread_count,
-  COUNT(*) FILTER (WHERE COALESCE(st.is_read, false) = true) AS read_count
-FROM articles a
-JOIN sources s ON a.source_id = s.id
-LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
-WHERE s.user_id = $1
-  AND s.deleted_at IS NULL;
+  COUNT(*) FILTER (WHERE has_unread) AS unread_count,
+  COUNT(*) FILTER (WHERE NOT has_unread) AS read_count
+FROM grouped;
 
 -- name: CountArticlesBySourceReadState :one
 SELECT
@@ -198,20 +231,3 @@ FROM articles a
 JOIN sources s ON a.source_id = s.id AND s.user_id = @user_id AND s.deleted_at IS NULL
 LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = @user_id
 WHERE a.source_id = @source_id;
-
--- name: ListUnreadArticlesEnriched :many
-SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
-       COALESCE(ai.title_translated, '') AS title_translated,
-       COALESCE(ai.summary, '') AS summary,
-       s.title AS source_title,
-       COALESCE(st.is_read, false) AS is_read,
-       COALESCE(st.is_starred, false) AS is_starred
-FROM articles a
-JOIN sources s ON a.source_id = s.id
-LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
-LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
-WHERE s.user_id = $1
-  AND s.deleted_at IS NULL
-  AND (st.is_read IS NULL OR st.is_read = false)
-ORDER BY a.published_at DESC
-LIMIT 200;

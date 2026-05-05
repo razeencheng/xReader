@@ -1,83 +1,72 @@
 # Production deployment
 
-This guide assumes the repository is already cloned on the target host and Docker Compose is available.
+xReader is a single Go binary that serves both the API and static frontend. It connects to a Postgres 16 database and auto-migrates on startup.
 
-## 1) Clone the repository
+## 1) Prerequisites
 
-```bash
-git clone <repo-url> /data/xreader/xreader-web
-cd /data/xreader/xreader-web
-```
+- Docker and Docker Compose installed on the target host
+- A GitHub OAuth App (create at https://github.com/settings/developers)
+  - Set the callback URL to `https://your-domain.com/api/auth/callback/github`
 
-If you already have the repo checked out, pull the latest changes instead:
+## 2) Deploy with Docker Compose
 
-```bash
-git pull
-```
-
-## 2) Prepare the production environment file
-
-Create `/etc/xreader/.env` on the host and keep secrets out of the repository.
-
-Minimum required values:
-
-```dotenv
-DATABASE_URL=postgres://xreader:xreader@postgres:5432/xreader?sslmode=disable
-REDIS_URL=redis://redis:6379/0
-GITHUB_CLIENT_ID=...
-GITHUB_CLIENT_SECRET=...
-SESSION_SECRET=...
-XREADER_AI_API_KEY=...
-```
-
-Make sure the AI config file exists at `./config/ai.yaml` in the repo. The production compose file mounts it into the API and worker containers.
-
-## 3) Start the stack
-
-Use the production override:
+The `deploy/` directory contains a ready-to-use compose file.
 
 ```bash
-docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d
+cd deploy
+cp .env.example .env
+# Edit .env with your values (see below)
+docker compose up -d
 ```
 
 The stack includes:
 
-- `postgres` on a bind mount at `/data/xreader/postgres`
-- `redis`
-- `api`
-- `web`
-- `worker`
+- `xreader` — single binary serving HTTP on port 3000
+- `postgres` — Postgres 16 with a named volume for data persistence
+- `cloudflared` (optional) — Cloudflare Tunnel for exposing the service
 
-## 4) Run database migrations
+## 3) Required environment variables
 
-Run the migrations before opening traffic to the app.
+| Variable | Description |
+|---|---|
+| `SESSION_SECRET` | Random secret for cookie signing (generate with `openssl rand -hex 32`) |
+| `POSTGRES_PASSWORD` | Password for the Postgres `xreader` user |
 
-If you have the `migrate` CLI installed on the host, run:
+`DATABASE_URL` is auto-configured in the Docker Compose file using `POSTGRES_PASSWORD`.
+
+### Optional environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `GITHUB_CLIENT_ID` | (none) | GitHub OAuth App client ID (can also be set via Setup Wizard) |
+| `GITHUB_CLIENT_SECRET` | (none) | GitHub OAuth App client secret (can also be set via Setup Wizard) |
+| `GITHUB_CALLBACK_URL` | (none) | OAuth callback URL (can also be set via Setup Wizard) |
+| `PORT` | `3000` | HTTP listen port |
+| `SETUP_TOKEN` | (auto-generated) | Token for the Setup Wizard; if unset, a random one is printed to logs |
+| `COOKIE_SECURE` | (unset) | Set to `true` to mark session cookies as Secure (use behind HTTPS) |
+| `XREADER_AI_ENCRYPTION_KEY` | (derived from SESSION_SECRET) | Separate key for encrypting AI API keys stored in DB |
+| `TZ` | `Asia/Shanghai` | Container timezone |
+
+## 4) Initial setup via Setup Wizard
+
+On first launch with no admin users configured, xReader prints a setup token to the container logs:
 
 ```bash
-export DATABASE_URL="$(grep '^DATABASE_URL=' /etc/xreader/.env | cut -d= -f2-)"
-cd /data/xreader/xreader-web/server
-migrate -path db/migrations -database "$DATABASE_URL" up
+docker compose logs xreader | grep "SETUP TOKEN"
 ```
 
-If you prefer to keep everything inside Docker, run the same migration command from a disposable helper container that has the `migrate` binary available.
+Open `https://your-domain.com/setup` in a browser and enter the token. The wizard guides you through:
 
-## 5) Seed the first admin
+1. GitHub OAuth configuration (client ID, secret, callback URL)
+2. AI provider settings (base URL, model, API key)
+3. First admin user (GitHub username)
 
-Seed the GitHub username that should receive admin access:
+All settings are stored in the database and take effect without restarting.
 
-```bash
-docker compose -f docker-compose.prod.yml exec api ./api seed-admin --github-username=<username>
-```
-
-This adds the username to the allowlist and upgrades the user role to `admin` once the account exists.
-
-## 6) Verify health
-
-Check the API health endpoint:
+## 5) Verify health
 
 ```bash
-curl -fsS http://localhost:8080/health
+curl -fsS http://localhost:3000/health
 ```
 
 Expected response:
@@ -86,24 +75,38 @@ Expected response:
 {"status":"ok"}
 ```
 
-You should also confirm the web app is reachable on port 3000 and that the worker is running in the background.
-
-## 7) Useful operational commands
+## 6) Useful operational commands
 
 Check container status:
 
 ```bash
-docker compose -f docker-compose.prod.yml ps
+docker compose ps
 ```
 
 View logs:
 
 ```bash
-docker compose -f docker-compose.prod.yml logs -f api
+docker compose logs -f xreader
 ```
 
-Restart one service:
+Restart the service:
 
 ```bash
-docker compose -f docker-compose.prod.yml restart api
+docker compose restart xreader
 ```
+
+Seed an admin manually (alternative to the Setup Wizard):
+
+```bash
+docker compose exec xreader /xreader seed-admin --github-username=<username>
+```
+
+## 7) Updating
+
+Pull the latest image and recreate:
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+Migrations run automatically on startup. No manual migration step is needed.

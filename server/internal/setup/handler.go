@@ -9,7 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jin/xreader-web/internal/crypto"
+	"github.com/razeencheng/xreader/internal/crypto"
 )
 
 // Handler implements the Setup Wizard endpoints. It is secured by a

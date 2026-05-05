@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jin/xreader-web/db/gen"
-	"github.com/jin/xreader-web/internal/ai"
-	"github.com/jin/xreader-web/internal/source"
+	"github.com/razeencheng/xreader/db/gen"
+	"github.com/razeencheng/xreader/internal/ai"
+	"github.com/razeencheng/xreader/internal/source"
 )
 
 type Worker struct {

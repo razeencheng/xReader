@@ -8,12 +8,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jin/xreader-web/db/gen"
+	"github.com/razeencheng/xreader/db/gen"
 )
 
 var errNotFound = errors.New("not found")
+var errForbidden = errors.New("forbidden")
 
 type ArticleService struct {
 	pool           *pgxpool.Pool
@@ -143,26 +145,6 @@ func (s *ArticleService) ListBySourceEnriched(ctx context.Context, userID, sourc
 	return out, nil
 }
 
-func (s *ArticleService) ListUnreadEnriched(ctx context.Context, userID int64, lang string) ([]EnrichedArticle, error) {
-	rows, err := s.queries.ListUnreadArticlesEnriched(ctx, gen.ListUnreadArticlesEnrichedParams{
-		UserID: userID, TargetLanguage: lang,
-	})
-	if err != nil {
-		return nil, err
-	}
-	out := make([]EnrichedArticle, len(rows))
-	for i, r := range rows {
-		out[i] = EnrichedArticle{
-			ID: r.ID, SourceID: r.SourceID, Title: r.Title,
-			TitleTranslated: r.TitleTranslated, Summary: r.Summary,
-			SourceTitle: r.SourceTitle, Link: r.Link, Language: r.Language,
-			Author: r.Author, PublishedAt: r.PublishedAt, ContentText: r.ContentText,
-			IsRead: r.IsRead, IsStarred: r.IsStarred,
-		}
-	}
-	return out, nil
-}
-
 func (s *ArticleService) ListBySource(ctx context.Context, userID, sourceID int64) ([]gen.Article, error) {
 	_ = userID
 	return s.queries.ListArticlesBySource(ctx, sourceID)
@@ -191,23 +173,32 @@ func (s *ArticleService) Search(ctx context.Context, userID int64, query string)
 	return items, nil
 }
 
-func (s *ArticleService) GetByID(ctx context.Context, userID, articleID int64) (gen.Article, error) {
+type ArticleWithSource struct {
+	gen.Article
+	SourceTitle string
+}
+
+func (s *ArticleService) GetByID(ctx context.Context, userID, articleID int64) (ArticleWithSource, error) {
 	article, err := s.queries.GetArticleByID(ctx, articleID)
 	if err != nil {
-		return gen.Article{}, errNotFound
+		return ArticleWithSource{}, errNotFound
 	}
 
 	source, err := s.queries.GetSourceByID(ctx, article.SourceID)
 	if err != nil || source.UserID != userID {
-		return gen.Article{}, errNotFound
+		return ArticleWithSource{}, errNotFound
 	}
 
-	return article, nil
+	return ArticleWithSource{Article: article, SourceTitle: source.Title}, nil
 }
 
 func (s *ArticleService) SetRead(ctx context.Context, userID, articleID int64, isRead bool) error {
 	return s.withTx(ctx, func(q *gen.Queries) error {
-		if err := q.SetArticleRead(ctx, gen.SetArticleReadParams{UserID: userID, ArticleID: articleID, IsRead: isRead}); err != nil {
+		_, err := q.SetArticleRead(ctx, gen.SetArticleReadParams{UserID: userID, ID: articleID, IsRead: isRead})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return errForbidden
+		}
+		if err != nil {
 			return err
 		}
 		return q.RecordStateChange(ctx, gen.RecordStateChangeParams{UserID: userID, ArticleID: articleID})
@@ -216,7 +207,11 @@ func (s *ArticleService) SetRead(ctx context.Context, userID, articleID int64, i
 
 func (s *ArticleService) SetStarred(ctx context.Context, userID, articleID int64, isStarred bool) error {
 	return s.withTx(ctx, func(q *gen.Queries) error {
-		if err := q.SetArticleStarred(ctx, gen.SetArticleStarredParams{UserID: userID, ArticleID: articleID, IsStarred: isStarred}); err != nil {
+		_, err := q.SetArticleStarred(ctx, gen.SetArticleStarredParams{UserID: userID, ID: articleID, IsStarred: isStarred})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return errForbidden
+		}
+		if err != nil {
 			return err
 		}
 		return q.RecordStateChange(ctx, gen.RecordStateChangeParams{UserID: userID, ArticleID: articleID})
@@ -224,11 +219,15 @@ func (s *ArticleService) SetStarred(ctx context.Context, userID, articleID int64
 }
 
 func (s *ArticleService) UpdateProgress(ctx context.Context, userID, articleID int64, progress []byte) error {
-	return s.queries.UpdateReadingProgress(ctx, gen.UpdateReadingProgressParams{
+	_, err := s.queries.UpdateReadingProgress(ctx, gen.UpdateReadingProgressParams{
 		UserID:          userID,
-		ArticleID:       articleID,
+		ID:              articleID,
 		ReadingProgress: progress,
 	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return errForbidden
+	}
+	return err
 }
 
 func (s *ArticleService) BatchSetRead(ctx context.Context, userID int64, scope string, isRead bool) ([]int64, error) {

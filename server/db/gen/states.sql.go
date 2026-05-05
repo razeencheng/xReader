@@ -273,57 +273,75 @@ func (q *Queries) RecordStateChange(ctx context.Context, arg RecordStateChangePa
 	return err
 }
 
-const setArticleRead = `-- name: SetArticleRead :exec
+const setArticleRead = `-- name: SetArticleRead :one
 INSERT INTO article_states (user_id, article_id, is_read, last_read_at)
-VALUES ($1, $2, $3, now())
+SELECT $1, a.id, $3, now()
+FROM articles a
+JOIN sources s ON a.source_id = s.id
+WHERE a.id = $2 AND s.user_id = $1 AND s.deleted_at IS NULL
 ON CONFLICT (user_id, article_id) DO UPDATE SET
   is_read = $3,
   last_read_at = now()
+RETURNING article_id
 `
 
 type SetArticleReadParams struct {
-	UserID    int64 `json:"user_id"`
-	ArticleID int64 `json:"article_id"`
-	IsRead    bool  `json:"is_read"`
+	UserID int64 `json:"user_id"`
+	ID     int64 `json:"id"`
+	IsRead bool  `json:"is_read"`
 }
 
-func (q *Queries) SetArticleRead(ctx context.Context, arg SetArticleReadParams) error {
-	_, err := q.db.Exec(ctx, setArticleRead, arg.UserID, arg.ArticleID, arg.IsRead)
-	return err
+func (q *Queries) SetArticleRead(ctx context.Context, arg SetArticleReadParams) (int64, error) {
+	row := q.db.QueryRow(ctx, setArticleRead, arg.UserID, arg.ID, arg.IsRead)
+	var article_id int64
+	err := row.Scan(&article_id)
+	return article_id, err
 }
 
-const setArticleStarred = `-- name: SetArticleStarred :exec
+const setArticleStarred = `-- name: SetArticleStarred :one
 INSERT INTO article_states (user_id, article_id, is_starred)
-VALUES ($1, $2, $3)
+SELECT $1, a.id, $3
+FROM articles a
+JOIN sources s ON a.source_id = s.id
+WHERE a.id = $2 AND s.user_id = $1 AND s.deleted_at IS NULL
 ON CONFLICT (user_id, article_id) DO UPDATE SET
   is_starred = $3
+RETURNING article_id
 `
 
 type SetArticleStarredParams struct {
 	UserID    int64 `json:"user_id"`
-	ArticleID int64 `json:"article_id"`
+	ID        int64 `json:"id"`
 	IsStarred bool  `json:"is_starred"`
 }
 
-func (q *Queries) SetArticleStarred(ctx context.Context, arg SetArticleStarredParams) error {
-	_, err := q.db.Exec(ctx, setArticleStarred, arg.UserID, arg.ArticleID, arg.IsStarred)
-	return err
+func (q *Queries) SetArticleStarred(ctx context.Context, arg SetArticleStarredParams) (int64, error) {
+	row := q.db.QueryRow(ctx, setArticleStarred, arg.UserID, arg.ID, arg.IsStarred)
+	var article_id int64
+	err := row.Scan(&article_id)
+	return article_id, err
 }
 
-const updateReadingProgress = `-- name: UpdateReadingProgress :exec
+const updateReadingProgress = `-- name: UpdateReadingProgress :one
 INSERT INTO article_states (user_id, article_id, reading_progress)
-VALUES ($1, $2, $3)
+SELECT $1, a.id, $3
+FROM articles a
+JOIN sources s ON a.source_id = s.id
+WHERE a.id = $2 AND s.user_id = $1 AND s.deleted_at IS NULL
 ON CONFLICT (user_id, article_id) DO UPDATE SET
   reading_progress = $3
+RETURNING article_id
 `
 
 type UpdateReadingProgressParams struct {
 	UserID          int64  `json:"user_id"`
-	ArticleID       int64  `json:"article_id"`
+	ID              int64  `json:"id"`
 	ReadingProgress []byte `json:"reading_progress"`
 }
 
-func (q *Queries) UpdateReadingProgress(ctx context.Context, arg UpdateReadingProgressParams) error {
-	_, err := q.db.Exec(ctx, updateReadingProgress, arg.UserID, arg.ArticleID, arg.ReadingProgress)
-	return err
+func (q *Queries) UpdateReadingProgress(ctx context.Context, arg UpdateReadingProgressParams) (int64, error) {
+	row := q.db.QueryRow(ctx, updateReadingProgress, arg.UserID, arg.ID, arg.ReadingProgress)
+	var article_id int64
+	err := row.Scan(&article_id)
+	return article_id, err
 }

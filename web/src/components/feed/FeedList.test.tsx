@@ -38,7 +38,7 @@ test('FeedList shows all caught up message when unread filter has no items', asy
 
   render(<FeedList />, { wrapper });
 
-  expect(await screen.findByText(/已全部处理/)).toBeInTheDocument();
+  expect(await screen.findByText(/全部读完|清空未读|阅读进度|一篇不落|全部搞定|未读清零/)).toBeInTheDocument();
 });
 
 test('FeedList turns a zero-source account into subscription onboarding', async () => {
@@ -250,7 +250,7 @@ test('keeps a just-read article visible in unread filter before delayed dismissa
   expect(screen.getByRole('button', { name: '撤销已读' })).toBeInTheDocument();
 });
 
-test('dismisses a just-read article from unread filter after the grace period', async () => {
+test('undo button disappears after the grace period while article stays visible', async () => {
   vi.mocked(apiFetch).mockImplementation(async (path) => {
     if (String(path).startsWith('/api/articles?')) {
       return {
@@ -275,11 +275,12 @@ test('dismisses a just-read article from unread filter after the grace period', 
 
   await userEvent.click(await screen.findByRole('button', { name: '标已读' }));
   expect(screen.getByText('Delayed Archive Article')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '撤销已读' })).toBeInTheDocument();
 
   await new Promise((resolve) => setTimeout(resolve, 3100));
 
-  expect(screen.queryByText('Delayed Archive Article')).not.toBeInTheDocument();
-  expect(screen.getByText(/已全部处理/)).toBeInTheDocument();
+  expect(screen.getByText('Delayed Archive Article')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '撤销已读' })).not.toBeInTheDocument();
 }, 8000);
 
 test('can batch mark the current view read and undo it', async () => {
@@ -324,7 +325,6 @@ test('can batch mark the current view read and undo it', async () => {
   expect(screen.queryByRole('button', { name: '整理未读' })).not.toBeInTheDocument();
   const bulkReadButton = await screen.findByRole('button', { name: '全部已读' });
   expect(bulkReadButton).toBeInTheDocument();
-  expect(bulkReadButton).toHaveClass('min-h-11', 'md:min-h-0');
 
   await userEvent.click(screen.getByRole('button', { name: '全部2' }));
   expect(screen.queryByRole('button', { name: '全部已读' })).not.toBeInTheDocument();
@@ -341,7 +341,8 @@ test('can batch mark the current view read and undo it', async () => {
   await userEvent.click(screen.getByRole('button', { name: '确认标记全部已读' }));
 
   expect(await screen.findByText(/已将当前视图 2 篇标为已读/)).toBeInTheDocument();
-  expect(screen.queryByText('Bulk One')).not.toBeInTheDocument();
+  expect(screen.getByText('Bulk One')).toBeInTheDocument();
+  expect(screen.getByText('Bulk Two')).toBeInTheDocument();
 
   await userEvent.click(screen.getByRole('button', { name: '撤销批量标已读' }));
 

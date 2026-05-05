@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jin/xreader-web/db/gen"
+	"github.com/razeencheng/xreader/db/gen"
 )
 
 type EagerJob struct {

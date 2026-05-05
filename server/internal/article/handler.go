@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jin/xreader-web/db/gen"
-	"github.com/jin/xreader-web/internal/middleware"
+	"github.com/razeencheng/xreader/db/gen"
+	"github.com/razeencheng/xreader/internal/middleware"
 )
 
 type ArticleHandler struct {
@@ -138,7 +138,7 @@ func (h *ArticleHandler) GetByID(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	articleRow, err := h.Service.GetByID(ctx, user.ID, id)
+	result, err := h.Service.GetByID(ctx, user.ID, id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
 		return
@@ -149,7 +149,9 @@ func (h *ArticleHandler) GetByID(c *gin.Context) {
 		state = gen.ArticleState{}
 	}
 
-	resp := articleDetailResponse{articleResponse: toArticleResponse(articleRow, true), IsRead: state.IsRead, IsStarred: state.IsStarred}
+	articleResp := toArticleResponse(result.Article, true)
+	articleResp.SourceTitle = result.SourceTitle
+	resp := articleDetailResponse{articleResponse: articleResp, IsRead: state.IsRead, IsStarred: state.IsStarred}
 	targetLang := user.NativeLanguage
 	if targetLang == "" {
 		targetLang = "zh-CN"
@@ -189,12 +191,20 @@ func (h *ArticleHandler) UpdateState(c *gin.Context) {
 	ctx := c.Request.Context()
 	if req.IsRead != nil {
 		if err := h.Service.SetRead(ctx, user.ID, id, *req.IsRead); err != nil {
+			if errors.Is(err, errForbidden) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
+				return
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update state"})
 			return
 		}
 	}
 	if req.IsStarred != nil {
 		if err := h.Service.SetStarred(ctx, user.ID, id, *req.IsStarred); err != nil {
+			if errors.Is(err, errForbidden) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
+				return
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update state"})
 			return
 		}
@@ -223,6 +233,10 @@ func (h *ArticleHandler) UpdateProgress(c *gin.Context) {
 	}
 
 	if err := h.Service.UpdateProgress(c.Request.Context(), user.ID, id, body); err != nil {
+		if errors.Is(err, errForbidden) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update progress"})
 		return
 	}

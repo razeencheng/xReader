@@ -32,7 +32,7 @@ func (h *Handler) BeginLogin(c *gin.Context) {
 		return
 	}
 	// Set the CSRF state as an HttpOnly cookie so HandleCallback can verify it.
-	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetSameSite(http.SameSiteStrictMode)
 	c.SetCookie("xreader_oauth_state", state, 600, "/", "", h.isSecureCookie(c), true)
 	c.Redirect(http.StatusTemporaryRedirect, redirectURL)
 }
@@ -54,7 +54,7 @@ func (h *Handler) HandleCallback(c *gin.Context) {
 	result, err := h.Service.Callback(c.Request.Context(), stateParam, cookieValue, code, c.GetHeader("User-Agent"))
 
 	// Clear the one-time state cookie regardless of outcome.
-	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetSameSite(http.SameSiteStrictMode)
 	c.SetCookie("xreader_oauth_state", "", -1, "/", "", h.isSecureCookie(c), true)
 
 	if err != nil {
