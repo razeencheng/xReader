@@ -63,10 +63,10 @@ func (q *Queries) GetSession(ctx context.Context, id string) (AuthSession, error
 }
 
 const getUserByGithubID = `-- name: GetUserByGithubID :one
-SELECT id, github_id, github_username, avatar_url, native_language, role, density_pref, theme_pref, created_at, fever_api_key FROM users WHERE github_id = $1
+SELECT id, github_id, github_username, avatar_url, native_language, role, density_pref, theme_pref, created_at, fever_api_key, expires_at FROM users WHERE github_id = $1
 `
 
-func (q *Queries) GetUserByGithubID(ctx context.Context, githubID int64) (User, error) {
+func (q *Queries) GetUserByGithubID(ctx context.Context, githubID pgtype.Int8) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByGithubID, githubID)
 	var i User
 	err := row.Scan(
@@ -80,12 +80,13 @@ func (q *Queries) GetUserByGithubID(ctx context.Context, githubID int64) (User, 
 		&i.ThemePref,
 		&i.CreatedAt,
 		&i.FeverApiKey,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
 
 const getUserByGithubUsername = `-- name: GetUserByGithubUsername :one
-SELECT id, github_id, github_username, avatar_url, native_language, role, density_pref, theme_pref, created_at, fever_api_key FROM users WHERE github_username = $1
+SELECT id, github_id, github_username, avatar_url, native_language, role, density_pref, theme_pref, created_at, fever_api_key, expires_at FROM users WHERE github_username = $1
 `
 
 func (q *Queries) GetUserByGithubUsername(ctx context.Context, githubUsername string) (User, error) {
@@ -102,12 +103,13 @@ func (q *Queries) GetUserByGithubUsername(ctx context.Context, githubUsername st
 		&i.ThemePref,
 		&i.CreatedAt,
 		&i.FeverApiKey,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, github_id, github_username, avatar_url, native_language, role, density_pref, theme_pref, created_at, fever_api_key FROM users WHERE id = $1
+SELECT id, github_id, github_username, avatar_url, native_language, role, density_pref, theme_pref, created_at, fever_api_key, expires_at FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
@@ -124,6 +126,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
 		&i.ThemePref,
 		&i.CreatedAt,
 		&i.FeverApiKey,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
@@ -184,7 +187,7 @@ SET native_language = COALESCE(NULLIF($2, ''), native_language),
     density_pref = COALESCE(NULLIF($3, ''), density_pref),
     theme_pref = COALESCE(NULLIF($4, ''), theme_pref)
 WHERE id = $1
-RETURNING id, github_id, github_username, avatar_url, native_language, role, density_pref, theme_pref, created_at, fever_api_key
+RETURNING id, github_id, github_username, avatar_url, native_language, role, density_pref, theme_pref, created_at, fever_api_key, expires_at
 `
 
 type UpdateUserSettingsParams struct {
@@ -213,6 +216,7 @@ func (q *Queries) UpdateUserSettings(ctx context.Context, arg UpdateUserSettings
 		&i.ThemePref,
 		&i.CreatedAt,
 		&i.FeverApiKey,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
@@ -223,11 +227,11 @@ VALUES ($1, $2, $3)
 ON CONFLICT (github_id) DO UPDATE SET
     github_username = EXCLUDED.github_username,
     avatar_url = EXCLUDED.avatar_url
-RETURNING id, github_id, github_username, avatar_url, native_language, role, density_pref, theme_pref, created_at, fever_api_key
+RETURNING id, github_id, github_username, avatar_url, native_language, role, density_pref, theme_pref, created_at, fever_api_key, expires_at
 `
 
 type UpsertUserParams struct {
-	GithubID       int64       `json:"github_id"`
+	GithubID       pgtype.Int8 `json:"github_id"`
 	GithubUsername string      `json:"github_username"`
 	AvatarUrl      pgtype.Text `json:"avatar_url"`
 }
@@ -246,6 +250,7 @@ func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, e
 		&i.ThemePref,
 		&i.CreatedAt,
 		&i.FeverApiKey,
+		&i.ExpiresAt,
 	)
 	return i, err
 }

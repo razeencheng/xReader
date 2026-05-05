@@ -1,6 +1,7 @@
 package source
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,8 +13,9 @@ import (
 )
 
 type SourceHandler struct {
-	Service  *SourceService
-	JobStore JobStore
+	Service         *SourceService
+	JobStore        JobStore
+	ContentOwnerID  func(ctx context.Context) (int64, error)
 }
 
 func NewSourceHandler(svc *SourceService, jobStore JobStore) *SourceHandler {
@@ -25,6 +27,19 @@ func NewSourceHandler(svc *SourceService, jobStore JobStore) *SourceHandler {
 
 func (h *SourceHandler) List(c *gin.Context) {
 	user := middleware.GetUser(c)
+	if user.Role == "guest" && h.ContentOwnerID != nil {
+		if adminID, err := h.ContentOwnerID(c.Request.Context()); err == nil {
+			// Fetch sources owned by the admin but compute unread counts against
+			// the guest's own article_states so guests see their read progress.
+			sources, err := h.Service.GuestList(c.Request.Context(), adminID, user.ID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list sources"})
+				return
+			}
+			c.JSON(http.StatusOK, sources)
+			return
+		}
+	}
 	sources, err := h.Service.List(c.Request.Context(), user.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list sources"})
@@ -191,7 +206,13 @@ func (h *SourceHandler) ExportOPML(c *gin.Context) {
 		return
 	}
 
-	data, err := h.Service.ExportOPML(c.Request.Context(), user.ID, "xReader Export")
+	ownerID := user.ID
+	if user.Role == "guest" && h.ContentOwnerID != nil {
+		if id, err := h.ContentOwnerID(c.Request.Context()); err == nil {
+			ownerID = id
+		}
+	}
+	data, err := h.Service.ExportOPML(c.Request.Context(), ownerID, "xReader Export")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate OPML"})
 		return

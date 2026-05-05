@@ -30,7 +30,6 @@ export async function apiFetch<T = unknown>(
   });
 
   if (res.status === 401) {
-    window.location.href = '/login';
     throw new ApiError(401, 'UNAUTHORIZED', 'Not authenticated');
   }
 

@@ -315,6 +315,12 @@ const en: MessageMap = {
   'settings.feverInstructions': 'Use these credentials in Reeder, NetNewsWire, or other Fever-compatible RSS clients. Set the server URL and paste the API key when prompted.',
   'settings.feverRegenerate': 'Generate a new key',
 
+  'settings.guestMode': 'Guest Mode',
+  'settings.guestModeDesc': 'Allow visitors to browse without logging in.',
+  'settings.guestModeEnabled': 'Guest mode is enabled.',
+  'settings.guestModeDisabled': 'Guest mode is disabled.',
+  'settings.guestModeSaveError': 'Failed to update guest mode.',
+
   'tweaks.title': 'Reading Settings',
   'tweaks.layout': 'Layout',
   'tweaks.layoutClassic': 'Classic',
@@ -382,6 +388,9 @@ const en: MessageMap = {
   'setup.submitting': 'Setting up…',
   'setup.submit': 'Complete Setup',
   'setup.statusError': 'Failed to check setup status',
+
+  'guest.banner': 'Guest Mode · Data expires in 24h',
+  'guest.signIn': 'Sign in with GitHub',
 };
 
 const zh: MessageMap = {
@@ -680,6 +689,12 @@ const zh: MessageMap = {
   'settings.feverInstructions': '在 Reeder、NetNewsWire 或其他 Fever 兼容客户端中使用这些凭证。设置服务器地址并在提示时粘贴 API Key。',
   'settings.feverRegenerate': '重新生成',
 
+  'settings.guestMode': '访客模式',
+  'settings.guestModeDesc': '允许访客无需登录即可浏览。',
+  'settings.guestModeEnabled': '访客模式已开启。',
+  'settings.guestModeDisabled': '访客模式已关闭。',
+  'settings.guestModeSaveError': '访客模式设置保存失败。',
+
   'tweaks.title': '阅读设置',
   'tweaks.layout': '版式',
   'tweaks.layoutClassic': '经典',
@@ -747,6 +762,9 @@ const zh: MessageMap = {
   'setup.submitting': '正在初始化…',
   'setup.submit': '完成初始化',
   'setup.statusError': '无法检查初始化状态',
+
+  'guest.banner': '访客模式 · 数据 24 小时后清除',
+  'guest.signIn': '使用 GitHub 登录',
 };
 
 function withOverrides(overrides: MessageMap): MessageMap {

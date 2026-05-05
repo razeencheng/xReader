@@ -120,7 +120,7 @@ type Source struct {
 
 type User struct {
 	ID             int64              `json:"id"`
-	GithubID       int64              `json:"github_id"`
+	GithubID       pgtype.Int8        `json:"github_id"`
 	GithubUsername string             `json:"github_username"`
 	AvatarUrl      pgtype.Text        `json:"avatar_url"`
 	NativeLanguage string             `json:"native_language"`
@@ -129,4 +129,5 @@ type User struct {
 	ThemePref      string             `json:"theme_pref"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	FeverApiKey    pgtype.Text        `json:"fever_api_key"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
 }

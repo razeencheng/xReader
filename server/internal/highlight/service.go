@@ -38,7 +38,7 @@ func NewHighlightService(pool *pgxpool.Pool) *HighlightService {
 	return &HighlightService{pool: pool, queries: gen.New(pool)}
 }
 
-func (s *HighlightService) Create(ctx context.Context, userID int64, params CreateParams) (*gen.Highlight, error) {
+func (s *HighlightService) Create(ctx context.Context, userID, contentOwnerID int64, params CreateParams) (*gen.Highlight, error) {
 	params.Layer = strings.TrimSpace(params.Layer)
 	if err := validateLayer(params.Layer); err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ func (s *HighlightService) Create(ctx context.Context, userID int64, params Crea
 	if err := validateOffsets(params.TextStartOffset, params.TextEndOffset); err != nil {
 		return nil, err
 	}
-	if err := s.validateQuotedText(ctx, userID, params); err != nil {
+	if err := s.validateQuotedText(ctx, contentOwnerID, params); err != nil {
 		return nil, err
 	}
 
@@ -92,8 +92,8 @@ func (s *HighlightService) Delete(ctx context.Context, userID, highlightID int64
 	return s.queries.DeleteHighlight(ctx, gen.DeleteHighlightParams{ID: highlightID, UserID: userID})
 }
 
-func (s *HighlightService) validateQuotedText(ctx context.Context, userID int64, params CreateParams) error {
-	paragraphText, err := s.paragraphText(ctx, userID, params)
+func (s *HighlightService) validateQuotedText(ctx context.Context, contentOwnerID int64, params CreateParams) error {
+	paragraphText, err := s.paragraphText(ctx, contentOwnerID, params)
 	if err != nil {
 		return err
 	}
@@ -108,14 +108,14 @@ func (s *HighlightService) validateQuotedText(ctx context.Context, userID int64,
 	return nil
 }
 
-func (s *HighlightService) paragraphText(ctx context.Context, userID int64, params CreateParams) (string, error) {
+func (s *HighlightService) paragraphText(ctx context.Context, contentOwnerID int64, params CreateParams) (string, error) {
 	article, err := s.queries.GetArticleByID(ctx, params.ArticleID)
 	if err != nil {
 		return "", errNotFound
 	}
 
 	source, err := s.queries.GetSourceByID(ctx, article.SourceID)
-	if err != nil || source.UserID != userID {
+	if err != nil || source.UserID != contentOwnerID {
 		return "", errNotFound
 	}
 

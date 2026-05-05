@@ -7,6 +7,10 @@ import { apiFetch } from '@/lib/api-client';
 import { useI18n } from '@/lib/i18n';
 import { useAuthStore } from '@/stores/useAuthStore';
 
+interface GuestSettings {
+  enabled: boolean;
+}
+
 interface AISettings {
   endpoint: string;
   model: string;
@@ -24,6 +28,7 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { t } = useI18n();
   const isAdmin = useAuthStore((state) => state.user?.role === 'admin');
+  const isGuest = useAuthStore((state) => state.user?.role === 'guest');
   const [endpoint, setEndpoint] = useState('');
   const [model, setModel] = useState('');
   const [apiKey, setAPIKey] = useState('');
@@ -85,6 +90,22 @@ export default function SettingsPage() {
       setFeverMessage(t('settings.feverGenerated'));
     },
     onError: () => setFeverMessage(t('settings.feverError')),
+  });
+
+  const { data: guestSettings } = useQuery({
+    queryKey: ['guest-settings'],
+    queryFn: () => apiFetch<GuestSettings>('/api/settings/guest'),
+    enabled: isAdmin,
+  });
+
+  const toggleGuestMode = useMutation({
+    mutationFn: (enabled: boolean) =>
+      apiFetch('/api/settings/guest', {
+        method: 'PATCH',
+        body: JSON.stringify({ enabled }),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['guest-settings'] }),
+    onError: () => setMessage(t('settings.guestModeSaveError')),
   });
 
   const copyToClipboard = async (text: string, kind: 'key' | 'url') => {
@@ -190,7 +211,33 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="mt-6 rounded-[8px] border border-[var(--border-light)] bg-[var(--bg)] p-5 shadow-[0_18px_40px_rgba(65,52,35,0.06)]">
+        {isAdmin && (
+          <section className="mt-6 rounded-[8px] border border-[var(--border-light)] bg-[var(--bg)] p-5 shadow-[0_18px_40px_rgba(65,52,35,0.06)]">
+            <div className="mb-5">
+              <h2 className="font-serif text-2xl font-semibold text-[var(--text-body)]">{t('settings.guestMode')}</h2>
+              <p className="mt-2 font-[system-ui] text-sm leading-6 text-[var(--text-muted)]">{t('settings.guestModeDesc')}</p>
+            </div>
+            <div className="flex items-center gap-3 font-[system-ui]">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={guestSettings?.enabled ?? false}
+                onClick={() => toggleGuestMode.mutate(!(guestSettings?.enabled ?? false))}
+                disabled={toggleGuestMode.isPending || guestSettings === undefined}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${(guestSettings?.enabled ?? false) ? 'bg-[var(--accent)]' : 'bg-[var(--border-light)]'}`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform duration-200 ease-in-out ${(guestSettings?.enabled ?? false) ? 'translate-x-5' : 'translate-x-0'}`}
+                />
+              </button>
+              <span className="text-sm text-[var(--text-muted)]">
+                {(guestSettings?.enabled ?? false) ? t('settings.guestModeEnabled') : t('settings.guestModeDisabled')}
+              </span>
+            </div>
+          </section>
+        )}
+
+        {!isGuest && <section className="mt-6 rounded-[8px] border border-[var(--border-light)] bg-[var(--bg)] p-5 shadow-[0_18px_40px_rgba(65,52,35,0.06)]">
           <div className="mb-5">
             <h2 className="font-serif text-2xl font-semibold text-[var(--text-body)]">{t('settings.feverTitle')}</h2>
             <p className="mt-2 font-[system-ui] text-sm leading-6 text-[var(--text-muted)]">{t('settings.feverDescription')}</p>
@@ -271,7 +318,7 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
-        </section>
+        </section>}
       </div>
     </main>
   );

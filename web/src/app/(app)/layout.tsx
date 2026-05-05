@@ -10,6 +10,7 @@ import { useI18n } from '@/lib/i18n';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useUIStore } from '@/stores/useUIStore';
 
+import { GuestBanner } from '@/components/layout/GuestBanner';
 import { KeyboardShortcutsModal } from '@/components/layout/KeyboardShortcutsModal';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileTopBar, TabletTopNav } from '@/components/layout/ResponsiveAppNav';
@@ -66,6 +67,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-[var(--bg-body)] text-[var(--text-body)]">
+      <GuestBanner />
       <TabletTopNav focusMode={focusMode} />
       <MobileTopBar focusMode={focusMode} />
 

@@ -1,6 +1,7 @@
 package highlight
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,7 +13,8 @@ import (
 )
 
 type HighlightHandler struct {
-	Service *HighlightService
+	Service        *HighlightService
+	ContentOwnerID func(ctx context.Context) (int64, error)
 }
 
 func NewHighlightHandler(svc *HighlightService) *HighlightHandler {
@@ -68,7 +70,13 @@ func (h *HighlightHandler) Create(c *gin.Context) {
 		return
 	}
 
-	created, err := h.Service.Create(c.Request.Context(), user.ID, CreateParams{
+	contentOwnerID := user.ID
+	if user.Role == "guest" && h.ContentOwnerID != nil {
+		if id, err := h.ContentOwnerID(c.Request.Context()); err == nil {
+			contentOwnerID = id
+		}
+	}
+	created, err := h.Service.Create(c.Request.Context(), user.ID, contentOwnerID, CreateParams{
 		ArticleID:       req.ArticleID,
 		Layer:           strings.TrimSpace(req.Layer),
 		ParagraphIndex:  req.ParagraphIndex,

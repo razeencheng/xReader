@@ -73,7 +73,7 @@ func withHighlightUser(userID int64) gin.HandlerFunc {
 func insertHighlight(t *testing.T, svc *HighlightService, ctx context.Context, userID, articleID int64) gen.Highlight {
 	t.Helper()
 	note := "initial note"
-	created, err := svc.Create(ctx, userID, CreateParams{
+	created, err := svc.Create(ctx, userID, userID, CreateParams{
 		ArticleID:       articleID,
 		Layer:           "original",
 		ParagraphIndex:  0,
