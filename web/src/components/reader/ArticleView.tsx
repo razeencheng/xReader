@@ -3,6 +3,8 @@
 import { useCallback } from 'react';
 import { apiFetch } from '@/lib/api-client';
 import { broadcast } from '@/lib/broadcast';
+import { useQueryClient } from '@tanstack/react-query';
+import { applyArticleStateChange } from '@/lib/article-state-cache';
 import { ArticleReader } from '@/components/reader/ArticleReader';
 import { NextUpCard } from '@/components/reader/NextUpCard';
 import type { ArticleItem } from '@/lib/types';
@@ -33,18 +35,27 @@ export function ArticleView({
   total,
 }: ArticleViewProps) {
   const articleId = Number(id);
+  const queryClient = useQueryClient();
 
-  const markRead = useCallback(async (articleIdToMark: number) => {
-    try {
-      await apiFetch(`/api/articles/${articleIdToMark}/state`, {
-        method: 'PATCH',
-        body: JSON.stringify({ is_read: true }),
-      });
-      broadcast({ type: 'state-change', articleId: articleIdToMark, is_read: true });
-    } catch {
-      // Keep navigation responsive
-    }
-  }, []);
+  const markRead = useCallback(
+    async (articleIdToMark: number) => {
+      const cached = queryClient.getQueryData<ArticleItem>(['article', String(articleIdToMark)]);
+      const previousRead = cached?.is_read ?? false;
+      if (previousRead) return; // already read; nothing to do
+
+      applyArticleStateChange(queryClient, { articleId: articleIdToMark, is_read: true });
+      try {
+        await apiFetch(`/api/articles/${articleIdToMark}/state`, {
+          method: 'PATCH',
+          body: JSON.stringify({ is_read: true }),
+        });
+        broadcast({ type: 'state-change', articleId: articleIdToMark, is_read: true });
+      } catch {
+        applyArticleStateChange(queryClient, { articleId: articleIdToMark, is_read: previousRead });
+      }
+    },
+    [queryClient],
+  );
 
   return (
     <ArticleReader
