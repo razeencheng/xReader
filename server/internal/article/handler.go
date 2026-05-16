@@ -77,6 +77,17 @@ type articleReadCounts struct {
 type articleChangeResponse struct {
 	ArticleID int64  `json:"article_id"`
 	ChangedAt string `json:"changed_at"`
+	IsRead    bool   `json:"is_read"`
+	IsStarred bool   `json:"is_starred"`
+}
+
+func toArticleChangeResponse(row gen.ListStateChangesSinceRow) articleChangeResponse {
+	return articleChangeResponse{
+		ArticleID: row.ArticleID,
+		ChangedAt: row.ChangedAt.Time.UTC().Format(time.RFC3339Nano),
+		IsRead:    row.IsRead,
+		IsStarred: row.IsStarred,
+	}
 }
 
 type originalContentResponse struct {
@@ -342,7 +353,7 @@ func (h *ArticleHandler) Changes(c *gin.Context) {
 
 	items := make([]articleChangeResponse, 0, len(changes))
 	for _, change := range changes {
-		items = append(items, articleChangeResponse{ArticleID: change.ArticleID, ChangedAt: change.ChangedAt.Time.UTC().Format(time.RFC3339Nano)})
+		items = append(items, toArticleChangeResponse(change))
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }

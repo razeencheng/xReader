@@ -38,9 +38,15 @@ INSERT INTO article_state_changes (user_id, article_id)
 VALUES ($1, $2);
 
 -- name: ListStateChangesSince :many
-SELECT article_id, changed_at FROM article_state_changes
-WHERE user_id = $1 AND changed_at > $2
-ORDER BY changed_at ASC;
+SELECT sc.article_id,
+       sc.changed_at,
+       COALESCE(st.is_read, false)    AS is_read,
+       COALESCE(st.is_starred, false) AS is_starred
+FROM article_state_changes sc
+LEFT JOIN article_states st
+  ON st.user_id = sc.user_id AND st.article_id = sc.article_id
+WHERE sc.user_id = $1 AND sc.changed_at > $2
+ORDER BY sc.changed_at ASC;
 
 -- name: BatchSetReadBySource :many
 WITH upserted AS (

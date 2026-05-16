@@ -175,9 +175,15 @@ func (q *Queries) GetArticleState(ctx context.Context, arg GetArticleStateParams
 }
 
 const listStateChangesSince = `-- name: ListStateChangesSince :many
-SELECT article_id, changed_at FROM article_state_changes
-WHERE user_id = $1 AND changed_at > $2
-ORDER BY changed_at ASC
+SELECT sc.article_id,
+       sc.changed_at,
+       COALESCE(st.is_read, false)    AS is_read,
+       COALESCE(st.is_starred, false) AS is_starred
+FROM article_state_changes sc
+LEFT JOIN article_states st
+  ON st.user_id = sc.user_id AND st.article_id = sc.article_id
+WHERE sc.user_id = $1 AND sc.changed_at > $2
+ORDER BY sc.changed_at ASC
 `
 
 type ListStateChangesSinceParams struct {
@@ -188,6 +194,8 @@ type ListStateChangesSinceParams struct {
 type ListStateChangesSinceRow struct {
 	ArticleID int64              `json:"article_id"`
 	ChangedAt pgtype.Timestamptz `json:"changed_at"`
+	IsRead    bool               `json:"is_read"`
+	IsStarred bool               `json:"is_starred"`
 }
 
 func (q *Queries) ListStateChangesSince(ctx context.Context, arg ListStateChangesSinceParams) ([]ListStateChangesSinceRow, error) {
@@ -199,7 +207,12 @@ func (q *Queries) ListStateChangesSince(ctx context.Context, arg ListStateChange
 	items := []ListStateChangesSinceRow{}
 	for rows.Next() {
 		var i ListStateChangesSinceRow
-		if err := rows.Scan(&i.ArticleID, &i.ChangedAt); err != nil {
+		if err := rows.Scan(
+			&i.ArticleID,
+			&i.ChangedAt,
+			&i.IsRead,
+			&i.IsStarred,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
