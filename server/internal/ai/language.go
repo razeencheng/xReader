@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"strings"
 	"unicode"
 
 	"github.com/abadojack/whatlanggo"
@@ -39,6 +40,76 @@ func DetectLanguage(text string, fallback string) string {
 		return fallback
 	}
 	return "unknown"
+}
+
+// NormalizeLangCode reconciles stored native_language tags (zh-CN, en-US,
+// ja-JP, …) with the bare detector codes produced by langMap (en, ja, zh-CN).
+// zh-CN is already the detector code and stays as-is; region-tagged Latin/CJK
+// tags collapse to their base code. Unknown inputs pass through unchanged.
+func NormalizeLangCode(code string) string {
+	switch code {
+	case "zh-CN", "zh-Hans", "zh":
+		return "zh-CN"
+	case "zh-TW", "zh-Hant":
+		return "zh-CN"
+	}
+	if i := strings.IndexByte(code, '-'); i > 0 {
+		return code[:i]
+	}
+	return code
+}
+
+// DetectTitleLanguage detects a title's language from the title text alone.
+// Unlike DetectLanguage it never falls back to feed metadata (titles are short
+// and that fallback is what left English titles judged as the body language).
+// Returns "" when the language cannot be determined (e.g. only digits/symbols).
+func DetectTitleLanguage(title string) string {
+	if cjk := detectCJKByRunes(title); cjk != "" {
+		// Titles are short, so a kana-and-Han mix (common in Japanese
+		// headlines) can tie under detectCJKByRunes' hiragana+katakana > han
+		// rule and fall through to zh-CN. Any kana presence means Japanese.
+		if cjk == "zh-CN" {
+			for _, r := range title {
+				if unicode.Is(unicode.Hiragana, r) || unicode.Is(unicode.Katakana, r) {
+					return "ja"
+				}
+			}
+		}
+		return cjk
+	}
+
+	var letters int
+	for _, r := range title {
+		if unicode.IsLetter(r) {
+			letters++
+		}
+	}
+	if letters < 2 {
+		return ""
+	}
+
+	info := whatlanggo.Detect(title)
+	if !info.IsReliable() {
+		var ascii, nonASCII int
+		for _, r := range title {
+			if !unicode.IsLetter(r) {
+				continue
+			}
+			if r < 128 {
+				ascii++
+			} else {
+				nonASCII++
+			}
+		}
+		if ascii > 0 && ascii >= nonASCII {
+			return "en"
+		}
+		return ""
+	}
+	if code, ok := langMap[info.Lang]; ok {
+		return code
+	}
+	return ""
 }
 
 func detectCJKByRunes(text string) string {

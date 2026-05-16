@@ -37,3 +37,44 @@ func TestLanguageDetect_MixedChineseEnglish(t *testing.T) {
 	lang := DetectLanguage("Gadget System Framework（GSF）- 我开发的一个 Windows 10/11 桌面小工具框架", "")
 	require.Equal(t, "zh-CN", lang)
 }
+
+func TestDetectTitleLanguage(t *testing.T) {
+	cases := []struct {
+		name  string
+		title string
+		want  string
+	}{
+		{"english short", "Breaking News: AI Progress", "en"},
+		{"english tiny", "Go 1.24 released", "en"},
+		{"chinese", "人工智能的最新进展", "zh-CN"},
+		{"japanese kana", "アニメの新作発表", "ja"},
+		{"korean", "인공지능 뉴스", "ko"},
+		{"mixed han-present", "OpenAI 发布 GPT-5", "zh-CN"},
+		{"numbers/symbols only", "2026 — #1!", ""},
+		{"empty", "", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := DetectTitleLanguage(c.title); got != c.want {
+				t.Fatalf("DetectTitleLanguage(%q) = %q, want %q", c.title, got, c.want)
+			}
+		})
+	}
+}
+
+func TestNormalizeLangCode(t *testing.T) {
+	cases := map[string]string{
+		"zh-CN": "zh-CN",
+		"en-US": "en",
+		"ja-JP": "ja",
+		"ko-KR": "ko",
+		"en":    "en",
+		"ja":    "ja",
+		"":      "",
+	}
+	for in, want := range cases {
+		if got := NormalizeLangCode(in); got != want {
+			t.Fatalf("NormalizeLangCode(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
