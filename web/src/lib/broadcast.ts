@@ -56,42 +56,21 @@ function rememberLocalChange(change: StateChangePayload) {
   localChanges.set(stateChangeKey(change), Date.now());
 }
 
-function candidateKeys(
-  change: Pick<StateChangePayload, 'articleId' | 'is_read' | 'is_starred'>,
-) {
-  const keys = [stateChangeKey(change)];
-
-  if (change.is_read !== undefined) {
-    keys.push(stateChangeKey({ articleId: change.articleId, is_read: change.is_read }));
-  }
-
-  if (change.is_starred !== undefined) {
-    keys.push(stateChangeKey({ articleId: change.articleId, is_starred: change.is_starred }));
-  }
-
-  return keys;
-}
-
 export function wasLocallyBroadcast(
   change: Pick<StateChangePayload, 'articleId' | 'is_read' | 'is_starred'>,
 ) {
   pruneLocalChanges();
-  return candidateKeys(change).some((key) => localChanges.has(key));
+  return localChanges.has(stateChangeKey(change));
 }
 
 export function consumeLocalBroadcast(
   change: Pick<StateChangePayload, 'articleId' | 'is_read' | 'is_starred'>,
 ) {
   pruneLocalChanges();
-  let found = false;
-
-  for (const key of candidateKeys(change)) {
-    if (localChanges.delete(key)) {
-      found = true;
-    }
-  }
-
-  return found;
+  const key = stateChangeKey(change);
+  const exists = localChanges.has(key);
+  localChanges.delete(key);
+  return exists;
 }
 
 export function broadcast(msg: StateChangePayload) {
