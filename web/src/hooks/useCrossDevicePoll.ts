@@ -6,8 +6,19 @@ import { apiFetch } from '@/lib/api-client';
 import { applyArticleStateChange, type ArticleStateChange } from '@/lib/article-state-cache';
 import { consumeLocalBroadcast } from '@/lib/broadcast';
 
+interface ServerArticleChange {
+  article_id: number;
+  changed_at: string;
+  is_read?: boolean;
+  is_starred?: boolean;
+}
+
 interface ArticleChangeResponse {
-  items: Array<ArticleStateChange & { changed_at: string }>;
+  items: ServerArticleChange[];
+}
+
+function toStateChange(item: ServerArticleChange): ArticleStateChange {
+  return { articleId: item.article_id, is_read: item.is_read, is_starred: item.is_starred };
 }
 
 const POLL_INTERVAL_MS = 30_000;
@@ -47,13 +58,12 @@ export function useCrossDevicePoll(enabled = true) {
         }
 
         let newestChangeAt = pollStartedAt;
-        for (const change of response.items ?? []) {
-          newestChangeAt = laterTimestamp(newestChangeAt, change.changed_at);
-
+        for (const item of response.items ?? []) {
+          newestChangeAt = laterTimestamp(newestChangeAt, item.changed_at);
+          const change = toStateChange(item);
           if (consumeLocalBroadcast(change)) {
             continue;
           }
-
           applyArticleStateChange(queryClient, change);
         }
 
