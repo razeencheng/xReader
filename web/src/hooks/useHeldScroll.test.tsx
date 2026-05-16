@@ -132,4 +132,30 @@ describe('useHeldScroll', () => {
     expect(el.scrollTop).toBe(stopped);
     expect(cancel).toHaveBeenCalled();
   });
+
+  it('falls back to the other held key when one of two held keys is released', () => {
+    const { el } = setup();
+    keydown('j');
+    flushFrames(2);
+    const downPos = el.scrollTop;
+    expect(downPos).toBeGreaterThan(0);
+    keydown('k'); // both held; now scrolling up
+    flushFrames(2);
+    expect(el.scrollTop).toBeLessThan(downPos);
+    const upPos = el.scrollTop;
+    keyup('k'); // release k while j still held → must resume scrolling DOWN, not stop
+    flushFrames(3);
+    expect(el.scrollTop).toBeGreaterThan(upPos);
+    keyup('j');
+  });
+
+  it('a duplicate non-repeat keydown of an already-held key does not add an extra nudge', () => {
+    const { el } = setup();
+    keydown('j'); // one immediate nudge, no frames flushed yet
+    const afterFirst = el.scrollTop;
+    expect(afterFirst).toBeGreaterThan(0);
+    keydown('j'); // duplicate (repeat=false) — must be ignored, no second nudge
+    expect(el.scrollTop).toBe(afterFirst);
+    keyup('j');
+  });
 });

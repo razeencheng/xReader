@@ -7,6 +7,9 @@ interface HeldScrollOptions {
   disabled?: boolean;
 }
 
+// DOWN_KEYS/UP_KEYS must stay non-default-scroll keys (j/k): browser native
+// scroll keys (arrows/space/PageUp/PageDown) would native-scroll on held-key
+// repeats since we only preventDefault the first keydown.
 const DOWN_KEYS = new Set(['j']);
 const UP_KEYS = new Set(['k']);
 
@@ -34,6 +37,7 @@ export function useHeldScroll(
   useEffect(() => {
     if (disabled) return;
 
+    const held = new Set<string>(); // currently-held scroll keys ('j' / 'k')
     let direction = 0;
     let rafId: number | null = null;
     let pressStartedAt = 0;
@@ -58,11 +62,11 @@ export function useHeldScroll(
       rafId = requestAnimationFrame(step);
     };
 
-    const start = (dir: number) => {
-      // Immediate nudge so a quick tap always produces visible movement even
-      // if keyup cancels the rAF loop before the first frame fires.
-      applyScroll(dir, BASE_VELOCITY);
-      if (direction === dir) return;
+    // Begin (or redirect) the glide. Called only on a genuine key-state
+    // change, so the immediate tap nudge never double-fires on duplicate
+    // keydowns of an already-held key.
+    const drive = (dir: number) => {
+      applyScroll(dir, BASE_VELOCITY); // immediate nudge → a quick tap always moves
       direction = dir;
       pressStartedAt = now();
       if (rafId === null) {
@@ -78,33 +82,43 @@ export function useHeldScroll(
       }
     };
 
+    // Re-derive motion from the still-held keys (last-press semantics:
+    // whichever scroll key remains held wins; none held → stop).
+    const settle = () => {
+      if (held.has('j')) drive(1);
+      else if (held.has('k')) drive(-1);
+      else stop();
+    };
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (isEditableTarget(event.target) || isEditableTarget(document.activeElement)) return;
       const key = event.key.toLowerCase();
-      if (DOWN_KEYS.has(key)) {
-        event.preventDefault();
-        start(1);
-      } else if (UP_KEYS.has(key)) {
-        event.preventDefault();
-        start(-1);
-      }
+      if (!DOWN_KEYS.has(key) && !UP_KEYS.has(key)) return;
+      event.preventDefault();
+      if (held.has(key)) return; // ignore duplicate keydown of an already-held key (no extra nudge)
+      held.add(key);
+      drive(DOWN_KEYS.has(key) ? 1 : -1);
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase();
-      if (DOWN_KEYS.has(key) && direction === 1) stop();
-      else if (UP_KEYS.has(key) && direction === -1) stop();
+      if (!held.delete(key)) return;
+      settle(); // fall back to the other held key, or stop if none
     };
 
-    const onBlur = () => stop();
+    const onBlur = () => {
+      held.clear();
+      stop();
+    };
 
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
 
     return () => {
+      held.clear();
       stop();
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('keyup', onKeyUp);
