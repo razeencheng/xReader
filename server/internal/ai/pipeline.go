@@ -41,11 +41,32 @@ func (j *EagerJob) Run(ctx context.Context) error {
 		return fmt.Errorf("ensure article_ai: %w", err)
 	}
 
-	detectedLang := DetectLanguage(article.ContentText, article.Language)
-	sameLang := detectedLang == j.targetLang
-	shortContent := len(article.ContentText) < 280
+	// Title decision: from the title's own language, normalized so en-US/ja-JP
+	// native tags compare correctly against detector codes (en/ja). Independent
+	// of the body — the body-based decision was the root cause.
+	titleLang := DetectTitleLanguage(article.Title)
+	titleNeedsTranslation := titleLang != "" && titleLang != NormalizeLangCode(j.targetLang)
 
-	if sameLang {
+	// Summary decision: unchanged from the original (body-based, raw targetLang)
+	// so summary behaviour cannot regress.
+	bodyLang := DetectLanguage(article.ContentText, article.Language)
+	bodySameLang := bodyLang == j.targetLang
+	shortContent := len(article.ContentText) < 280
+	summaryNeeded := !bodySameLang && !shortContent
+
+	switch {
+	case titleNeedsTranslation && summaryNeeded:
+		// Both needed: keep the single combined AI call (the only combined case).
+		return j.runCombined(ctx, article)
+
+	case titleNeedsTranslation:
+		if err := j.runTitleOnly(ctx, article); err != nil {
+			return err
+		}
+		return j.finishSummary(ctx, article, shortContent)
+
+	default:
+		// Title already target-language (or undetermined) -> keep original.
 		if err := j.queries.UpsertTitleTranslation(ctx, gen.UpsertTitleTranslationParams{
 			ArticleID:       j.articleID,
 			TargetLanguage:  j.targetLang,
@@ -53,21 +74,15 @@ func (j *EagerJob) Run(ctx context.Context) error {
 		}); err != nil {
 			return fmt.Errorf("upsert title: %w", err)
 		}
-		if shortContent {
-			return j.queries.UpsertSummary(ctx, gen.UpsertSummaryParams{
-				ArticleID:         j.articleID,
-				TargetLanguage:    j.targetLang,
-				SummaryStatus:     "skipped",
-				SummarySkipReason: "short",
-			})
-		}
-		return j.runSummaryOnly(ctx, article)
+		return j.finishSummary(ctx, article, shortContent)
 	}
+}
 
+// finishSummary records the summary for the non-combined paths, exactly
+// matching the original pipeline's summary outcomes: short content is
+// skipped("short"); otherwise a summary is generated.
+func (j *EagerJob) finishSummary(ctx context.Context, article gen.Article, shortContent bool) error {
 	if shortContent {
-		if err := j.runTitleOnly(ctx, article); err != nil {
-			return err
-		}
 		return j.queries.UpsertSummary(ctx, gen.UpsertSummaryParams{
 			ArticleID:         j.articleID,
 			TargetLanguage:    j.targetLang,
@@ -75,8 +90,7 @@ func (j *EagerJob) Run(ctx context.Context) error {
 			SummarySkipReason: "short",
 		})
 	}
-
-	return j.runCombined(ctx, article)
+	return j.runSummaryOnly(ctx, article)
 }
 
 func (j *EagerJob) runCombined(ctx context.Context, article gen.Article) error {
@@ -92,17 +106,18 @@ func (j *EagerJob) runCombined(ctx context.Context, article gen.Article) error {
 	}
 
 	title, summary := parseCombinedResponse(resp.Content)
-	if title == "" {
-		title = article.Title
-	}
 
-	if err := j.queries.UpsertTitleTranslation(ctx, gen.UpsertTitleTranslationParams{
-		ArticleID:       j.articleID,
-		TargetLanguage:  j.targetLang,
-		TitleTranslated: title,
-	}); err != nil {
-		return fmt.Errorf("upsert title: %w", err)
+	if title != "" {
+		if err := j.queries.UpsertTitleTranslation(ctx, gen.UpsertTitleTranslationParams{
+			ArticleID:       j.articleID,
+			TargetLanguage:  j.targetLang,
+			TitleTranslated: title,
+		}); err != nil {
+			return fmt.Errorf("upsert title: %w", err)
+		}
 	}
+	// title == "": do NOT write the original title; leave title_translated = ''
+	// so it is not treated as permanently done.
 
 	status := "done"
 	if summary == "" {

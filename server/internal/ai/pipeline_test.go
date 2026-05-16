@@ -151,3 +151,79 @@ func TestParseCombinedResponse(t *testing.T) {
 	require.Equal(t, "标题", title2)
 	require.Equal(t, "这是一段没有前缀的摘要", summary2)
 }
+
+func TestEagerTranslatesEnglishTitleOnChineseBody(t *testing.T) {
+	ctx := context.Background()
+	pool, queries, userID, cleanup := setupPipelineTest(t)
+	t.Cleanup(cleanup)
+
+	body := strings.Repeat("这是一段中文正文内容用于测试摘要与语言检测。", 20)
+	art := insertTestArticle(t, queries, ctx, userID, "Breaking News: AI Progress", body, "en")
+
+	// English title + Chinese body: the title needs translation but the body
+	// is already the target language, so the pipeline takes the title-only
+	// path (no summary call). The title-translation prompt returns the bare
+	// translated title.
+	mock := &sequenceMock{responses: []ChatResponse{
+		{Content: "突发新闻：AI 的进展"},
+	}}
+	job := NewEagerJob(pool, mock, art.ID, "zh-CN")
+	require.NoError(t, job.Run(ctx))
+
+	row, err := queries.GetArticleAI(ctx, gen.GetArticleAIParams{ArticleID: art.ID, TargetLanguage: "zh-CN"})
+	require.NoError(t, err)
+	require.Equal(t, "突发新闻：AI 的进展", row.TitleTranslated)
+	require.NotEqual(t, art.Title, row.TitleTranslated)
+}
+
+func TestEagerCombinedParseFailureDoesNotPoisonTitle(t *testing.T) {
+	ctx := context.Background()
+	pool, queries, userID, cleanup := setupPipelineTest(t)
+	t.Cleanup(cleanup)
+
+	body := strings.Repeat("This is a long English body used to require a summary call. ", 20)
+	art := insertTestArticle(t, queries, ctx, userID, "Some English Headline", body, "en")
+
+	mock := &sequenceMock{responses: []ChatResponse{{Content: "text without the expected prefixes"}}}
+	job := NewEagerJob(pool, mock, art.ID, "zh-CN")
+	require.NoError(t, job.Run(ctx))
+
+	row, err := queries.GetArticleAI(ctx, gen.GetArticleAIParams{ArticleID: art.ID, TargetLanguage: "zh-CN"})
+	require.NoError(t, err)
+	require.NotEqual(t, art.Title, row.TitleTranslated)
+	require.Equal(t, "", row.TitleTranslated)
+}
+
+func TestEagerKeepsOriginalWhenTitleAlreadyTargetLang(t *testing.T) {
+	ctx := context.Background()
+	pool, queries, userID, cleanup := setupPipelineTest(t)
+	t.Cleanup(cleanup)
+
+	body := strings.Repeat("这是中文正文。", 50)
+	art := insertTestArticle(t, queries, ctx, userID, "人工智能最新进展报道", body, "zh-CN")
+
+	mock := &sequenceMock{}
+	job := NewEagerJob(pool, mock, art.ID, "zh-CN")
+	require.NoError(t, job.Run(ctx))
+
+	row, err := queries.GetArticleAI(ctx, gen.GetArticleAIParams{ArticleID: art.ID, TargetLanguage: "zh-CN"})
+	require.NoError(t, err)
+	require.Equal(t, art.Title, row.TitleTranslated)
+}
+
+func TestEagerEnglishTitleEnUSUserNotSpuriouslyTranslated(t *testing.T) {
+	ctx := context.Background()
+	pool, queries, userID, cleanup := setupPipelineTest(t)
+	t.Cleanup(cleanup)
+
+	body := strings.Repeat("This is a long English body for an English-native user. ", 20)
+	art := insertTestArticle(t, queries, ctx, userID, "An English Headline", body, "en")
+
+	mock := &sequenceMock{}
+	job := NewEagerJob(pool, mock, art.ID, "en-US")
+	require.NoError(t, job.Run(ctx))
+
+	row, err := queries.GetArticleAI(ctx, gen.GetArticleAIParams{ArticleID: art.ID, TargetLanguage: "en-US"})
+	require.NoError(t, err)
+	require.Equal(t, art.Title, row.TitleTranslated)
+}
