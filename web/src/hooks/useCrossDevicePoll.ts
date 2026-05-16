@@ -4,7 +4,6 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
 import { applyArticleStateChange, type ArticleStateChange } from '@/lib/article-state-cache';
-import { consumeLocalBroadcast } from '@/lib/broadcast';
 
 interface ServerArticleChange {
   article_id: number;
@@ -57,14 +56,14 @@ export function useCrossDevicePoll(enabled = true) {
           return;
         }
 
+        // /changes returns the authoritative current state per changed article, so
+        // applying every snapshot is idempotent and convergent (incl. this tab's own
+        // changes). Gating on local-echo dedup is unnecessary and could drop a
+        // genuine remote change that shares an article with a recent local change.
         let newestChangeAt = pollStartedAt;
         for (const item of response.items ?? []) {
           newestChangeAt = laterTimestamp(newestChangeAt, item.changed_at);
-          const change = toStateChange(item);
-          if (consumeLocalBroadcast(change)) {
-            continue;
-          }
-          applyArticleStateChange(queryClient, change);
+          applyArticleStateChange(queryClient, toStateChange(item));
         }
 
         sinceRef.current = newestChangeAt;
