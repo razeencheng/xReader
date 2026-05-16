@@ -29,8 +29,8 @@ export function useReaderShortcuts({
     }
 
     const nextShortcuts: Record<string, () => void> = {};
-    nextShortcuts.j = () => onNext?.();
-    nextShortcuts.k = () => onPrev?.();
+    nextShortcuts.l = () => onNext?.();
+    nextShortcuts.h = () => onPrev?.();
     nextShortcuts.arrowright = () => onNext?.();
     nextShortcuts.arrowleft = () => onPrev?.();
     nextShortcuts.s = () => onToggleStar?.();
