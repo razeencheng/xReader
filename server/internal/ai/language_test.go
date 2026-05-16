@@ -52,6 +52,21 @@ func TestDetectTitleLanguage(t *testing.T) {
 		{"mixed han-present", "OpenAI 发布 GPT-5", "zh-CN"},
 		{"numbers/symbols only", "2026 — #1!", ""},
 		{"empty", "", ""},
+		// Accented non-English titles must NOT be judged "en" (that caused
+		// spurious "translate fr into fr" calls). Empirically these strings
+		// are not reliably detected by whatlanggo at title length, so they
+		// fall to the unreliable branch and now return "" (safe skip).
+		{"french accented", "Café résumé déjà vu naïve", ""},
+		{"german sharp-s", "Größe Straße schön müde wäre", ""},
+		{"spanish enye", "El niño está en la mañana señor", ""},
+		{"pure ascii english stays", "Quarterly Earnings Report Released", "en"},
+		// langMap has ru, but short Cyrillic is not reliably detected; the
+		// unreliable branch sees only non-ASCII letters -> "" (safe skip).
+		{"russian cyrillic undetermined", "Москва объявила сегодня новости", ""},
+		// Documented acceptable ambiguity: pure kanji with no kana is
+		// indistinguishable from Chinese here, so detectCJKByRunes -> zh-CN.
+		// This is intentional and out of scope to disambiguate.
+		{"pure kanji acceptable zh", "漢字発表案件", "zh-CN"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -64,13 +79,20 @@ func TestDetectTitleLanguage(t *testing.T) {
 
 func TestNormalizeLangCode(t *testing.T) {
 	cases := map[string]string{
-		"zh-CN": "zh-CN",
-		"en-US": "en",
-		"ja-JP": "ja",
-		"ko-KR": "ko",
-		"en":    "en",
-		"ja":    "ja",
-		"":      "",
+		"zh-CN":      "zh-CN",
+		"zh-TW":      "zh-CN",
+		"zh-Hant":    "zh-CN",
+		"zh-Hant-TW": "zh-CN",
+		"en-US":      "en",
+		"ja-JP":      "ja",
+		"ko-KR":      "ko",
+		"es-ES":      "es",
+		"fr-FR":      "fr",
+		"de-DE":      "de",
+		"pt-PT":      "pt",
+		"en":         "en",
+		"ja":         "ja",
+		"":           "",
 	}
 	for in, want := range cases {
 		if got := NormalizeLangCode(in); got != want {

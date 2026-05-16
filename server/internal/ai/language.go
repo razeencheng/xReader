@@ -47,10 +47,10 @@ func DetectLanguage(text string, fallback string) string {
 // zh-CN is already the detector code and stays as-is; region-tagged Latin/CJK
 // tags collapse to their base code. Unknown inputs pass through unchanged.
 func NormalizeLangCode(code string) string {
-	switch code {
-	case "zh-CN", "zh-Hans", "zh":
-		return "zh-CN"
-	case "zh-TW", "zh-Hant":
+	// All Chinese variants map to zh-CN: langMap has no Traditional code, so
+	// Traditional titles are treated as same-language for zh-CN/zh-TW users
+	// (no script conversion is performed — out of scope).
+	if strings.HasPrefix(code, "zh") {
 		return "zh-CN"
 	}
 	if i := strings.IndexByte(code, '-'); i > 0 {
@@ -101,7 +101,10 @@ func DetectTitleLanguage(title string) string {
 				nonASCII++
 			}
 		}
-		if ascii > 0 && ascii >= nonASCII {
+		// Only a purely-ASCII-letter title is confidently English here.
+		// Any accented/non-ASCII letters → undetermined (safe: skip rather
+		// than spuriously "translate" e.g. a French title into French).
+		if nonASCII == 0 && ascii > 0 {
 			return "en"
 		}
 		return ""
