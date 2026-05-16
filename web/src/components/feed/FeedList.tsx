@@ -91,7 +91,13 @@ export function FeedList({ onOpenArticle, selectedArticleId = null }: FeedListPr
   }, [data?.pages, items]);
 
   const filteredItems = useMemo(() => {
-    if (currentView === 'starred' || articleReadFilter) return items;
+    if (currentView === 'starred') return items;
+    if (articleReadFilter === 'unread') {
+      return items.filter((item) => !item.is_read || pendingReadIds.has(item.id));
+    }
+    if (articleReadFilter === 'read') {
+      return items.filter((item) => item.is_read);
+    }
     if (readFilter === 'unread') return items.filter((item) => !item.is_read || pendingReadIds.has(item.id));
     if (readFilter === 'read') return items.filter((item) => item.is_read);
     return items;

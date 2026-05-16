@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('react-intersection-observer', () => ({
@@ -250,36 +250,48 @@ test('keeps a just-read article visible in unread filter before delayed dismissa
   expect(screen.getByRole('button', { name: '撤销已读' })).toBeInTheDocument();
 });
 
-test('undo button disappears after the grace period while article stays visible', async () => {
+test('under server-side unread filter, a just-read row lingers then is removed after the grace period', async () => {
+  useUIStore.setState({ currentView: 'today', readFilter: 'unread' });
+
   vi.mocked(apiFetch).mockImplementation(async (path) => {
     if (String(path).startsWith('/api/articles?')) {
       return {
-        items: [
-          {
-            id: 1,
-            source_id: 1,
-            title: 'Delayed Archive Article',
-            link: 'https://example.com/1',
-            language: 'en',
-            is_read: false,
-          },
-        ],
+        items: [{ id: 1, source_id: 1, title: 'Server Filtered', link: 'https://e.com/1', language: 'en', is_read: false }],
         next_cursor: null,
       };
     }
-
     return {};
   });
 
   render(<FeedList />, { wrapper });
 
   await userEvent.click(await screen.findByRole('button', { name: '标已读' }));
-  expect(screen.getByText('Delayed Archive Article')).toBeInTheDocument();
+  expect(screen.getByText('Server Filtered')).toBeInTheDocument(); // visible during grace
+
+  await new Promise((r) => setTimeout(r, 3100));
+  await waitFor(() => expect(screen.queryByText('Server Filtered')).not.toBeInTheDocument()); // removed after grace
+}, 8000);
+
+test('removes a just-read article from the unread list after the grace period', async () => {
+  vi.mocked(apiFetch).mockImplementation(async (path) => {
+    if (String(path).startsWith('/api/articles?')) {
+      return {
+        items: [{ id: 1, source_id: 1, title: 'Delayed Archive Article', link: 'https://example.com/1', language: 'en', is_read: false }],
+        next_cursor: null,
+      };
+    }
+    return {};
+  });
+
+  render(<FeedList />, { wrapper });
+
+  await userEvent.click(await screen.findByRole('button', { name: '标已读' }));
+  expect(screen.getByText('Delayed Archive Article')).toBeInTheDocument();        // visible during grace
   expect(screen.getByRole('button', { name: '撤销已读' })).toBeInTheDocument();
 
   await new Promise((resolve) => setTimeout(resolve, 3100));
 
-  expect(screen.getByText('Delayed Archive Article')).toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByText('Delayed Archive Article')).not.toBeInTheDocument()); // removed after grace
   expect(screen.queryByRole('button', { name: '撤销已读' })).not.toBeInTheDocument();
 }, 8000);
 
@@ -340,12 +352,14 @@ test('can batch mark the current view read and undo it', async () => {
 
   await userEvent.click(screen.getByRole('button', { name: '确认标记全部已读' }));
 
+  // Bulk-marked rows leave the unread view; undo banner is offered.
   expect(await screen.findByText(/已将当前视图 2 篇标为已读/)).toBeInTheDocument();
-  expect(screen.getByText('Bulk One')).toBeInTheDocument();
-  expect(screen.getByText('Bulk Two')).toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByText('Bulk One')).not.toBeInTheDocument());
+  expect(screen.queryByText('Bulk Two')).not.toBeInTheDocument();
 
   await userEvent.click(screen.getByRole('button', { name: '撤销批量标已读' }));
 
+  // Undo re-flips is_read=false → rows come back (cache row was never deleted).
   expect(await screen.findByText('Bulk One')).toBeInTheDocument();
   expect(screen.getByText('Bulk Two')).toBeInTheDocument();
 });
