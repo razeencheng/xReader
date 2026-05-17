@@ -259,7 +259,7 @@ func TestWorker_EagerAIFansOutToDistinctNativeLanguages(t *testing.T) {
 		},
 	}
 	client := &ai.MockClient{Response: ai.ChatResponse{Content: "translated"}}
-	worker := NewWorker(pool, adapter, client)
+	worker := NewWorker(pool, adapter, client, ai.NewRetranslateQueue(8))
 
 	worker.tick(ctx)
 

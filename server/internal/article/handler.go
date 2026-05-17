@@ -12,12 +12,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/razeencheng/xreader/db/gen"
+	"github.com/razeencheng/xreader/internal/ai"
 	"github.com/razeencheng/xreader/internal/middleware"
 )
 
 type ArticleHandler struct {
-	Service        *ArticleService
-	ContentOwnerID func(ctx context.Context) (int64, error)
+	Service          *ArticleService
+	ContentOwnerID   func(ctx context.Context) (int64, error)
+	RetranslateQueue *ai.RetranslateQueue
 }
 
 func NewArticleHandler(svc *ArticleService) *ArticleHandler {

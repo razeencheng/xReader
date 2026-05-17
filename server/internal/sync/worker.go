@@ -14,22 +14,25 @@ import (
 )
 
 type Worker struct {
-	pool       *pgxpool.Pool
-	queries    *gen.Queries
-	job        *FetchJob
-	aiClient   ai.AIClient
-	interval   time.Duration
-	maxWorkers int
+	pool        *pgxpool.Pool
+	queries     *gen.Queries
+	job         *FetchJob
+	aiClient    ai.AIClient
+	interval    time.Duration
+	maxWorkers  int
+	retranslate *ai.RetranslateQueue
+	lastCatchUp time.Time // set/read only by the single catchUpAI goroutine
 }
 
-func NewWorker(pool *pgxpool.Pool, adapter source.SourceAdapter, aiClient ai.AIClient) *Worker {
+func NewWorker(pool *pgxpool.Pool, adapter source.SourceAdapter, aiClient ai.AIClient, retranslate *ai.RetranslateQueue) *Worker {
 	return &Worker{
-		pool:       pool,
-		queries:    gen.New(pool),
-		job:        NewFetchJob(pool, adapter),
-		aiClient:   aiClient,
-		interval:   60 * time.Second,
-		maxWorkers: 8,
+		pool:        pool,
+		queries:     gen.New(pool),
+		job:         NewFetchJob(pool, adapter),
+		aiClient:    aiClient,
+		interval:    60 * time.Second,
+		maxWorkers:  8,
+		retranslate: retranslate,
 	}
 }
 
