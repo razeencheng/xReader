@@ -15,6 +15,11 @@ test('renders handoff shortcut groups and closes from the close button', async (
   expect(screen.getByText('Article')).toBeInTheDocument();
   expect(screen.getByText('View')).toBeInTheDocument();
   expect(screen.getByText('Next article')).toBeInTheDocument();
+  expect(screen.getByText('Previous article')).toBeInTheDocument();
+  expect(screen.getByText('Scroll down')).toBeInTheDocument();
+  expect(screen.getByText('Scroll up')).toBeInTheDocument();
+  expect(screen.getByText('H')).toBeInTheDocument();
+  expect(screen.getByText('L')).toBeInTheDocument();
   expect(screen.getByText('Star / unstar current article')).toBeInTheDocument();
   expect(screen.getByText('Toggle focus mode')).toBeInTheDocument();
 
