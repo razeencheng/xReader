@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
 import DOMPurify from 'dompurify';
 import { createSSEClient, type SSEClient } from '@/lib/sse-client';
+import {
+  getBodyWarmup,
+  subscribeBodyWarmup,
+  claimBodyWarmup,
+  releaseBodyWarmup,
+} from '@/lib/body-translation-warmup';
 import { fontForLang } from '@/lib/langFonts';
 import { isSameLanguage } from '@/lib/article-meta';
 import { useI18n } from '@/lib/i18n';
@@ -299,6 +305,47 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
       activeClientsRef.current = [];
     };
   }, [resetKey]);
+
+  // #3 prefetch: seed + adopt any warm-up started for this (article, native
+  // language) so an opened-from-prefetch article shows its first paragraphs
+  // immediately and never re-requests the warmed range (dedupe). Released on
+  // cleanup so the store stays bounded and a resetKey change (e.g. "load
+  // original content" swaps contentHtml) drops the now-mismatched entry
+  // instead of re-seeding stale paragraph indices.
+  useEffect(() => {
+    if (!shouldTranslate) {
+      return;
+    }
+
+    const applyParagraph = (index: number, translation: string) => {
+      requestedIndicesRef.current.add(index);
+      setTranslationState((previous) => {
+        const nextTranslations =
+          previous.key === resetKey ? new Map(previous.translations) : new Map<number, string>();
+        const nextPending = previous.key === resetKey ? new Set(previous.pending) : new Set<number>();
+        nextTranslations.set(index, translation);
+        nextPending.delete(index);
+        return { key: resetKey, translations: nextTranslations, pending: nextPending };
+      });
+    };
+
+    const snapshot = getBodyWarmup(articleId, nativeLanguage);
+    if (!snapshot) {
+      return;
+    }
+    claimBodyWarmup(articleId, nativeLanguage);
+    snapshot.translations.forEach((translation, index) => applyParagraph(index, translation));
+    let unsubscribe = () => {};
+    if (!snapshot.done) {
+      unsubscribe = subscribeBodyWarmup(articleId, nativeLanguage, (paragraph) => {
+        applyParagraph(paragraph.index, paragraph.translation);
+      });
+    }
+    return () => {
+      unsubscribe();
+      releaseBodyWarmup(articleId, nativeLanguage);
+    };
+  }, [articleId, nativeLanguage, resetKey, shouldTranslate]);
 
   const requestTranslationRange = useCallback((visibleIndex: number) => {
     if (!shouldTranslate || visibleIndex < 0 || visibleIndex >= translatableCount) {
