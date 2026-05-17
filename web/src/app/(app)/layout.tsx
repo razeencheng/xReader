@@ -14,6 +14,7 @@ import { GuestBanner } from '@/components/layout/GuestBanner';
 import { KeyboardShortcutsModal } from '@/components/layout/KeyboardShortcutsModal';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileTopBar, TabletTopNav } from '@/components/layout/ResponsiveAppNav';
+import { SourceImportStatus } from '@/components/layout/SourceImportStatus';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useI18n();
@@ -87,6 +88,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       <KeyboardShortcutsModal open={isShortcutsOpen} onClose={closeShortcuts} />
+      <SourceImportStatus />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,9 +14,9 @@ import (
 )
 
 type SourceHandler struct {
-	Service         *SourceService
-	JobStore        JobStore
-	ContentOwnerID  func(ctx context.Context) (int64, error)
+	Service        *SourceService
+	JobStore       JobStore
+	ContentOwnerID func(ctx context.Context) (int64, error)
 }
 
 func NewSourceHandler(svc *SourceService, jobStore JobStore) *SourceHandler {
@@ -190,13 +191,34 @@ func (h *SourceHandler) ImportOPML(c *gin.Context) {
 }
 
 func (h *SourceHandler) GetJob(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+
 	jobID := c.Param("jobID")
+	if !jobBelongsToUser(jobID, user.ID) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "job not found"})
+		return
+	}
+
 	status, ok := h.JobStore.Get(jobID)
 	if !ok {
 		c.JSON(http.StatusNotFound, gin.H{"error": "job not found"})
 		return
 	}
 	c.JSON(http.StatusOK, status)
+}
+
+func jobBelongsToUser(jobID string, userID int64) bool {
+	parts := strings.Split(jobID, "-")
+	if len(parts) != 3 || parts[0] != "import" {
+		return false
+	}
+
+	ownerID, err := strconv.ParseInt(parts[1], 10, 64)
+	return err == nil && ownerID == userID
 }
 
 func (h *SourceHandler) ExportOPML(c *gin.Context) {

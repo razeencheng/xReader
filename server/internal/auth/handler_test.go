@@ -15,7 +15,7 @@ func setupTestRouter(svc *Service) *gin.Engine {
 	r := gin.New()
 	h := NewHandler(svc, nil)
 	r.GET("/api/auth/github", h.BeginLogin)
-	r.GET("/api/auth/callback/github", h.HandleCallback)
+	r.GET("/api/auth/callback", h.HandleCallback)
 	return r
 }
 
@@ -59,7 +59,7 @@ func TestHandler_Callback_HappyPath_SetsCookie(t *testing.T) {
 
 	r := setupTestRouter(svc)
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/auth/callback/github?state="+state+"&code=test-code", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/callback?state="+state+"&code=test-code", nil)
 	// Set the state cookie to simulate browser behavior.
 	req.AddCookie(&http.Cookie{Name: "xreader_oauth_state", Value: state})
 	r.ServeHTTP(w, req)
@@ -88,7 +88,7 @@ func TestHandler_Callback_DeniedUser_Returns403(t *testing.T) {
 
 	r := setupTestRouter(svc)
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/auth/callback/github?state="+state+"&code=test-code", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/callback?state="+state+"&code=test-code", nil)
 	req.AddCookie(&http.Cookie{Name: "xreader_oauth_state", Value: state})
 	r.ServeHTTP(w, req)
 
@@ -103,7 +103,7 @@ func TestHandler_Callback_BadState_Returns400(t *testing.T) {
 
 	r := setupTestRouter(svc)
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/auth/callback/github?state=wrong&code=test-code", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/callback?state=wrong&code=test-code", nil)
 	// Set a mismatched cookie.
 	req.AddCookie(&http.Cookie{Name: "xreader_oauth_state", Value: "also-wrong"})
 	r.ServeHTTP(w, req)
@@ -119,7 +119,7 @@ func TestHandler_Callback_MissingStateCookie_Returns400(t *testing.T) {
 
 	r := setupTestRouter(svc)
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/auth/callback/github?state=some-state&code=test-code", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/callback?state=some-state&code=test-code", nil)
 	// No cookie set.
 	r.ServeHTTP(w, req)
 

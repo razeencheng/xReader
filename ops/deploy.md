@@ -6,7 +6,7 @@ xReader is a single Go binary that serves both the API and static frontend. It c
 
 - Docker and Docker Compose installed on the target host
 - A GitHub OAuth App (create at https://github.com/settings/developers)
-  - Set the callback URL to `https://your-domain.com/api/auth/callback/github`
+  - Set the callback URL to `https://your-domain.com/api/auth/callback`
 
 ## 2) Deploy with Docker Compose
 

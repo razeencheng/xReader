@@ -19,6 +19,16 @@ test('apiFetch redirects to /login on 401', async () => {
   expect(loc.href).toBe('/login');
 });
 
+test('apiFetch can suppress redirect on background 401', async () => {
+  const loc: Pick<Location, 'href'> = { href: '' };
+  vi.stubGlobal('location', loc);
+  globalThis.fetch = vi.fn(async () => new Response('', { status: 401 })) as typeof fetch;
+
+  await expect(apiFetch('/x', { redirectOnUnauthorized: false })).rejects.toMatchObject({ status: 401 });
+
+  expect(loc.href).toBe('');
+});
+
 test('apiFetch sets X-Requested-With on POST', async () => {
   globalThis.fetch = vi.fn(async () =>
     new Response(JSON.stringify({}), { status: 200 }),

@@ -33,16 +33,40 @@ func (s *PgUserStore) UpsertUser(ctx context.Context, githubID int64, username, 
 
 	var id int64
 	err := s.pool.QueryRow(ctx,
-		`INSERT INTO users (github_id, github_username, avatar_url, role)
-		 VALUES ($1, $2, $3, $4)
-		 ON CONFLICT (github_id) DO UPDATE SET
-		   github_username = EXCLUDED.github_username,
-		   avatar_url = EXCLUDED.avatar_url,
-		   role = CASE
-		     WHEN users.role = 'admin' OR EXCLUDED.role = 'admin' THEN 'admin'
-		     ELSE users.role
-		   END
-		 RETURNING id`,
+		`WITH updated_by_id AS (
+		   UPDATE users
+		      SET github_username = $2,
+		          avatar_url = $3,
+		          role = CASE
+		            WHEN users.role = 'admin' OR $4 = 'admin' THEN 'admin'
+		            ELSE users.role
+		          END
+		    WHERE github_id = $1
+		    RETURNING id
+		 ), updated_by_username AS (
+		   UPDATE users
+		      SET github_id = $1,
+		          avatar_url = $3,
+		          role = CASE
+		            WHEN users.role = 'admin' OR $4 = 'admin' THEN 'admin'
+		            ELSE users.role
+		          END
+		    WHERE github_username = $2
+		      AND NOT EXISTS (SELECT 1 FROM updated_by_id)
+		    RETURNING id
+		 ), inserted AS (
+		   INSERT INTO users (github_id, github_username, avatar_url, role)
+		   SELECT $1, $2, $3, $4
+		    WHERE NOT EXISTS (SELECT 1 FROM updated_by_id)
+		      AND NOT EXISTS (SELECT 1 FROM updated_by_username)
+		    RETURNING id
+		 )
+		 SELECT id FROM updated_by_id
+		 UNION ALL
+		 SELECT id FROM updated_by_username
+		 UNION ALL
+		 SELECT id FROM inserted
+		 LIMIT 1`,
 		githubID, username, avatarURL, desiredRole,
 	).Scan(&id)
 	return id, err

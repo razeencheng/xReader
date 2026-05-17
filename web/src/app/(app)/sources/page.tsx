@@ -21,12 +21,16 @@ import { ApiError, apiFetch } from '@/lib/api-client';
 import { useI18n } from '@/lib/i18n';
 import { useIsGuest } from '@/stores/useAuthStore';
 import {
+  getSourceImportCompleted,
+  getSourceImportProgress,
+  isSourceImportLookupExpired,
   useCreateSource,
   useDeleteSource,
   useRefreshSource,
   useSourceImportJob,
   useSources,
 } from '@/lib/queries/sources';
+import { useUIStore } from '@/stores/useUIStore';
 import type { Source } from '@/lib/types';
 import styles from './SourcesPage.module.css';
 
@@ -424,10 +428,11 @@ export function SourcesPage() {
   const [showFavicons, setShowFavicons] = useState(true);
   const [isTweaksOpen, setIsTweaksOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [importJobId, setImportJobId] = useState<string | null>(null);
-  const [importFileName, setImportFileName] = useState<string | null>(null);
+  const sourceImportJob = useUIStore((state) => state.sourceImportJob);
+  const startSourceImport = useUIStore((state) => state.startSourceImport);
+  const clearSourceImport = useUIStore((state) => state.clearSourceImport);
 
-  const importJob = useSourceImportJob(importJobId);
+  const importJob = useSourceImportJob(sourceImportJob?.id ?? null);
 
   const visibleSources = useMemo(() => {
     if (!sources) return [];
@@ -469,10 +474,13 @@ export function SourcesPage() {
     });
   }, [filterQuery, sortMode, sourceRows, statusFilter]);
 
-  const importRawProgress = importJob.data?.progress ?? 0;
-  const importProgress = Math.max(0, Math.min(100, importRawProgress <= 1 ? importRawProgress * 100 : importRawProgress));
+  const importProgress = getSourceImportProgress(importJob.data);
+  const importTotal = importJob.data?.total && importJob.data.total > 0 ? importJob.data.total : 100;
+  const importCompleted = importJob.data?.total ? Math.min(importTotal, getSourceImportCompleted(importJob.data)) : Math.round(importProgress);
   const importDone = importJob.data?.status === 'done';
-  const importRunning = Boolean(importFileName && (importJobId || importJob.isFetching));
+  const importLookupExpired = isSourceImportLookupExpired(importJob.error);
+  const importFailed = !importLookupExpired && (importJob.isError || importJob.data?.status === 'failed');
+  const importRunning = Boolean(sourceImportJob && !importLookupExpired);
   const latestSync = sourceRows.reduce((latest, source) => Math.max(latest, source.lastCheckedMs), 0);
 
   useEffect(() => () => {
@@ -482,19 +490,24 @@ export function SourcesPage() {
   }, []);
 
   useEffect(() => {
-    if (!importJobId || !importJob.data) return;
-    if (handledImportJobId.current === importJobId) return;
+    if (!sourceImportJob?.id) return;
+    if (importLookupExpired) {
+      clearSourceImport();
+      return;
+    }
+    if (!importJob.data) return;
+    if (handledImportJobId.current === sourceImportJob.id) return;
 
     if (importJob.data.status === 'done') {
-      handledImportJobId.current = importJobId;
+      handledImportJobId.current = sourceImportJob.id;
       showToast(t('sources.importCompleteMessage'));
     }
 
     if (importJob.data.status === 'failed') {
-      handledImportJobId.current = importJobId;
+      handledImportJobId.current = sourceImportJob.id;
       showToast(t('sources.importFailedMessage'));
     }
-  }, [importJob.data, importJobId, t]);
+  }, [clearSourceImport, importJob.data, importLookupExpired, sourceImportJob?.id, t]);
 
   function showToast(message: string) {
     setToast(message);
@@ -617,8 +630,6 @@ export function SourcesPage() {
   }
 
   async function handleImport(file: File) {
-    setImportFileName(file.name);
-    setImportJobId(null);
     handledImportJobId.current = null;
 
     try {
@@ -628,11 +639,11 @@ export function SourcesPage() {
         headers: { 'Content-Type': 'text/x-opml; charset=utf-8' },
         body: raw,
       });
-      setImportJobId(response.job_id);
+      startSourceImport(response.job_id, file.name);
       showToast(t('sources.importingMessage'));
     } catch (error) {
       const detail = error instanceof Error ? error.message : t('sources.importFailedMessage');
-      setImportFileName(null);
+      clearSourceImport();
       showToast(detail);
     }
   }
@@ -795,23 +806,20 @@ export function SourcesPage() {
           <section className={styles.importSheet}>
             <div className={styles.importHead}>
               <div>
-                <div className={styles.importTitle}>{t('sources.importingFile', { filename: importFileName || 'subscriptions.opml' })}</div>
+                <div className={styles.importTitle}>{t('sources.importingFile', { filename: sourceImportJob?.fileName || 'subscriptions.opml' })}</div>
                 <div className={styles.importSub}>
                   {t('sources.importProgressFeeds', {
-                    done: Math.round(importProgress),
-                    total: 100,
-                    state: importDone ? t('sources.importDoneState') : t('sources.importPolling'),
+                    done: importCompleted,
+                    total: importTotal,
+                    state: importFailed ? t('sources.importFailed') : importDone ? t('sources.importDoneState') : t('sources.importPolling'),
                   })}
                 </div>
               </div>
-              {importDone ? (
+              {importDone || importFailed ? (
                 <button
                   type="button"
                   className={styles.buttonGhost}
-                  onClick={() => {
-                    setImportJobId(null);
-                    setImportFileName(null);
-                  }}
+                  onClick={clearSourceImport}
                 >
                   {t('sources.dismiss')}
                 </button>

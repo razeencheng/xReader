@@ -53,3 +53,6 @@ lint: ## Lint backend + frontend
 
 seed-admin: ## Bootstrap admin (GH_USER=xxx)
 	cd server && go run ./cmd/xreader seed-admin --github-username=$${GH_USER}
+
+build-push:
+	docker buildx build --platform linux/amd64,linux/arm64 -t razeencheng/xreader:v0.1.4 -t razeencheng/xreader:latest --push .

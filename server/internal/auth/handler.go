@@ -32,7 +32,10 @@ func (h *Handler) BeginLogin(c *gin.Context) {
 		return
 	}
 	// Set the CSRF state as an HttpOnly cookie so HandleCallback can verify it.
-	c.SetSameSite(http.SameSiteStrictMode)
+	// Must be SameSite=Lax (not Strict): GitHub's OAuth redirect back to this
+	// app is a cross-site top-level navigation, and Strict would drop the
+	// cookie, breaking state verification. Lax still blocks CSRF here.
+	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie("xreader_oauth_state", state, 600, "/", "", h.isSecureCookie(c), true)
 	c.Redirect(http.StatusTemporaryRedirect, redirectURL)
 }

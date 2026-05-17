@@ -13,7 +13,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   storage.clear();
-  useUIStore.setState({ density: 'comfortable', theme: 'system', nativeLanguage: 'zh-CN' });
+  useUIStore.setState({ density: 'comfortable', theme: 'system', nativeLanguage: 'zh-CN', sourceImportJob: null, _hydrated: false });
   globalThis.fetch = vi.fn(async () => new Response('{}', { status: 200 })) as typeof fetch;
 });
 
@@ -42,4 +42,33 @@ test('hydrate loads from user prefs', () => {
   expect(useUIStore.getState().density).toBe('compact');
   expect(useUIStore.getState().theme).toBe('dark');
   expect(useUIStore.getState().nativeLanguage).toBe('en');
+});
+
+test('source import job persists across page remounts', () => {
+  useUIStore.getState().startSourceImport('import-123', 'feeds.opml');
+
+  expect(useUIStore.getState().sourceImportJob).toMatchObject({
+    id: 'import-123',
+    fileName: 'feeds.opml',
+  });
+  expect(localStorage.getItem('xreader:sourceImportJobId')).toBe('import-123');
+  expect(localStorage.getItem('xreader:sourceImportFileName')).toBe('feeds.opml');
+
+  useUIStore.setState({ sourceImportJob: null, _hydrated: false });
+  useUIStore.getState().hydrateFromLocalStorage();
+
+  expect(useUIStore.getState().sourceImportJob).toMatchObject({
+    id: 'import-123',
+    fileName: 'feeds.opml',
+  });
+});
+
+test('clearSourceImport clears active and persisted import job', () => {
+  useUIStore.getState().startSourceImport('import-123', 'feeds.opml');
+
+  useUIStore.getState().clearSourceImport();
+
+  expect(useUIStore.getState().sourceImportJob).toBeNull();
+  expect(localStorage.getItem('xreader:sourceImportJobId')).toBeNull();
+  expect(localStorage.getItem('xreader:sourceImportFileName')).toBeNull();
 });

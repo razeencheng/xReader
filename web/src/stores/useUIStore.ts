@@ -10,6 +10,12 @@ export type AccentColor = 'blue' | 'sage' | 'ember' | 'rose';
 export type ReadFilter = 'unread' | 'all' | 'read';
 export type ViewTab = 'today' | 'all' | 'starred' | 'sources';
 
+export interface SourceImportJob {
+  id: string;
+  fileName: string;
+  startedAt: number;
+}
+
 interface UIState {
   density: Density;
   theme: Theme;
@@ -22,6 +28,7 @@ interface UIState {
   selectedSourceId: number | null;
   nativeLanguage: string;
   isShortcutsOpen: boolean;
+  sourceImportJob: SourceImportJob | null;
   _hydrated: boolean;
 
   setDensity: (d: Density) => void;
@@ -36,6 +43,8 @@ interface UIState {
   setNativeLanguage: (l: string) => void;
   openShortcuts: () => void;
   closeShortcuts: () => void;
+  startSourceImport: (jobId: string, fileName: string) => void;
+  clearSourceImport: () => void;
 
   hydrate: (prefs: {
     density_pref?: string;
@@ -107,6 +116,18 @@ function persist(key: string, value: unknown) {
   }
 }
 
+function removeStoredValue(key: string) {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined' || typeof localStorage.removeItem !== 'function') {
+    return;
+  }
+
+  try {
+    localStorage.removeItem(`xreader:${key}`);
+  } catch {
+    return;
+  }
+}
+
 export const useUIStore = create<UIState>((set, get) => ({
   // Initialize with safe defaults to avoid SSR hydration mismatch
   density: 'comfortable',
@@ -120,6 +141,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   selectedSourceId: null,
   nativeLanguage: 'zh-CN',
   isShortcutsOpen: false,
+  sourceImportJob: null,
   _hydrated: false,
 
   setDensity: (density) => {
@@ -168,6 +190,19 @@ export const useUIStore = create<UIState>((set, get) => ({
   },
   openShortcuts: () => set({ isShortcutsOpen: true }),
   closeShortcuts: () => set({ isShortcutsOpen: false }),
+  startSourceImport: (jobId, fileName) => {
+    const job = { id: jobId, fileName, startedAt: Date.now() };
+    set({ sourceImportJob: job });
+    persist('sourceImportJobId', job.id);
+    persist('sourceImportFileName', job.fileName);
+    persist('sourceImportStartedAt', job.startedAt);
+  },
+  clearSourceImport: () => {
+    set({ sourceImportJob: null });
+    removeStoredValue('sourceImportJobId');
+    removeStoredValue('sourceImportFileName');
+    removeStoredValue('sourceImportStartedAt');
+  },
 
   hydrate: (prefs) => {
     const update: Partial<UIState> = {};
@@ -190,6 +225,9 @@ export const useUIStore = create<UIState>((set, get) => ({
     const storedCurrentView = readStoredValue('currentView');
     const storedSelectedSourceId = readStoredValue('selectedSourceId');
     const storedNativeLanguage = readStoredValue('nativeLanguage');
+    const storedImportJobId = readStoredValue('sourceImportJobId');
+    const storedImportFileName = readStoredValue('sourceImportFileName');
+    const storedImportStartedAt = readStoredValue('sourceImportStartedAt');
 
     const update: Partial<UIState> = { _hydrated: true };
 
@@ -205,6 +243,14 @@ export const useUIStore = create<UIState>((set, get) => ({
       update.selectedSourceId = Number(storedSelectedSourceId);
     }
     if (storedNativeLanguage) update.nativeLanguage = storedNativeLanguage;
+    if (storedImportJobId) {
+      const startedAt = Number(storedImportStartedAt);
+      update.sourceImportJob = {
+        id: storedImportJobId,
+        fileName: storedImportFileName || 'subscriptions.opml',
+        startedAt: Number.isFinite(startedAt) ? startedAt : Date.now(),
+      };
+    }
 
     set(update);
   },

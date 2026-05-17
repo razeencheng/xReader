@@ -1,10 +1,16 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useUIStore } from '@/stores/useUIStore';
 
 const queryState = vi.hoisted(() => ({
   sources: [] as unknown[],
+  importJob: {
+    data: null as null | { status: 'pending' | 'running' | 'done' | 'failed'; total?: number; succeeded?: number; failed?: number; skipped?: number },
+    isError: false,
+    error: null as Error | null,
+    isFetching: false,
+  },
   createSource: {
     mutateAsync: vi.fn(),
     isPending: false,
@@ -19,14 +25,18 @@ const queryState = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@/lib/queries/sources', () => ({
-  useSources: () => ({ data: queryState.sources, isLoading: false, isFetching: false }),
-  useCreateSource: () => queryState.createSource,
-  useRenameSource: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useDeleteSource: () => queryState.deleteSource,
-  useRefreshSource: () => queryState.refreshSource,
-  useSourceImportJob: () => ({ data: null, isFetching: false }),
-}));
+vi.mock('@/lib/queries/sources', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/queries/sources')>('@/lib/queries/sources');
+  return {
+    ...actual,
+    useSources: () => ({ data: queryState.sources, isLoading: false, isFetching: false }),
+    useCreateSource: () => queryState.createSource,
+    useRenameSource: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useDeleteSource: () => queryState.deleteSource,
+    useRefreshSource: () => queryState.refreshSource,
+    useSourceImportJob: () => queryState.importJob,
+  };
+});
 
 vi.mock('@/lib/api-client', () => ({
   apiFetch: vi.fn(),
@@ -40,6 +50,7 @@ vi.mock('@/lib/api-client', () => ({
 }));
 
 import { SourcesPage } from '@/app/(app)/sources/page';
+import { ApiError, apiFetch } from '@/lib/api-client';
 
 beforeEach(() => {
   queryState.sources = [];
@@ -56,7 +67,12 @@ beforeEach(() => {
   queryState.deleteSource.mutateAsync.mockReset();
   queryState.deleteSource.mutateAsync.mockResolvedValue(undefined);
   queryState.deleteSource.isPending = false;
-  useUIStore.setState({ nativeLanguage: 'zh-CN' });
+  queryState.importJob.data = null;
+  queryState.importJob.isError = false;
+  queryState.importJob.error = null;
+  queryState.importJob.isFetching = false;
+  vi.mocked(apiFetch).mockReset();
+  useUIStore.setState({ nativeLanguage: 'zh-CN', sourceImportJob: null });
 });
 
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -105,6 +121,47 @@ test('SourcesPage debounces URL discovery and subscribes from the preview', asyn
 
   expect(queryState.createSource.mutateAsync).toHaveBeenCalledWith('https://example.com/feed.xml');
   expect(await screen.findByText('已订阅 Example')).toBeInTheDocument();
+});
+
+test('SourcesPage stores the active OPML import job globally', async () => {
+  const user = userEvent.setup();
+  vi.mocked(apiFetch).mockResolvedValueOnce({ job_id: 'import-123' });
+
+  render(<SourcesPage />, { wrapper });
+
+  const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+  const file = new File(['<opml version="2.0"><body /></opml>'], 'feeds.opml', { type: 'text/x-opml' });
+  await user.upload(fileInput, file);
+
+  await waitFor(() => {
+    expect(useUIStore.getState().sourceImportJob).toMatchObject({
+      id: 'import-123',
+      fileName: 'feeds.opml',
+    });
+  });
+  expect(apiFetch).toHaveBeenCalledWith('/api/sources/import', expect.objectContaining({
+    method: 'POST',
+    headers: { 'Content-Type': 'text/x-opml; charset=utf-8' },
+  }));
+});
+
+test('SourcesPage clears a stale persisted OPML import job', async () => {
+  queryState.importJob.isError = true;
+  queryState.importJob.error = new ApiError('job not found', 404);
+  useUIStore.setState({
+    sourceImportJob: {
+      id: 'import-123',
+      fileName: 'feeds.opml',
+      startedAt: Date.now(),
+    },
+  });
+
+  render(<SourcesPage />, { wrapper });
+
+  await waitFor(() => {
+    expect(useUIStore.getState().sourceImportJob).toBeNull();
+  });
+  expect(screen.queryByText(/导入失败/)).not.toBeInTheDocument();
 });
 
 test('SourcesPage filters, searches, and sorts populated sources', async () => {

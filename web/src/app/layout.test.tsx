@@ -1,7 +1,5 @@
-vi.mock('next/font/google', () => ({
-  Inter: () => ({ variable: 'font-inter' }),
-  JetBrains_Mono: () => ({ variable: 'font-jetbrains-mono' }),
-  Newsreader: () => ({ variable: 'font-newsreader' }),
+vi.mock('next/font/local', () => ({
+  default: () => ({ variable: 'font-local' }),
 }));
 
 import { viewport } from './layout';

@@ -10,26 +10,34 @@ export class ApiError extends Error {
   }
 }
 
+type ApiFetchOptions = RequestInit & {
+  redirectOnUnauthorized?: boolean;
+};
+
 export async function apiFetch<T = unknown>(
   path: string,
-  options: RequestInit = {},
+  options: ApiFetchOptions = {},
 ): Promise<T> {
-  const headers = new Headers(options.headers);
+  const { redirectOnUnauthorized = true, ...fetchOptions } = options;
+  const headers = new Headers(fetchOptions.headers);
   if (!headers.has('Content-Type') && options.body) {
     headers.set('Content-Type', 'application/json');
   }
-  const method = (options.method ?? 'GET').toUpperCase();
+  const method = (fetchOptions.method ?? 'GET').toUpperCase();
   if (method !== 'GET' && method !== 'HEAD') {
     headers.set('X-Requested-With', 'xhr');
   }
 
   const res = await fetch(path, {
-    ...options,
+    ...fetchOptions,
     headers,
     credentials: 'include',
   });
 
   if (res.status === 401) {
+    if (redirectOnUnauthorized && typeof globalThis.location !== 'undefined') {
+      globalThis.location.href = '/login';
+    }
     throw new ApiError(401, 'UNAUTHORIZED', 'Not authenticated');
   }
 

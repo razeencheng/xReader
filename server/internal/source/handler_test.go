@@ -178,6 +178,40 @@ func TestHandler_DELETE_OwnerOnly(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, w.Code)
 }
 
+func TestHandler_GetJobOwnerOnly(t *testing.T) {
+	r, handler, userID, cleanup := setupHandlerTest(t)
+	t.Cleanup(cleanup)
+
+	jobID := fmt.Sprintf("import-%d-123", userID)
+	handler.JobStore.Set(jobID, JobStatus{Status: "running", Total: 1})
+
+	r.Use(withUser(userID))
+	r.GET("/api/sources/jobs/:jobID", handler.GetJob)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/sources/jobs/"+jobID, nil)
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestHandler_GetJobHidesOtherUsersJobs(t *testing.T) {
+	r, handler, userID, cleanup := setupHandlerTest(t)
+	t.Cleanup(cleanup)
+
+	jobID := fmt.Sprintf("import-%d-123", userID)
+	handler.JobStore.Set(jobID, JobStatus{Status: "running", Total: 1})
+
+	r.Use(withUser(userID + 999))
+	r.GET("/api/sources/jobs/:jobID", handler.GetJob)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/sources/jobs/"+jobID, nil)
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusNotFound, w.Code)
+}
+
 func formatID(v any) string {
 	switch id := v.(type) {
 	case float64:
