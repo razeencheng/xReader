@@ -328,3 +328,43 @@ func TestWorker_EagerAIFansOutToDistinctNativeLanguages(t *testing.T) {
 
 	require.Equal(t, []string{"ja-JP", "zh-CN"}, languages)
 }
+
+func TestWorker_RunCatchUpSkipsWhenRunRecently(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pool, cleanup := testutil.SetupTestDB(t, ctx)
+	t.Cleanup(cleanup)
+
+	src := setupTestSource(t, pool, ctx)
+
+	// A user whose native language differs from the English title, so the
+	// eager pipeline actually calls the AI client during catch-up.
+	_, err := pool.Exec(ctx,
+		"INSERT INTO users (github_id, github_username, role, native_language) VALUES ($1,$2,$3,$4)",
+		2, "zh-reader", "user", "zh-CN")
+	require.NoError(t, err)
+
+	_, err = pool.Exec(ctx, `
+		INSERT INTO articles
+		  (source_id, external_id, link, normalized_link, title, language,
+		   content_html, content_text, published_at, fetched_at)
+		VALUES ($1,'cu-1','https://example.com/cu-1','https://example.com/cu-1',
+		        'A catch-up headline','en','<p>body</p>','body', now(), now())
+	`, src.ID)
+	require.NoError(t, err)
+
+	client := &ai.MockClient{Response: ai.ChatResponse{Content: "已翻译"}}
+	worker := NewWorker(pool, &mockAdapter{}, client, ai.NewRetranslateQueue(8))
+
+	// First run processes the missing article -> the AI client is called.
+	worker.runCatchUp(ctx)
+	require.NotEmpty(t, client.Calls, "first catch-up should call the AI client")
+	callsAfterFirst := len(client.Calls)
+
+	// Immediate second run is within catchUpInterval -> the in-memory guard
+	// must skip it entirely, so the AI client is NOT called again.
+	worker.runCatchUp(ctx)
+	require.Equal(t, callsAfterFirst, len(client.Calls),
+		"a second catch-up within the interval must not call the AI client again")
+}

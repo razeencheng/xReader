@@ -113,24 +113,38 @@ func (w *Worker) tick(ctx context.Context) {
 }
 
 const catchUpThrottle = 2 * time.Second
+const catchUpInterval = 15 * time.Minute
 
 func (w *Worker) catchUpAI(ctx context.Context) {
 	if w.aiClient == nil {
 		return
 	}
-
-	// Check if catch-up already ran recently (within 10 minutes)
-	var lastRun *time.Time
-	row := w.pool.QueryRow(ctx,
-		"SELECT updated_at FROM article_ai ORDER BY updated_at DESC LIMIT 1")
-	var t time.Time
-	if row.Scan(&t) == nil {
-		lastRun = &t
+	w.runCatchUp(ctx) // run once immediately (preserve startup behavior)
+	ticker := time.NewTicker(catchUpInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			w.runCatchUp(ctx)
+		}
 	}
-	if lastRun != nil && time.Since(*lastRun) < 10*time.Minute {
+}
+
+func (w *Worker) runCatchUp(ctx context.Context) {
+	if w.aiClient == nil {
+		return
+	}
+	// In-memory guard: skip if catch-up itself ran within the interval. This
+	// replaces the old "any article_ai updated in last 10 min" DB gate, which
+	// on an active site suppressed catch-up indefinitely. lastCatchUp is set
+	// before doing work so a re-entrant/rapid call skips.
+	if !w.lastCatchUp.IsZero() && time.Since(w.lastCatchUp) < catchUpInterval {
 		log.Println("worker: AI catch-up skipped (ran recently)")
 		return
 	}
+	w.lastCatchUp = time.Now()
 
 	languages, err := w.queries.ListDistinctNativeLanguages(ctx)
 	if err != nil || len(languages) == 0 {
