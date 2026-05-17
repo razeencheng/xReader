@@ -9,6 +9,7 @@ import { broadcast } from '@/lib/broadcast';
 import { estimateReadMinutes, formatRelativeTime, getDisplayTitle, isLikelySummaryOnly, isSameLanguage } from '@/lib/article-meta';
 import { useI18n } from '@/lib/i18n';
 import { getActiveReaderLayout, toggleReaderFocusMode } from '@/lib/reader-layout';
+import { useHeldScroll } from '@/hooks/useHeldScroll';
 import { useReaderGestures } from '@/hooks/useReaderGestures';
 import { useUIStore } from '@/stores/useUIStore';
 import { KeyPointsCallout } from '@/components/reader/KeyPointsCallout';
@@ -88,8 +89,10 @@ export function ArticleReader({
   const focusMode = useUIStore((state) => state.focusMode);
   const setFocusMode = useUIStore((state) => state.setFocusMode);
   const setLayout = useUIStore((state) => state.setLayout);
+  const isShortcutsOpen = useUIStore((state) => state.isShortcutsOpen);
 
   const activeLayout = getActiveReaderLayout(layout, focusMode);
+  useHeldScroll(scrollRef, { disabled: isShortcutsOpen });
 
   const { data: article, isLoading, error } = useQuery({
     queryKey: ['article', id],

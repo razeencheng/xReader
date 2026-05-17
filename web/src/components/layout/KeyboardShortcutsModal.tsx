@@ -8,13 +8,15 @@ const SHORTCUT_GROUPS = [
   {
     labelKey: 'shortcuts.navigation',
     items: [
-      ['j', 'shortcuts.nextArticle'],
-      ['k', 'shortcuts.previousArticle'],
+      ['l', 'shortcuts.nextArticle'],
+      ['h', 'shortcuts.previousArticle'],
     ],
   },
   {
     labelKey: 'shortcuts.article',
     items: [
+      ['j', 'shortcuts.scrollDown'],
+      ['k', 'shortcuts.scrollUp'],
       ['s', 'shortcuts.starArticle'],
       ['r', 'shortcuts.markRead'],
     ],
@@ -118,7 +120,7 @@ export function KeyboardShortcutsModal({
                     }`}
                   >
                     <span className="text-[13px] text-[var(--text-2)]">{t(labelKey)}</span>
-                    <Kbd>{key}</Kbd>
+                    <Kbd>{key.toUpperCase()}</Kbd>
                   </div>
                 ))}
               </div>
