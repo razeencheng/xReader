@@ -20,10 +20,11 @@ import (
 )
 
 type RouterDeps struct {
-	Pool          *pgxpool.Pool
-	SessionSecret string
-	StaticFS      fs.FS
-	SetupToken    string
+	Pool             *pgxpool.Pool
+	SessionSecret    string
+	StaticFS         fs.FS
+	SetupToken       string
+	RetranslateQueue *ai.RetranslateQueue
 }
 
 func NewRouter(deps RouterDeps) *gin.Engine {
@@ -115,6 +116,7 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		articleSvc := article.NewArticleService(deps.Pool)
 		articleH := article.NewArticleHandler(articleSvc)
 		articleH.ContentOwnerID = guestSvc.ContentOwnerID
+		articleH.RetranslateQueue = deps.RetranslateQueue
 		imageProxyH := article.NewImageProxyHandler()
 		authed.GET("/articles", articleH.List)
 		authed.GET("/articles/:id", articleH.GetByID)

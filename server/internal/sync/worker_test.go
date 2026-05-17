@@ -234,6 +234,48 @@ func TestFetchJob_DoesNotApplyInitialBacklogRuleAfterFirstSuccess(t *testing.T) 
 	require.Equal(t, 1, unreadCount)
 }
 
+func TestWorker_RetranslateLoopProcessesQueuedArticle(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pool, cleanup := testutil.SetupTestDB(t, ctx)
+	t.Cleanup(cleanup)
+
+	src := setupTestSource(t, pool, ctx)
+
+	var articleID int64
+	err := pool.QueryRow(ctx, `
+		INSERT INTO articles
+		  (source_id, external_id, link, normalized_link, title, language,
+		   content_html, content_text, published_at, fetched_at)
+		VALUES ($1,'rt-1','https://example.com/rt-1','https://example.com/rt-1',
+		        'Breaking News Today','en','<p>body</p>','body', now(), now())
+		RETURNING id
+	`, src.ID).Scan(&articleID)
+	require.NoError(t, err)
+
+	queue := ai.NewRetranslateQueue(8)
+	client := &ai.MockClient{Response: ai.ChatResponse{Content: "今日要闻"}}
+	adapter := &mockAdapter{}
+	worker := NewWorker(pool, adapter, client, queue)
+
+	go worker.retranslateLoop(ctx)
+
+	require.True(t, queue.Enqueue(articleID, "zh-CN"))
+
+	require.Eventually(t, func() bool {
+		var translated string
+		row := pool.QueryRow(ctx, `
+			SELECT title_translated FROM article_ai
+			WHERE article_id = $1 AND target_language = 'zh-CN'
+		`, articleID)
+		if err := row.Scan(&translated); err != nil {
+			return false
+		}
+		return translated != "" && translated != "Breaking News Today"
+	}, 10*time.Second, 100*time.Millisecond)
+}
+
 func TestWorker_EagerAIFansOutToDistinctNativeLanguages(t *testing.T) {
 	ctx := context.Background()
 	pool, cleanup := testutil.SetupTestDB(t, ctx)
@@ -259,7 +301,7 @@ func TestWorker_EagerAIFansOutToDistinctNativeLanguages(t *testing.T) {
 		},
 	}
 	client := &ai.MockClient{Response: ai.ChatResponse{Content: "translated"}}
-	worker := NewWorker(pool, adapter, client)
+	worker := NewWorker(pool, adapter, client, ai.NewRetranslateQueue(8))
 
 	worker.tick(ctx)
 
@@ -285,4 +327,44 @@ func TestWorker_EagerAIFansOutToDistinctNativeLanguages(t *testing.T) {
 	require.NoError(t, rows.Err())
 
 	require.Equal(t, []string{"ja-JP", "zh-CN"}, languages)
+}
+
+func TestWorker_RunCatchUpSkipsWhenRunRecently(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pool, cleanup := testutil.SetupTestDB(t, ctx)
+	t.Cleanup(cleanup)
+
+	src := setupTestSource(t, pool, ctx)
+
+	// A user whose native language differs from the English title, so the
+	// eager pipeline actually calls the AI client during catch-up.
+	_, err := pool.Exec(ctx,
+		"INSERT INTO users (github_id, github_username, role, native_language) VALUES ($1,$2,$3,$4)",
+		2, "zh-reader", "user", "zh-CN")
+	require.NoError(t, err)
+
+	_, err = pool.Exec(ctx, `
+		INSERT INTO articles
+		  (source_id, external_id, link, normalized_link, title, language,
+		   content_html, content_text, published_at, fetched_at)
+		VALUES ($1,'cu-1','https://example.com/cu-1','https://example.com/cu-1',
+		        'A catch-up headline','en','<p>body</p>','body', now(), now())
+	`, src.ID)
+	require.NoError(t, err)
+
+	client := &ai.MockClient{Response: ai.ChatResponse{Content: "已翻译"}}
+	worker := NewWorker(pool, &mockAdapter{}, client, ai.NewRetranslateQueue(8))
+
+	// First run processes the missing article -> the AI client is called.
+	worker.runCatchUp(ctx)
+	require.NotEmpty(t, client.Calls, "first catch-up should call the AI client")
+	callsAfterFirst := len(client.Calls)
+
+	// Immediate second run is within catchUpInterval -> the in-memory guard
+	// must skip it entirely, so the AI client is NOT called again.
+	worker.runCatchUp(ctx)
+	require.Equal(t, callsAfterFirst, len(client.Calls),
+		"a second catch-up within the interval must not call the AI client again")
 }

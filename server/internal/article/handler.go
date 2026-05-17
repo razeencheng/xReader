@@ -12,12 +12,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/razeencheng/xreader/db/gen"
+	"github.com/razeencheng/xreader/internal/ai"
 	"github.com/razeencheng/xreader/internal/middleware"
 )
 
 type ArticleHandler struct {
-	Service        *ArticleService
-	ContentOwnerID func(ctx context.Context) (int64, error)
+	Service          *ArticleService
+	ContentOwnerID   func(ctx context.Context) (int64, error)
+	RetranslateQueue *ai.RetranslateQueue
 }
 
 func NewArticleHandler(svc *ArticleService) *ArticleHandler {
@@ -136,6 +138,15 @@ func (h *ArticleHandler) List(c *gin.Context) {
 		return
 	}
 
+	// Only the non-search list paths go through the enriched query that
+	// populates TitleTranslated. The search branch uses a non-enriched query
+	// that never sets it, so every (even already-translated) search hit would
+	// look "missing" and be re-enqueued on every keystroke. Gate enqueue to
+	// the non-search paths.
+	if strings.TrimSpace(q) == "" {
+		h.enqueueMissingTitleTranslations(items, isGuest, user.NativeLanguage)
+	}
+
 	resp := articleListResponse{Items: items}
 	if counts, err := h.countsForList(ctx, stateOwnerID, contentOwnerID, isGuest, tab, q, sourceIDRaw); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -149,6 +160,42 @@ func (h *ArticleHandler) List(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusOK, resp)
+}
+
+// enqueueMissingTitleTranslations submits on-demand AI title-translation jobs
+// for the articles currently visible on this page whose title has no stored
+// translation for the requesting user's native language (either never
+// attempted, or a prior combined AI call returned an empty title). It is
+// bounded to the
+// page (items is already limited), de-duped/rate-limited by RetranslateQueue,
+// and never blocks the response. Guests are excluded (read-only demo over the
+// content owner's data). Polluted rows (title_translated != "") are left alone
+// — historical backfill is intentionally out of scope.
+//
+// Note on repeated polling: after Complete the de-dup reservation clears, so a
+// still-untranslated article CAN be re-enqueued by the next list poll. That is
+// acceptable by design — the real AI-load cap is the consumer side: a bounded
+// (drop-when-full) queue drained by a single worker goroutine throttled at
+// catchUpThrottle (~2s/job). Enqueue is a cheap non-blocking map/channel op;
+// it does not call the AI provider. Do not "fix" this with extra negative-cache
+// state — the throttle already bounds provider QPS.
+func (h *ArticleHandler) enqueueMissingTitleTranslations(items []articleResponse, isGuest bool, nativeLang string) {
+	if h.RetranslateQueue == nil || isGuest || nativeLang == "" {
+		return
+	}
+	target := ai.NormalizeLangCode(nativeLang)
+	for _, it := range items {
+		if it.TitleTranslated != "" {
+			continue
+		}
+		titleLang := ai.DetectTitleLanguage(it.Title)
+		if titleLang == "" || titleLang == target {
+			continue
+		}
+		// Enqueue with the raw native language tag (e.g. "zh-CN") to match
+		// the eager pipeline and the per-language article_ai join.
+		h.RetranslateQueue.Enqueue(it.ID, nativeLang)
+	}
 }
 
 func (h *ArticleHandler) GetByID(c *gin.Context) {

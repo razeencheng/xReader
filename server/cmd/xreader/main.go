@@ -86,13 +86,17 @@ func main() {
 		log.Printf("==================================================\n")
 	}
 
+	// Shared on-demand AI retranslate queue: produced by the article list
+	// handler, consumed by the worker goroutine.
+	retranslateQueue := ai.NewRetranslateQueue(512)
+
 	// Start worker in background goroutine
 	go func() {
 		log.Println("worker: starting fetch loop")
 		settings := ai.NewSettingsService(ai.NewPostgresSettingsRepository(pool))
 		aiClient := ai.NewDynamicClient(settings)
 		adapter := source.NewRSSAdapter()
-		worker := syncpkg.NewWorker(pool, adapter, aiClient)
+		worker := syncpkg.NewWorker(pool, adapter, aiClient, retranslateQueue)
 		if err := worker.Run(ctx); err != nil && err != context.Canceled {
 			log.Printf("worker: %v", err)
 		}
@@ -100,10 +104,11 @@ func main() {
 
 	// Start HTTP server
 	router := platform.NewRouter(platform.RouterDeps{
-		Pool:          pool,
-		SessionSecret: sessionSecret,
-		StaticFS:      staticFS,
-		SetupToken:    setupToken,
+		Pool:             pool,
+		SessionSecret:    sessionSecret,
+		StaticFS:         staticFS,
+		SetupToken:       setupToken,
+		RetranslateQueue: retranslateQueue,
 	})
 
 	srv := &http.Server{

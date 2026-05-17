@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/razeencheng/xreader/db/gen"
+	"github.com/razeencheng/xreader/internal/ai"
 	"github.com/razeencheng/xreader/internal/middleware"
 	"github.com/razeencheng/xreader/internal/testutil"
 	"github.com/stretchr/testify/require"
@@ -47,6 +48,15 @@ func setupArticleHandlerTest(t *testing.T) (*gin.Engine, *ArticleHandler, *gen.Q
 func withArticleUser(userID int64) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Set("user", &middleware.User{ID: userID, GitHubUsername: "testuser", Role: "user"})
+		c.Next()
+	}
+}
+
+func withArticleUserLang(userID int64, lang string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Set("user", &middleware.User{
+			ID: userID, GitHubUsername: "testuser", Role: "user", NativeLanguage: lang,
+		})
 		c.Next()
 	}
 }
@@ -400,4 +410,108 @@ func TestArticleHandler_BatchCanUndoSourceReadState(t *testing.T) {
 	state, err := gen.New(pool).GetArticleState(ctx, gen.GetArticleStateParams{UserID: userID, ArticleID: article.ID})
 	require.NoError(t, err)
 	require.False(t, state.IsRead)
+}
+
+func TestEnqueueMissingTitleTranslations_Selection(t *testing.T) {
+	q := ai.NewRetranslateQueue(16)
+	h := &ArticleHandler{RetranslateQueue: q}
+
+	items := []articleResponse{
+		{ID: 1, Title: "Breaking News Today", TitleTranslated: ""},   // en, untranslated -> enqueue
+		{ID: 2, Title: "今日要闻", TitleTranslated: ""},                 // zh, same as target -> skip
+		{ID: 3, Title: "Already done", TitleTranslated: "已翻译"},      // has translation -> skip
+		{ID: 4, Title: "1234 5678", TitleTranslated: ""},             // digits only: <2 letters -> DetectTitleLanguage="" -> skip
+	}
+
+	h.enqueueMissingTitleTranslations(items, false, "zh-CN")
+
+	got := map[int64]bool{}
+	for {
+		select {
+		case j := <-q.Jobs():
+			got[j.ArticleID] = true
+			if j.TargetLang != "zh-CN" {
+				t.Fatalf("expected raw native language target, got %q", j.TargetLang)
+			}
+			continue
+		default:
+		}
+		break
+	}
+	if !got[1] || len(got) != 1 {
+		t.Fatalf("expected only article 1 enqueued, got %v", got)
+	}
+}
+
+func TestEnqueueMissingTitleTranslations_GuardsNoOp(t *testing.T) {
+	q := ai.NewRetranslateQueue(4)
+	items := []articleResponse{{ID: 1, Title: "Breaking News Today"}}
+
+	// Guest request: never enqueue.
+	(&ArticleHandler{RetranslateQueue: q}).enqueueMissingTitleTranslations(items, true, "zh-CN")
+	// Empty native language: never enqueue.
+	(&ArticleHandler{RetranslateQueue: q}).enqueueMissingTitleTranslations(items, false, "")
+	// Nil queue: must not panic (no RetranslateQueue set).
+	(&ArticleHandler{}).enqueueMissingTitleTranslations(items, false, "zh-CN")
+
+	select {
+	case j := <-q.Jobs():
+		t.Fatalf("expected no enqueue, got %+v", j)
+	default:
+	}
+}
+
+func TestArticleHandler_ListEnqueuesUntranslatedTitles(t *testing.T) {
+	r, handler, queries, _, userID, sourceID, cleanup := setupArticleHandlerTest(t)
+	t.Cleanup(cleanup)
+	ctx := context.Background()
+
+	article := insertHandlerArticle(t, queries, ctx, sourceID, "Breaking News Today", time.Now())
+
+	queue := ai.NewRetranslateQueue(8)
+	handler.RetranslateQueue = queue
+
+	r.Use(withArticleUserLang(userID, "zh-CN"))
+	r.GET("/api/articles", handler.List)
+
+	req, _ := http.NewRequest("GET", "/api/articles?tab=today", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	select {
+	case job := <-queue.Jobs():
+		require.Equal(t, article.ID, job.ArticleID)
+		require.Equal(t, "zh-CN", job.TargetLang)
+	default:
+		t.Fatal("expected the untranslated English-title article to be enqueued")
+	}
+}
+
+func TestArticleHandler_ListDoesNotEnqueueForSearch(t *testing.T) {
+	r, handler, queries, _, userID, sourceID, cleanup := setupArticleHandlerTest(t)
+	t.Cleanup(cleanup)
+	ctx := context.Background()
+
+	insertHandlerArticle(t, queries, ctx, sourceID, "Breaking News Today", time.Now())
+
+	queue := ai.NewRetranslateQueue(8)
+	handler.RetranslateQueue = queue
+
+	r.Use(withArticleUserLang(userID, "zh-CN"))
+	r.GET("/api/articles", handler.List)
+
+	// The search branch of itemsForList uses the non-enriched query, which
+	// never populates TitleTranslated. Enqueueing there would mis-classify
+	// every already-translated search hit as "missing" on every keystroke.
+	req, _ := http.NewRequest("GET", "/api/articles?q=Breaking", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	select {
+	case j := <-queue.Jobs():
+		t.Fatalf("search path must not enqueue (non-enriched query lacks title_translated); got %+v", j)
+	default:
+	}
 }

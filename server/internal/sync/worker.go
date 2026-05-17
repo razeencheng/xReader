@@ -14,28 +14,32 @@ import (
 )
 
 type Worker struct {
-	pool       *pgxpool.Pool
-	queries    *gen.Queries
-	job        *FetchJob
-	aiClient   ai.AIClient
-	interval   time.Duration
-	maxWorkers int
+	pool        *pgxpool.Pool
+	queries     *gen.Queries
+	job         *FetchJob
+	aiClient    ai.AIClient
+	interval    time.Duration
+	maxWorkers  int
+	retranslate *ai.RetranslateQueue
+	lastCatchUp time.Time // set/read only by the single catchUpAI goroutine
 }
 
-func NewWorker(pool *pgxpool.Pool, adapter source.SourceAdapter, aiClient ai.AIClient) *Worker {
+func NewWorker(pool *pgxpool.Pool, adapter source.SourceAdapter, aiClient ai.AIClient, retranslate *ai.RetranslateQueue) *Worker {
 	return &Worker{
-		pool:       pool,
-		queries:    gen.New(pool),
-		job:        NewFetchJob(pool, adapter),
-		aiClient:   aiClient,
-		interval:   60 * time.Second,
-		maxWorkers: 8,
+		pool:        pool,
+		queries:     gen.New(pool),
+		job:         NewFetchJob(pool, adapter),
+		aiClient:    aiClient,
+		interval:    60 * time.Second,
+		maxWorkers:  8,
+		retranslate: retranslate,
 	}
 }
 
 func (w *Worker) Run(ctx context.Context) error {
 	log.Println("worker: starting fetch loop")
 	go w.catchUpAI(ctx)
+	go w.retranslateLoop(ctx)
 	go w.guestCleanupLoop(ctx)
 	w.tick(ctx)
 	ticker := time.NewTicker(w.interval)
@@ -109,24 +113,38 @@ func (w *Worker) tick(ctx context.Context) {
 }
 
 const catchUpThrottle = 2 * time.Second
+const catchUpInterval = 15 * time.Minute
 
 func (w *Worker) catchUpAI(ctx context.Context) {
 	if w.aiClient == nil {
 		return
 	}
-
-	// Check if catch-up already ran recently (within 10 minutes)
-	var lastRun *time.Time
-	row := w.pool.QueryRow(ctx,
-		"SELECT updated_at FROM article_ai ORDER BY updated_at DESC LIMIT 1")
-	var t time.Time
-	if row.Scan(&t) == nil {
-		lastRun = &t
+	w.runCatchUp(ctx) // run once immediately (preserve startup behavior)
+	ticker := time.NewTicker(catchUpInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			w.runCatchUp(ctx)
+		}
 	}
-	if lastRun != nil && time.Since(*lastRun) < 10*time.Minute {
+}
+
+func (w *Worker) runCatchUp(ctx context.Context) {
+	if w.aiClient == nil {
+		return
+	}
+	// In-memory guard: skip if catch-up itself ran within the interval. This
+	// replaces the old "any article_ai updated in last 10 min" DB gate, which
+	// on an active site suppressed catch-up indefinitely. lastCatchUp is set
+	// before doing work so a re-entrant/rapid call skips.
+	if !w.lastCatchUp.IsZero() && time.Since(w.lastCatchUp) < catchUpInterval {
 		log.Println("worker: AI catch-up skipped (ran recently)")
 		return
 	}
+	w.lastCatchUp = time.Now()
 
 	languages, err := w.queries.ListDistinctNativeLanguages(ctx)
 	if err != nil || len(languages) == 0 {
@@ -154,6 +172,49 @@ func (w *Worker) catchUpAI(ctx context.Context) {
 		}
 	}
 	log.Println("worker: AI catch-up complete")
+}
+
+// retranslateLoop drains on-demand title-translation jobs enqueued by the
+// article list handler, running the existing eager pipeline per job with the
+// same throttle as catch-up so we never storm the AI provider.
+func (w *Worker) retranslateLoop(ctx context.Context) {
+	if w.aiClient == nil || w.retranslate == nil {
+		return
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case job := <-w.retranslate.Jobs():
+			w.runRetranslate(ctx, job)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(catchUpThrottle):
+			}
+		}
+	}
+}
+
+// runRetranslate processes one queued job. Two deferred calls run LIFO at
+// return/panic: Complete (registered last) runs first and always releases the
+// in-flight de-dup reservation so the article can be re-enqueued by a future
+// list view; the recover closure (registered first) runs last and catches any
+// panic from EagerJob.Run — recover works from any deferred call of the
+// panicking frame — so one bad article cannot kill the long-lived consumer.
+func (w *Worker) runRetranslate(ctx context.Context, job ai.RetranslateJob) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("worker: on-demand retranslate panic for article %d (%s): %v",
+				job.ArticleID, job.TargetLang, r)
+		}
+	}()
+	defer w.retranslate.Complete(job)
+	eager := ai.NewEagerJob(w.pool, w.aiClient, job.ArticleID, job.TargetLang)
+	if err := eager.Run(ctx); err != nil {
+		log.Printf("worker: on-demand retranslate article %d (%s): %v",
+			job.ArticleID, job.TargetLang, err)
+	}
 }
 
 func (w *Worker) guestCleanupLoop(ctx context.Context) {
