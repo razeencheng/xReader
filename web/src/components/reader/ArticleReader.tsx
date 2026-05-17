@@ -10,6 +10,7 @@ import { estimateReadMinutes, formatRelativeTime, getDisplayTitle, isLikelySumma
 import { useI18n } from '@/lib/i18n';
 import { getActiveReaderLayout, toggleReaderFocusMode } from '@/lib/reader-layout';
 import { useHeldScroll } from '@/hooks/useHeldScroll';
+import { useNextArticleWarmup } from '@/hooks/useNextArticleWarmup';
 import { useReaderGestures } from '@/hooks/useReaderGestures';
 import { useUIStore } from '@/stores/useUIStore';
 import { KeyPointsCallout } from '@/components/reader/KeyPointsCallout';
@@ -57,6 +58,12 @@ export interface ArticleReaderProps {
   afterScroll?: React.ReactNode;
   className?: string;
   onNotFound?: () => void;
+  /**
+   * Next article (id + language) for #3 prefetch/warm-up; null when none.
+   * Must be referentially stable (memoize at the call site) — the hook's 1s
+   * dwell debounce resets on every identity change.
+   */
+  next?: { id: number; language: string } | null;
 }
 
 export function ArticleReader({
@@ -72,6 +79,7 @@ export function ArticleReader({
   afterScroll,
   className = '',
   onNotFound,
+  next,
 }: ArticleReaderProps) {
   const queryClient = useQueryClient();
   const { t } = useI18n();
@@ -118,6 +126,13 @@ export function ArticleReader({
   });
 
   const progress = progressState.articleId === id ? progressState.value : 0;
+  useNextArticleWarmup({
+    currentId: id,
+    next,
+    nativeLanguage,
+    articleLoaded: !!article,
+    progress,
+  });
   const originalContent = originalContentState?.articleId === id ? originalContentState.content : null;
   const isLoadingOriginal = loadingOriginalId === id;
   const originalError = originalErrorState?.articleId === id ? originalErrorState.message : null;

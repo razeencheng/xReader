@@ -1,4 +1,9 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+  startBodyWarmup,
+  getBodyWarmup,
+  __resetBodyWarmupForTests,
+} from '@/lib/body-translation-warmup';
 
 const sse = vi.hoisted(() => {
   type ClientRecord = {
@@ -365,4 +370,84 @@ test('stabilizes external images without dimensions and suppresses filename-like
   expect(image).toHaveAttribute('data-original-alt', 'image-20250412165248283');
   expect(image).toHaveAttribute('alt', '');
   expect(frame?.getAttribute('style')).toContain('aspect-ratio: 16 / 9');
+});
+
+describe('BilingualBody warm-up adoption', () => {
+  afterEach(() => {
+    __resetBodyWarmupForTests();
+    sse.reset();
+  });
+
+  test('seeds already-warmed paragraphs on mount and does not open a new SSE for them', () => {
+    startBodyWarmup(1, 'zh-CN', 5);
+    act(() => {
+      sse.pushParagraph(0, { index: 0, translation: '预热第一段' });
+      sse.pushParagraph(0, { index: 1, translation: '预热第二段' });
+      sse.pushDone(0);
+    });
+    const callsBeforeMount = sse.createSSEClient.mock.calls.length;
+
+    const { container } = render(
+      <BilingualBody articleId={1} contentHtml={contentHtml} language="en" nativeLanguage="zh-CN" />,
+    );
+
+    expect(screen.getByText('预热第一段')).toBeInTheDocument();
+    expect(screen.getByText('预热第二段')).toBeInTheDocument();
+    enterParagraph(container, 0);
+    expect(sse.createSSEClient.mock.calls.length).toBe(callsBeforeMount);
+  });
+
+  test('adopts an in-flight warm-up: paragraphs arriving after mount still render', () => {
+    startBodyWarmup(1, 'zh-CN', 5);
+    render(
+      <BilingualBody articleId={1} contentHtml={contentHtml} language="en" nativeLanguage="zh-CN" />,
+    );
+    const callsAfterMount = sse.createSSEClient.mock.calls.length;
+    act(() => {
+      sse.pushParagraph(0, { index: 0, translation: '流式第一段' });
+    });
+    expect(screen.getByText('流式第一段')).toBeInTheDocument();
+    expect(sse.createSSEClient.mock.calls.length).toBe(callsAfterMount);
+  });
+
+  test('releases the warm entry on unmount so the store stays bounded', () => {
+    startBodyWarmup(1, 'zh-CN', 5);
+    const { unmount } = render(
+      <BilingualBody articleId={1} contentHtml={contentHtml} language="en" nativeLanguage="zh-CN" />,
+    );
+    expect(getBodyWarmup(1, 'zh-CN')).toBeDefined();
+    unmount();
+    expect(getBodyWarmup(1, 'zh-CN')).toBeUndefined();
+  });
+
+  test('releases the entry on a resetKey change (content swap) and does not re-seed', () => {
+    startBodyWarmup(1, 'zh-CN', 5);
+    act(() => {
+      sse.pushParagraph(0, { index: 0, translation: '预热第一段' });
+      sse.pushParagraph(0, { index: 1, translation: '预热第二段' });
+      sse.pushDone(0);
+    });
+
+    const { rerender } = render(
+      <BilingualBody articleId={1} contentHtml={contentHtml} language="en" nativeLanguage="zh-CN" />,
+    );
+    expect(screen.getByText('预热第一段')).toBeInTheDocument();
+    expect(getBodyWarmup(1, 'zh-CN')).toBeDefined();
+
+    // Simulate "load original content": same article, swapped contentHtml ->
+    // resetKey changes -> the warm effect cleanup must release the entry, and
+    // the re-run must NOT re-seed the stale (summary-indexed) translations.
+    rerender(
+      <BilingualBody
+        articleId={1}
+        contentHtml={'<p>Original first</p><p>Original second</p>'}
+        language="en"
+        nativeLanguage="zh-CN"
+      />,
+    );
+
+    expect(getBodyWarmup(1, 'zh-CN')).toBeUndefined();
+    expect(screen.queryByText('预热第一段')).not.toBeInTheDocument();
+    expect(screen.getByText('Original first')).toBeInTheDocument();
+  });
 });

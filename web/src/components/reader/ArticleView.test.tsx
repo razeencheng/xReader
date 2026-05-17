@@ -15,8 +15,12 @@ const applyArticleStateChange = vi.fn();
 vi.mock('@/lib/article-state-cache', () => ({
   applyArticleStateChange: (...a: unknown[]) => applyArticleStateChange(...a),
 }));
+const readerProps = vi.hoisted(() => ({ current: null as unknown }));
 vi.mock('@/components/reader/ArticleReader', () => ({
-  ArticleReader: ({ afterBody }: { afterBody?: ReactNode }) => <div>{afterBody}</div>,
+  ArticleReader: (props: { afterBody?: ReactNode; next?: unknown }) => {
+    readerProps.current = props.next ?? null;
+    return <div>{props.afterBody}</div>;
+  },
 }));
 
 import { apiFetch } from '@/lib/api-client';
@@ -27,6 +31,21 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 const nextStub = { id: 8, title: 'Next', source_id: 1, link: '', language: 'en', published_at: new Date().toISOString() };
+
+describe('ArticleView.next prop forwarding', () => {
+  it('forwards the next article id+language to ArticleReader for prefetch', () => {
+    render(
+      <ArticleView id="7" next={{ id: 8, title: 'Next', source_id: 1, link: '', language: 'en', published_at: new Date().toISOString() } as never} />,
+      { wrapper },
+    );
+    expect(readerProps.current).toEqual({ id: 8, language: 'en' });
+  });
+
+  it('passes null next to ArticleReader when there is no next', () => {
+    render(<ArticleView id="7" />, { wrapper });
+    expect(readerProps.current).toBeNull();
+  });
+});
 
 describe('ArticleView.markRead', () => {
   beforeEach(() => {

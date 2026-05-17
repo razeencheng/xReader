@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { apiFetch } from '@/lib/api-client';
 import { broadcast } from '@/lib/broadcast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -37,6 +37,16 @@ export function ArticleView({
   const articleId = Number(id);
   const queryClient = useQueryClient();
 
+  // Intentionally keyed on primitives, not the `next` object identity:
+  // filteredItems can produce a new ArticleItem reference for the same article
+  // on list refreshes; keying on id+language prevents churning the hook
+  // effects (which would reset the 1s dwell debounce in useNextArticleWarmup).
+  const nextForWarmup = useMemo(
+    () => (next ? { id: next.id, language: next.language } : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [next?.id, next?.language],
+  );
+
   const markRead = useCallback(
     async (articleIdToMark: number) => {
       const cached = queryClient.getQueryData<ArticleItem>(['article', String(articleIdToMark)]);
@@ -65,6 +75,7 @@ export function ArticleView({
       onPrev={onPrev}
       onNotFound={onNotFound}
       className={className}
+      next={nextForWarmup}
       afterBody={
         next ? (
           <div className="mt-16 mb-12">
