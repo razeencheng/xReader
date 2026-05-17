@@ -234,6 +234,48 @@ func TestFetchJob_DoesNotApplyInitialBacklogRuleAfterFirstSuccess(t *testing.T) 
 	require.Equal(t, 1, unreadCount)
 }
 
+func TestWorker_RetranslateLoopProcessesQueuedArticle(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pool, cleanup := testutil.SetupTestDB(t, ctx)
+	t.Cleanup(cleanup)
+
+	src := setupTestSource(t, pool, ctx)
+
+	var articleID int64
+	err := pool.QueryRow(ctx, `
+		INSERT INTO articles
+		  (source_id, external_id, link, normalized_link, title, language,
+		   content_html, content_text, published_at, fetched_at)
+		VALUES ($1,'rt-1','https://example.com/rt-1','https://example.com/rt-1',
+		        'Breaking News Today','en','<p>body</p>','body', now(), now())
+		RETURNING id
+	`, src.ID).Scan(&articleID)
+	require.NoError(t, err)
+
+	queue := ai.NewRetranslateQueue(8)
+	client := &ai.MockClient{Response: ai.ChatResponse{Content: "今日要闻"}}
+	adapter := &mockAdapter{}
+	worker := NewWorker(pool, adapter, client, queue)
+
+	go worker.retranslateLoop(ctx)
+
+	require.True(t, queue.Enqueue(articleID, "zh-CN"))
+
+	require.Eventually(t, func() bool {
+		var translated string
+		row := pool.QueryRow(ctx, `
+			SELECT title_translated FROM article_ai
+			WHERE article_id = $1 AND target_language = 'zh-CN'
+		`, articleID)
+		if err := row.Scan(&translated); err != nil {
+			return false
+		}
+		return translated != "" && translated != "Breaking News Today"
+	}, 10*time.Second, 100*time.Millisecond)
+}
+
 func TestWorker_EagerAIFansOutToDistinctNativeLanguages(t *testing.T) {
 	ctx := context.Background()
 	pool, cleanup := testutil.SetupTestDB(t, ctx)
