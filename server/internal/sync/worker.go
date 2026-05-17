@@ -196,11 +196,12 @@ func (w *Worker) retranslateLoop(ctx context.Context) {
 	}
 }
 
-// runRetranslate processes one queued job. Two deferred calls (LIFO order):
-// recover runs first — it contains any panic from EagerJob.Run so one bad
-// article cannot kill the long-lived consumer goroutine; Complete runs second —
-// it always releases the in-flight de-dup reservation, even after a caught
-// panic, so the article can be re-enqueued by a future list view.
+// runRetranslate processes one queued job. Two deferred calls run LIFO at
+// return/panic: Complete (registered last) runs first and always releases the
+// in-flight de-dup reservation so the article can be re-enqueued by a future
+// list view; the recover closure (registered first) runs last and catches any
+// panic from EagerJob.Run — recover works from any deferred call of the
+// panicking frame — so one bad article cannot kill the long-lived consumer.
 func (w *Worker) runRetranslate(ctx context.Context, job ai.RetranslateJob) {
 	defer func() {
 		if r := recover(); r != nil {
