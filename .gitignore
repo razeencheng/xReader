@@ -6,7 +6,19 @@
 .env.local
 .DS_Store
 .playwright-mcp/
-docs/
+# Internal docs are ignored by default; public docs are explicitly allowlisted.
+docs/**
+!docs/screenshots/
+!docs/screenshots/**
+!docs/deployment.md
+!docs/deployment.zh-CN.md
+!docs/contributing.md
+!docs/contributing.zh-CN.md
+# Backstop: internal planning/audit material must never be published.
+docs/superpowers/
+docs/*-audit*.md
+docs/open-source-audit-report.md
+docs/ai-development-guidelines.md
 
 *.log
 
