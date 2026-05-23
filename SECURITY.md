@@ -6,7 +6,7 @@ If you discover a security vulnerability in xReader, please report it responsibl
 
 **Do NOT open a public GitHub issue for security vulnerabilities.**
 
-Instead, please email: **razeen.cheng@outlook.com**
+Instead, please email: **me@razeen.me**
 
 Include:
 - Description of the vulnerability
