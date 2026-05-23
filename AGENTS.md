@@ -37,7 +37,6 @@ cd web && pnpm lint                            # ESLint + TypeScript check
 make up                                        # Start Postgres 16 container
 make down                                      # Stop containers
 make build                                     # Build web + server binary
-make rebuild                                   # Rebuild and restart xreader
 make test                                      # Run all backend + frontend tests
 make lint                                      # Lint all
 make sqlc-generate                             # Regenerate Go code from SQL queries

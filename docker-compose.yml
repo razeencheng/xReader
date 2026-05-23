@@ -5,7 +5,7 @@ services:
       - "3000:3000"
     environment:
       DATABASE_URL: postgres://xreader:xreader@postgres:5432/xreader?sslmode=disable
-      SESSION_SECRET: ${SESSION_SECRET:-change-me-to-a-random-string}
+      SESSION_SECRET: "${SESSION_SECRET:?set SESSION_SECRET - generate with openssl rand -hex 32}"
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
     depends_on:
@@ -20,7 +20,7 @@ services:
   postgres:
     image: postgres:16
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     environment:

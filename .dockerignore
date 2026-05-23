@@ -11,3 +11,7 @@ server/cmd/xreader/xreader
 *.log
 .DS_Store
 .playwright-mcp
+
+# Landing-page (Cloudflare Workers) build artifacts — not part of the binary
+landing/node_modules
+landing/.wrangler
