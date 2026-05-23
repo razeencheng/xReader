@@ -3,6 +3,7 @@ package platform
 import (
 	"context"
 	"io/fs"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -28,9 +29,13 @@ type RouterDeps struct {
 }
 
 func NewRouter(deps RouterDeps) *gin.Engine {
+	// Optional Google Analytics, configured at runtime via env var. Empty means
+	// no analytics: the CSP stays locked and no gtag.js is injected.
+	gaID := os.Getenv("XREADER_GA_ID")
+
 	r := gin.New()
 	r.Use(gin.Recovery())
-	r.Use(middleware.SecurityHeaders())
+	r.Use(middleware.SecurityHeaders(gaID != ""))
 
 	r.GET("/health", healthHandler)
 
@@ -170,7 +175,7 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 
 	if deps.StaticFS != nil {
 		subFS, _ := fs.Sub(deps.StaticFS, "static")
-		r.NoRoute(gin.WrapH(NewSPAHandler(subFS)))
+		r.NoRoute(gin.WrapH(NewSPAHandler(subFS, gaID)))
 	}
 
 	return r
