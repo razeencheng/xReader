@@ -79,3 +79,15 @@ jobs:
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  secrets:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
