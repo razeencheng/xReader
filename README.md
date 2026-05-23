@@ -4,9 +4,9 @@
 
 **Self-hosted RSS reader with AI-powered translation & key points**
 
-**AI 驱动的自托管 RSS 阅读器 — 自动翻译 + 要点总结**
+**English** | [简体中文](README.zh-CN.md)
 
-[Features](#features) · [Quick Start](#quick-start) · [Fever API](#fever-api) · [中文](#中文)
+[Features](#features) · [Quick Start](#quick-start) · [Deployment](docs/deployment.md) · [Contributing](docs/contributing.md)
 
 </div>
 
@@ -25,7 +25,7 @@
 - **Dark Mode + Themes** — Light/dark/system with 4 accent colors
 - **OpenAI-Compatible AI** — Works with DeepSeek, Moonshot, one-api, OpenRouter, or any relay
 - **Simple Deployment** — Single binary + Postgres, 2 containers
-- **Keyboard-First** — J/K navigate, S star, E mark read, / search
+- **Keyboard-First** — `L`/`H` next/previous article, `J`/`K` scroll down/up, `S` star, `R` mark read, `F` focus mode
 
 ## Quick Start
 
@@ -50,8 +50,11 @@ docker compose logs xreader | grep "SETUP TOKEN"
 | `SESSION_SECRET` | Yes | Random string for session signing |
 | `GITHUB_CLIENT_ID` | No* | GitHub OAuth App Client ID |
 | `GITHUB_CLIENT_SECRET` | No* | GitHub OAuth App Client Secret |
+| `GITHUB_CALLBACK_URL` | No | OAuth callback URL, e.g. `https://your-domain/api/auth/github/callback` |
+| `COOKIE_SECURE` | No | Set `true` when served over HTTPS |
 | `SETUP_TOKEN` | No | Fixed setup token (auto-generated if unset) |
 | `XREADER_AI_ENCRYPTION_KEY` | No | Custom encryption key for stored secrets |
+| `XREADER_GA_ID` | No | Google Analytics measurement ID; injected at runtime when set |
 
 *Configured via Setup Wizard on first run, or set as env vars.
 
@@ -97,35 +100,8 @@ make test
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the [contributing guide](docs/contributing.md). Deployment: [docs/deployment.md](docs/deployment.md).
 
 ## License
 
 [AGPL-3.0](LICENSE)
-
----
-
-## 中文
-
-### 功能亮点
-
-- **AI 双语阅读** — 标题自动翻译，原文+译文段落交替排列，每篇文章 3-5 条要点摘要
-- **Fever API** — 支持 Reeder、NetNewsWire、Unread 等第三方客户端
-- **全文搜索** — 支持中日韩文搜索，无需额外插件
-- **高亮和笔记** — 选中文字高亮，添加笔记
-- **深色模式 + 主题** — 浅色/深色/跟随系统，4 种强调色
-- **OpenAI 兼容** — 支持 DeepSeek、Moonshot、one-api、OpenRouter 等中转
-- **极简部署** — 单个二进制 + Postgres，仅 2 个容器
-- **键盘优先** — J/K 导航、S 收藏、E 标记已读、/ 搜索
-
-### 快速开始
-
-```bash
-git clone https://github.com/razeencheng/xreader.git
-cd xreader
-echo "SESSION_SECRET=$(openssl rand -hex 32)" > .env
-
-docker compose up -d
-docker compose logs xreader | grep "SETUP TOKEN"
-# 打开 http://localhost:3000/setup → 输入令牌 → 完成配置
-```
