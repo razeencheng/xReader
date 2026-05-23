@@ -13,6 +13,8 @@ xReader 以单一 Go 二进制文件的形式分发，该二进制文件同时�
 
 二进制文件在启动时会自动执行数据库迁移，生产环境无需手动迁移。首次运行时，xReader 会将 `SETUP TOKEN` 打印到标准输出；管理员使用该令牌在 `/setup` 页面完成初始配置向导。
 
+> 营销着陆页位于 [`landing/`](../landing/)，单独部署到 Cloudflare Workers，详见 `landing/README.md`。
+
 ---
 
 ## 2. 使用预构建镜像快速启动

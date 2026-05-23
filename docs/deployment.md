@@ -13,6 +13,8 @@ Pre-built container images are published to two registries:
 
 The binary auto-migrates the database on startup, so no manual migration step is needed in production. On the very first run, xReader prints a `SETUP TOKEN` to stdout; the admin uses that token to complete the Setup Wizard at `/setup`.
 
+> The marketing landing page lives in [`landing/`](../landing/) and deploys separately to Cloudflare Workers; see `landing/README.md`.
+
 ---
 
 ## 2. Quick Start with Prebuilt Image
