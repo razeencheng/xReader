@@ -69,7 +69,6 @@ pnpm dev         # Turbopack dev server on :3000
 make up          # Start Postgres 16 container
 make down        # Stop containers
 make build       # Build web then compile Go binary
-make rebuild     # Rebuild and restart the xreader process
 make lint        # Run all linters (Go + TypeScript)
 make test        # Run all backend + frontend tests
 ```

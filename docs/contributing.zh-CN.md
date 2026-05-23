@@ -69,7 +69,6 @@ pnpm dev         # Turbopack 开发服务器，监听 :3000
 make up          # 启动 Postgres 16 容器
 make down        # 停止容器
 make build       # 构建前端并编译 Go 二进制
-make rebuild     # 重新构建并重启 xreader 进程
 make lint        # 运行所有 Linter（Go + TypeScript）
 make test        # 运行所有后端和前端测试
 ```
