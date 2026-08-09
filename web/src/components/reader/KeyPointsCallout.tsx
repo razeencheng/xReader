@@ -28,6 +28,14 @@ export function KeyPointsCallout({ text, locale }: Props) {
             ))}
           </ul>
         </>
+      ) : summary.kind === 'bulleted' ? (
+        <ul className="pl-5 text-[0.9em] leading-relaxed text-[var(--text-2)]">
+          {summary.points.map((point, index) => (
+            <li key={index} className="mb-[5px]">
+              {point}
+            </li>
+          ))}
+        </ul>
       ) : (
         <div className="space-y-2 text-[0.9em] leading-relaxed text-[var(--text-2)]">
           {summary.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}

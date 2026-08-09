@@ -39,6 +39,25 @@ describe('parseSummary', () => {
     });
   });
 
+  test('preserves explicit legacy bullet lines as semantic points', () => {
+    const text = [
+      '• 文章讨论了 Banana RAT 在巴西银行的内存金融盗窃攻击。  ',
+      '• 攻击是由操作者驱动的，利用了内存中的漏洞进行窃取。  ',
+      '• 文章来源于 Daily CyberSecurity 的每日网络安全报道。  ',
+      '• 相关文章涉及其他网络安全事件和恶意软件分析。',
+    ].join('\n');
+
+    expect(parseSummary(text, 'zh-CN')).toEqual({
+      kind: 'bulleted',
+      points: [
+        '文章讨论了 Banana RAT 在巴西银行的内存金融盗窃攻击。',
+        '攻击是由操作者驱动的，利用了内存中的漏洞进行窃取。',
+        '文章来源于 Daily CyberSecurity 的每日网络安全报道。',
+        '相关文章涉及其他网络安全事件和恶意软件分析。',
+      ],
+    });
+  });
+
   test('preserves text when no reliable sentence boundary exists', () => {
     const text = 'a compact summary with no terminal punctuation';
     expect(parseSummary(text, 'en')).toEqual({ kind: 'legacy', paragraphs: [text] });
