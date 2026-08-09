@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { ApiError, apiFetch } from '@/lib/api-client';
 import { ArticleReader } from './ArticleReader';
 import { useUIStore } from '@/stores/useUIStore';
+import { ReadStateProvider } from '@/components/providers/ReadStateProvider';
 
 vi.mock('@/lib/api-client', () => {
   class MockApiError extends Error {
@@ -28,7 +29,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
     defaultOptions: { queries: { retry: false } },
   });
 
-  return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+  return <QueryClientProvider client={qc}><ReadStateProvider>{children}</ReadStateProvider></QueryClientProvider>;
 }
 
 beforeEach(() => {

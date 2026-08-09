@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
-import { applyArticleStateChange } from '@/lib/article-state-cache';
 import { broadcast } from '@/lib/broadcast';
 import { useI18n } from '@/lib/i18n';
 import { useUIStore } from '@/stores/useUIStore';
 import type { ArticleItem } from '@/lib/types';
+import { useReadStateCoordinator } from '@/components/providers/ReadStateProvider';
+import type { ArticleStateSnapshot } from '@/lib/read-state-coordinator';
+import { applyArticleStateChange, coordinatedReadStateChange } from '@/lib/article-state-cache';
 
 type FeedArticleItem = ArticleItem & {
   is_starred?: boolean;
@@ -18,6 +20,7 @@ interface BatchStateResponse {
   status: string;
   updated: number;
   article_ids: number[];
+  states: ArticleStateSnapshot[];
 }
 
 interface BulkReadUndo {
@@ -29,6 +32,7 @@ const READ_DISMISS_DELAY_MS = 3000;
 
 export function useBulkRead(items: FeedArticleItem[]) {
   const queryClient = useQueryClient();
+  const readCoordinator = useReadStateCoordinator();
   const { t } = useI18n();
   const currentView = useUIStore((state) => state.currentView);
   const selectedSourceId = useUIStore((state) => state.selectedSourceId);
@@ -108,6 +112,19 @@ export function useBulkRead(items: FeedArticleItem[]) {
     previousReadState.current = new Map(items.map((item) => [item.id, Boolean(item.is_read)]));
   }, [clearPendingRead, items, schedulePendingRead]);
 
+  useEffect(() => {
+    for (const item of items) {
+      readCoordinator.seed({
+        article_id: item.id,
+        is_read: Boolean(item.is_read),
+        is_starred: Boolean(item.is_starred),
+        state_version: item.state_version,
+      });
+      const reconciliation = coordinatedReadStateChange(item, readCoordinator.get(item.id));
+      if (reconciliation) applyArticleStateChange(queryClient, reconciliation);
+    }
+  }, [items, queryClient, readCoordinator]);
+
   const updateArticleReadState = useCallback(
     async (article: FeedArticleItem, nextRead: boolean) => {
       const previousRead = Boolean(article.is_read);
@@ -119,24 +136,9 @@ export function useBulkRead(items: FeedArticleItem[]) {
         clearPendingRead(article.id);
       }
 
-      applyArticleStateChange(queryClient, { articleId: article.id, is_read: nextRead });
-
-      try {
-        await apiFetch(`/api/articles/${article.id}/state`, {
-          method: 'PATCH',
-          body: JSON.stringify({ is_read: nextRead }),
-        });
-        broadcast({ type: 'state-change', articleId: article.id, is_read: nextRead });
-      } catch {
-        applyArticleStateChange(queryClient, { articleId: article.id, is_read: previousRead });
-        if (previousRead) {
-          schedulePendingRead(article.id);
-        } else {
-          clearPendingRead(article.id);
-        }
-      }
+      await readCoordinator.setDesired(article.id, nextRead);
     },
-    [clearPendingRead, queryClient, schedulePendingRead],
+    [clearPendingRead, readCoordinator, schedulePendingRead],
   );
 
   const bulkScope = useMemo(() => {
@@ -153,19 +155,20 @@ export function useBulkRead(items: FeedArticleItem[]) {
   }, [currentView, selectedSourceId, t]);
 
   const syncBatchReadState = useCallback(
-    (articleIds: number[], isRead: boolean) => {
-      for (const articleId of articleIds) {
+    (states: ArticleStateSnapshot[], isRead: boolean) => {
+      for (const state of states) {
+        const articleId = state.article_id;
         if (isRead) {
           suppressPendingReadIds.current.add(articleId);
         } else {
           suppressPendingReadIds.current.delete(articleId);
         }
         clearPendingRead(articleId);
-        applyArticleStateChange(queryClient, { articleId, is_read: isRead });
-        broadcast({ type: 'state-change', articleId, is_read: isRead });
+        readCoordinator.applyRemote(state);
+        broadcast({ type: 'state-change', articleId, is_read: state.is_read, is_starred: state.is_starred, state_version: state.state_version });
       }
     },
-    [clearPendingRead, queryClient],
+    [clearPendingRead, readCoordinator],
   );
 
   const handleBulkMarkRead = useCallback(async () => {
@@ -180,7 +183,7 @@ export function useBulkRead(items: FeedArticleItem[]) {
         body: JSON.stringify({ scope: bulkScope.scope, is_read: true }),
       });
       const articleIds = result.article_ids ?? [];
-      syncBatchReadState(articleIds, true);
+      syncBatchReadState(result.states ?? [], true);
       await queryClient.invalidateQueries({ queryKey: ['sources'] });
 
       if (articleIds.length > 0) {
@@ -197,21 +200,13 @@ export function useBulkRead(items: FeedArticleItem[]) {
     const articleIds = bulkReadUndo.articleIds;
     setIsBulkUpdating(true);
     try {
-      await Promise.all(
-        articleIds.map((articleId) =>
-          apiFetch(`/api/articles/${articleId}/state`, {
-            method: 'PATCH',
-            body: JSON.stringify({ is_read: false }),
-          }),
-        ),
-      );
-      syncBatchReadState(articleIds, false);
+      await Promise.all(articleIds.map((articleId) => readCoordinator.setDesired(articleId, false)));
       await queryClient.invalidateQueries({ queryKey: ['sources'] });
       setBulkReadUndo(null);
     } finally {
       setIsBulkUpdating(false);
     }
-  }, [bulkReadUndo, isBulkUpdating, queryClient, syncBatchReadState]);
+  }, [bulkReadUndo, isBulkUpdating, queryClient, readCoordinator]);
 
   return {
     pendingReadIds,

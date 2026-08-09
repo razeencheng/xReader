@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/razeencheng/xreader/db/gen"
+	statepkg "github.com/razeencheng/xreader/internal/state"
 )
 
 var errNotFound = errors.New("not found")
@@ -21,10 +22,11 @@ type ArticleService struct {
 	pool           *pgxpool.Pool
 	queries        *gen.Queries
 	originalLoader func(context.Context, string) (OriginalContent, error)
+	stateMutations *statepkg.Service
 }
 
 func NewArticleService(pool *pgxpool.Pool) *ArticleService {
-	return &ArticleService{pool: pool, queries: gen.New(pool), originalLoader: fetchOriginalContent}
+	return &ArticleService{pool: pool, queries: gen.New(pool), originalLoader: fetchOriginalContent, stateMutations: statepkg.NewService(pool)}
 }
 
 type EnrichedArticle struct {
@@ -49,13 +51,162 @@ type ArticleReadCounts struct {
 	Read   int64
 }
 
+type EnrichedArticlePage struct {
+	Items      []EnrichedArticle
+	NextCursor string
+}
+
+func (s *ArticleService) ListEnrichedPage(ctx context.Context, userID int64, tab string, sourceID *int64, lang, readFilter string, cursor *ArticleCursor, limit int32) (EnrichedArticlePage, error) {
+	cursorTime, cursorID := articleCursorParams(cursor)
+	fetchLimit := clampLimit(limit) + 1
+	filter := normalizeReadFilter(readFilter)
+	items := make([]EnrichedArticle, 0, fetchLimit)
+
+	if sourceID != nil {
+		rows, err := s.queries.ListArticlesBySourceEnriched(ctx, gen.ListArticlesBySourceEnrichedParams{
+			UserID: userID, TargetLanguage: lang, SourceID: *sourceID, ReadFilter: filter,
+			CursorPublishedAt: cursorTime, CursorArticleID: cursorID, Lim: fetchLimit,
+		})
+		if err != nil {
+			return EnrichedArticlePage{}, err
+		}
+		for _, r := range rows {
+			items = append(items, enrichedArticle(r.ID, r.SourceID, r.Title, r.TitleTranslated, r.Summary, r.SourceTitle, r.Link, r.Language, r.Author, r.PublishedAt, r.ContentText, r.IsRead, r.IsStarred))
+		}
+		return finishEnrichedPage(items, limit), nil
+	}
+
+	switch tab {
+	case "", "today":
+		rows, err := s.queries.ListArticlesTodayEnriched(ctx, gen.ListArticlesTodayEnrichedParams{
+			UserID: userID, TargetLanguage: lang, ReadFilter: filter,
+			CursorPublishedAt: cursorTime, CursorArticleID: cursorID, Lim: fetchLimit,
+		})
+		if err != nil {
+			return EnrichedArticlePage{}, err
+		}
+		for _, r := range rows {
+			items = append(items, enrichedArticle(r.ID, r.SourceID, r.Title, r.TitleTranslated, r.Summary, r.SourceTitle, r.Link, r.Language, r.Author, r.PublishedAt, r.ContentText, r.IsRead, r.IsStarred))
+		}
+	case "stream", "all":
+		rows, err := s.queries.ListArticlesStreamEnriched(ctx, gen.ListArticlesStreamEnrichedParams{
+			UserID: userID, TargetLanguage: lang, ReadFilter: filter,
+			CursorPublishedAt: cursorTime, CursorArticleID: cursorID, Lim: fetchLimit,
+		})
+		if err != nil {
+			return EnrichedArticlePage{}, err
+		}
+		for _, r := range rows {
+			items = append(items, enrichedArticle(r.ID, r.SourceID, r.Title, r.TitleTranslated, r.Summary, r.SourceTitle, r.Link, r.Language, r.Author, r.PublishedAt, r.ContentText, r.IsRead, r.IsStarred))
+		}
+	case "starred":
+		rows, err := s.queries.ListArticlesStarredEnriched(ctx, gen.ListArticlesStarredEnrichedParams{
+			UserID: userID, TargetLanguage: lang,
+			CursorPublishedAt: cursorTime, CursorArticleID: cursorID, Lim: fetchLimit,
+		})
+		if err != nil {
+			return EnrichedArticlePage{}, err
+		}
+		for _, r := range rows {
+			items = append(items, enrichedArticle(r.ID, r.SourceID, r.Title, r.TitleTranslated, r.Summary, r.SourceTitle, r.Link, r.Language, r.Author, r.PublishedAt, r.ContentText, r.IsRead, r.IsStarred))
+		}
+	default:
+		return EnrichedArticlePage{}, fmt.Errorf("invalid tab: %s", tab)
+	}
+	return finishEnrichedPage(items, limit), nil
+}
+
+func (s *ArticleService) GuestListEnrichedPage(ctx context.Context, stateOwnerID, contentOwnerID int64, tab string, sourceID *int64, lang, readFilter string, cursor *ArticleCursor, limit int32) (EnrichedArticlePage, error) {
+	cursorTime, cursorID := articleCursorParams(cursor)
+	fetchLimit := clampLimit(limit) + 1
+	filter := normalizeReadFilter(readFilter)
+	items := make([]EnrichedArticle, 0, fetchLimit)
+
+	if sourceID != nil {
+		rows, err := s.queries.GuestListArticlesBySourceEnriched(ctx, gen.GuestListArticlesBySourceEnrichedParams{
+			TargetLanguage: lang, StateOwnerID: stateOwnerID, ContentOwnerID: contentOwnerID,
+			SourceID: *sourceID, ReadFilter: filter, CursorPublishedAt: cursorTime, CursorArticleID: cursorID, Lim: fetchLimit,
+		})
+		if err != nil {
+			return EnrichedArticlePage{}, err
+		}
+		for _, r := range rows {
+			items = append(items, enrichedArticle(r.ID, r.SourceID, r.Title, r.TitleTranslated, r.Summary, r.SourceTitle, r.Link, r.Language, r.Author, r.PublishedAt, r.ContentText, r.IsRead, r.IsStarred))
+		}
+		return finishEnrichedPage(items, limit), nil
+	}
+
+	switch tab {
+	case "", "today":
+		rows, err := s.queries.GuestListArticlesTodayEnriched(ctx, gen.GuestListArticlesTodayEnrichedParams{
+			TargetLanguage: lang, StateOwnerID: stateOwnerID, ContentOwnerID: contentOwnerID, ReadFilter: filter,
+			CursorPublishedAt: cursorTime, CursorArticleID: cursorID, Lim: fetchLimit,
+		})
+		if err != nil {
+			return EnrichedArticlePage{}, err
+		}
+		for _, r := range rows {
+			items = append(items, enrichedArticle(r.ID, r.SourceID, r.Title, r.TitleTranslated, r.Summary, r.SourceTitle, r.Link, r.Language, r.Author, r.PublishedAt, r.ContentText, r.IsRead, r.IsStarred))
+		}
+	case "stream", "all":
+		rows, err := s.queries.GuestListArticlesStreamEnriched(ctx, gen.GuestListArticlesStreamEnrichedParams{
+			TargetLanguage: lang, StateOwnerID: stateOwnerID, ContentOwnerID: contentOwnerID, ReadFilter: filter,
+			CursorPublishedAt: cursorTime, CursorArticleID: cursorID, Lim: fetchLimit,
+		})
+		if err != nil {
+			return EnrichedArticlePage{}, err
+		}
+		for _, r := range rows {
+			items = append(items, enrichedArticle(r.ID, r.SourceID, r.Title, r.TitleTranslated, r.Summary, r.SourceTitle, r.Link, r.Language, r.Author, r.PublishedAt, r.ContentText, r.IsRead, r.IsStarred))
+		}
+	case "starred":
+		rows, err := s.queries.GuestListArticlesStarredEnriched(ctx, gen.GuestListArticlesStarredEnrichedParams{
+			TargetLanguage: lang, StateOwnerID: stateOwnerID, ContentOwnerID: contentOwnerID,
+			CursorPublishedAt: cursorTime, CursorArticleID: cursorID, Lim: fetchLimit,
+		})
+		if err != nil {
+			return EnrichedArticlePage{}, err
+		}
+		for _, r := range rows {
+			items = append(items, enrichedArticle(r.ID, r.SourceID, r.Title, r.TitleTranslated, r.Summary, r.SourceTitle, r.Link, r.Language, r.Author, r.PublishedAt, r.ContentText, r.IsRead, r.IsStarred))
+		}
+	default:
+		return EnrichedArticlePage{}, fmt.Errorf("invalid tab: %s", tab)
+	}
+	return finishEnrichedPage(items, limit), nil
+}
+
+func enrichedArticle(id, sourceID int64, title, titleTranslated, summary, sourceTitle, link, language string, author pgtype.Text, publishedAt pgtype.Timestamptz, contentText string, isRead, isStarred bool) EnrichedArticle {
+	return EnrichedArticle{ID: id, SourceID: sourceID, Title: title, TitleTranslated: titleTranslated, Summary: summary, SourceTitle: sourceTitle, Link: link, Language: language, Author: author, PublishedAt: publishedAt, ContentText: contentText, IsRead: isRead, IsStarred: isStarred}
+}
+
+func finishEnrichedPage(items []EnrichedArticle, limit int32) EnrichedArticlePage {
+	publicLimit := clampLimit(limit)
+	page := EnrichedArticlePage{Items: items}
+	if len(items) > int(publicLimit) {
+		page.Items = items[:publicLimit]
+		last := page.Items[len(page.Items)-1]
+		if last.PublishedAt.Valid {
+			page.NextCursor = encodeArticleCursor(ArticleCursor{PublishedAt: last.PublishedAt.Time, ArticleID: last.ID})
+		}
+	}
+	return page
+}
+
+func articleCursorParams(cursor *ArticleCursor) (pgtype.Timestamptz, int64) {
+	if cursor == nil {
+		return pgtype.Timestamptz{}, 0
+	}
+	return pgtype.Timestamptz{Time: cursor.PublishedAt.UTC(), Valid: true}, cursor.ArticleID
+}
+
 func (s *ArticleService) ListToday(ctx context.Context, userID int64) ([]gen.Article, error) {
 	return s.queries.ListArticlesToday(ctx, userID)
 }
 
 func (s *ArticleService) ListTodayEnriched(ctx context.Context, userID int64, lang string, readFilter string) ([]EnrichedArticle, error) {
 	rows, err := s.queries.ListArticlesTodayEnriched(ctx, gen.ListArticlesTodayEnrichedParams{
-		UserID: userID, TargetLanguage: lang, ReadFilter: normalizeReadFilter(readFilter),
+		UserID: userID, TargetLanguage: lang, ReadFilter: normalizeReadFilter(readFilter), Lim: 100,
 	})
 	if err != nil {
 		return nil, err
@@ -82,8 +233,12 @@ func (s *ArticleService) ListStream(ctx context.Context, userID int64, cursor *t
 }
 
 func (s *ArticleService) ListStreamEnriched(ctx context.Context, userID int64, cursor *time.Time, limit int32, lang string, readFilter string) ([]EnrichedArticle, error) {
+	cursorID := int64(0)
+	if cursor != nil {
+		cursorID = -1 << 63
+	}
 	rows, err := s.queries.ListArticlesStreamEnriched(ctx, gen.ListArticlesStreamEnrichedParams{
-		UserID: userID, Column2: timestamptzOrNull(cursor), TargetLanguage: lang, Limit: clampLimit(limit), ReadFilter: normalizeReadFilter(readFilter),
+		UserID: userID, CursorPublishedAt: timestamptzOrNull(cursor), CursorArticleID: cursorID, TargetLanguage: lang, Lim: clampLimit(limit), ReadFilter: normalizeReadFilter(readFilter),
 	})
 	if err != nil {
 		return nil, err
@@ -107,7 +262,7 @@ func (s *ArticleService) ListStarred(ctx context.Context, userID int64) ([]gen.A
 
 func (s *ArticleService) ListStarredEnriched(ctx context.Context, userID int64, lang string) ([]EnrichedArticle, error) {
 	rows, err := s.queries.ListArticlesStarredEnriched(ctx, gen.ListArticlesStarredEnrichedParams{
-		UserID: userID, TargetLanguage: lang,
+		UserID: userID, TargetLanguage: lang, Lim: 100,
 	})
 	if err != nil {
 		return nil, err
@@ -127,7 +282,7 @@ func (s *ArticleService) ListStarredEnriched(ctx context.Context, userID int64, 
 
 func (s *ArticleService) ListBySourceEnriched(ctx context.Context, userID, sourceID int64, lang string, readFilter string) ([]EnrichedArticle, error) {
 	rows, err := s.queries.ListArticlesBySourceEnriched(ctx, gen.ListArticlesBySourceEnrichedParams{
-		UserID: userID, SourceID: sourceID, TargetLanguage: lang, ReadFilter: normalizeReadFilter(readFilter),
+		UserID: userID, SourceID: sourceID, TargetLanguage: lang, ReadFilter: normalizeReadFilter(readFilter), Lim: 100,
 	})
 	if err != nil {
 		return nil, err
@@ -193,29 +348,52 @@ func (s *ArticleService) GetByID(ctx context.Context, userID, articleID int64) (
 }
 
 func (s *ArticleService) SetRead(ctx context.Context, userID, articleID int64, isRead bool) error {
-	return s.withTx(ctx, func(q *gen.Queries) error {
-		_, err := q.SetArticleRead(ctx, gen.SetArticleReadParams{UserID: userID, ID: articleID, IsRead: isRead})
-		if errors.Is(err, pgx.ErrNoRows) {
-			return errForbidden
+	_, err := s.SetReadState(ctx, userID, articleID, isRead)
+	return err
+}
+
+func (s *ArticleService) SetReadState(ctx context.Context, userID, articleID int64, isRead bool) (statepkg.Snapshot, error) {
+	return s.UpdateStateSnapshot(ctx, userID, articleID, &isRead, nil)
+}
+
+func (s *ArticleService) UpdateStateSnapshot(ctx context.Context, userID, articleID int64, isRead, isStarred *bool) (statepkg.Snapshot, error) {
+	if isRead == nil && isStarred == nil {
+		return s.GetStateSnapshot(ctx, userID, articleID)
+	}
+	states, err := s.stateMutations.Apply(ctx, userID, func(q *gen.Queries) ([]int64, error) {
+		if isRead != nil {
+			_, err := q.SetArticleRead(ctx, gen.SetArticleReadParams{UserID: userID, ID: articleID, IsRead: *isRead})
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, errForbidden
+			}
+			if err != nil {
+				return nil, err
+			}
 		}
-		if err != nil {
-			return err
+		if isStarred != nil {
+			_, err := q.SetArticleStarred(ctx, gen.SetArticleStarredParams{UserID: userID, ID: articleID, IsStarred: *isStarred})
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, errForbidden
+			}
+			if err != nil {
+				return nil, err
+			}
 		}
-		return q.RecordStateChange(ctx, gen.RecordStateChangeParams{UserID: userID, ArticleID: articleID})
+		return []int64{articleID}, nil
 	})
+	if err != nil {
+		return statepkg.Snapshot{}, err
+	}
+	return states[0], nil
 }
 
 func (s *ArticleService) SetStarred(ctx context.Context, userID, articleID int64, isStarred bool) error {
-	return s.withTx(ctx, func(q *gen.Queries) error {
-		_, err := q.SetArticleStarred(ctx, gen.SetArticleStarredParams{UserID: userID, ID: articleID, IsStarred: isStarred})
-		if errors.Is(err, pgx.ErrNoRows) {
-			return errForbidden
-		}
-		if err != nil {
-			return err
-		}
-		return q.RecordStateChange(ctx, gen.RecordStateChangeParams{UserID: userID, ArticleID: articleID})
-	})
+	_, err := s.SetStarredState(ctx, userID, articleID, isStarred)
+	return err
+}
+
+func (s *ArticleService) SetStarredState(ctx context.Context, userID, articleID int64, isStarred bool) (statepkg.Snapshot, error) {
+	return s.UpdateStateSnapshot(ctx, userID, articleID, nil, &isStarred)
 }
 
 func (s *ArticleService) UpdateProgress(ctx context.Context, userID, articleID int64, progress []byte) error {
@@ -231,21 +409,31 @@ func (s *ArticleService) UpdateProgress(ctx context.Context, userID, articleID i
 }
 
 func (s *ArticleService) BatchSetRead(ctx context.Context, userID int64, scope string, isRead bool) ([]int64, error) {
+	states, err := s.BatchSetReadStates(ctx, userID, scope, isRead)
+	if err != nil {
+		return nil, err
+	}
+	return snapshotIDs(states), nil
+}
+
+func (s *ArticleService) BatchSetReadStates(ctx context.Context, userID int64, scope string, isRead bool) ([]statepkg.Snapshot, error) {
 	scope = strings.TrimSpace(scope)
-	if scope == "tab:today" {
-		return s.queries.BatchSetReadToday(ctx, gen.BatchSetReadTodayParams{UserID: userID, IsRead: isRead})
-	}
-	if scope == "tab:stream" || scope == "tab:all" {
-		return s.queries.BatchSetReadStream(ctx, gen.BatchSetReadStreamParams{UserID: userID, IsRead: isRead})
-	}
-	if after, ok := strings.CutPrefix(scope, "source:"); ok {
-		sourceID, err := strconv.ParseInt(after, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid scope: %s", scope)
+	return s.stateMutations.Apply(ctx, userID, func(q *gen.Queries) ([]int64, error) {
+		if scope == "tab:today" {
+			return q.BatchSetReadToday(ctx, gen.BatchSetReadTodayParams{UserID: userID, IsRead: isRead})
 		}
-		return s.queries.BatchSetReadBySource(ctx, gen.BatchSetReadBySourceParams{UserID: userID, ID: sourceID, IsRead: isRead})
-	}
-	return nil, fmt.Errorf("unknown scope: %s", scope)
+		if scope == "tab:stream" || scope == "tab:all" {
+			return q.BatchSetReadStream(ctx, gen.BatchSetReadStreamParams{UserID: userID, IsRead: isRead})
+		}
+		if after, ok := strings.CutPrefix(scope, "source:"); ok {
+			sourceID, err := strconv.ParseInt(after, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid scope: %s", scope)
+			}
+			return q.BatchSetReadBySource(ctx, gen.BatchSetReadBySourceParams{UserID: userID, ID: sourceID, IsRead: isRead})
+		}
+		return nil, fmt.Errorf("unknown scope: %s", scope)
+	})
 }
 
 func (s *ArticleService) CountTodayByReadState(ctx context.Context, userID int64) (ArticleReadCounts, error) {
@@ -280,6 +468,31 @@ func (s *ArticleService) ListChanges(ctx context.Context, userID int64, since ti
 		UserID:    userID,
 		ChangedAt: pgtype.Timestamptz{Time: since.UTC(), Valid: true},
 	})
+}
+
+func (s *ArticleService) ListStateChanges(ctx context.Context, userID int64, cursor string, limit int32) (statepkg.ChangePage, error) {
+	return s.stateMutations.Changes(ctx, userID, cursor, limit)
+}
+
+func (s *ArticleService) GetStateSnapshot(ctx context.Context, userID, articleID int64) (statepkg.Snapshot, error) {
+	return s.stateMutations.Get(ctx, userID, articleID)
+}
+
+func (s *ArticleService) ListStateSnapshots(ctx context.Context, userID int64, articleIDs []int64) (map[int64]statepkg.Snapshot, error) {
+	result := make(map[int64]statepkg.Snapshot, len(articleIDs))
+	for _, articleID := range articleIDs {
+		row, err := s.queries.GetArticleStateSnapshot(ctx, gen.GetArticleStateSnapshotParams{UserID: userID, ArticleID: articleID})
+		if err != nil {
+			return nil, err
+		}
+		snapshot := statepkg.Snapshot{ArticleID: row.ArticleID, IsRead: row.IsRead, IsStarred: row.IsStarred}
+		if row.ChangedAt.Valid {
+			version := statepkg.VersionFromTime(row.ChangedAt.Time, row.ArticleID)
+			snapshot.StateVersion = &version
+		}
+		result[articleID] = snapshot
+	}
+	return result, nil
 }
 
 func (s *ArticleService) GetState(ctx context.Context, userID, articleID int64) (gen.ArticleState, error) {
@@ -355,6 +568,7 @@ func (s *ArticleService) GuestListTodayEnriched(ctx context.Context, stateOwnerI
 		StateOwnerID:   stateOwnerID,
 		ContentOwnerID: contentOwnerID,
 		ReadFilter:     normalizeReadFilter(readFilter),
+		Lim:            100,
 	})
 	if err != nil {
 		return nil, err
@@ -373,13 +587,18 @@ func (s *ArticleService) GuestListTodayEnriched(ctx context.Context, stateOwnerI
 }
 
 func (s *ArticleService) GuestListStreamEnriched(ctx context.Context, stateOwnerID, contentOwnerID int64, cursor *time.Time, limit int32, lang string, readFilter string) ([]EnrichedArticle, error) {
+	cursorID := int64(0)
+	if cursor != nil {
+		cursorID = -1 << 63
+	}
 	rows, err := s.queries.GuestListArticlesStreamEnriched(ctx, gen.GuestListArticlesStreamEnrichedParams{
-		Lim:            clampLimit(limit),
-		TargetLanguage: lang,
-		StateOwnerID:   stateOwnerID,
-		ContentOwnerID: contentOwnerID,
-		Cursor:         timestamptzOrNull(cursor),
-		ReadFilter:     normalizeReadFilter(readFilter),
+		Lim:               clampLimit(limit),
+		TargetLanguage:    lang,
+		StateOwnerID:      stateOwnerID,
+		ContentOwnerID:    contentOwnerID,
+		CursorPublishedAt: timestamptzOrNull(cursor),
+		CursorArticleID:   cursorID,
+		ReadFilter:        normalizeReadFilter(readFilter),
 	})
 	if err != nil {
 		return nil, err
@@ -402,6 +621,7 @@ func (s *ArticleService) GuestListStarredEnriched(ctx context.Context, stateOwne
 		TargetLanguage: lang,
 		StateOwnerID:   stateOwnerID,
 		ContentOwnerID: contentOwnerID,
+		Lim:            100,
 	})
 	if err != nil {
 		return nil, err
@@ -426,6 +646,7 @@ func (s *ArticleService) GuestListBySourceEnriched(ctx context.Context, stateOwn
 		ContentOwnerID: contentOwnerID,
 		SourceID:       sourceID,
 		ReadFilter:     normalizeReadFilter(readFilter),
+		Lim:            100,
 	})
 	if err != nil {
 		return nil, err
@@ -465,39 +686,48 @@ func (s *ArticleService) GuestGetByID(ctx context.Context, contentOwnerID, artic
 }
 
 func (s *ArticleService) GuestSetRead(ctx context.Context, stateOwnerID, contentOwnerID, articleID int64, isRead bool) error {
-	return s.withTx(ctx, func(q *gen.Queries) error {
-		_, err := q.GuestSetArticleRead(ctx, gen.GuestSetArticleReadParams{
-			StateOwnerID:   stateOwnerID,
-			IsRead:         isRead,
-			ArticleID:      articleID,
-			ContentOwnerID: contentOwnerID,
-		})
-		if errors.Is(err, pgx.ErrNoRows) {
-			return errForbidden
-		}
-		if err != nil {
-			return err
-		}
-		return q.RecordStateChange(ctx, gen.RecordStateChangeParams{UserID: stateOwnerID, ArticleID: articleID})
-	})
+	_, err := s.GuestUpdateStateSnapshot(ctx, stateOwnerID, contentOwnerID, articleID, &isRead, nil)
+	return err
 }
 
 func (s *ArticleService) GuestSetStarred(ctx context.Context, stateOwnerID, contentOwnerID, articleID int64, isStarred bool) error {
-	return s.withTx(ctx, func(q *gen.Queries) error {
-		_, err := q.GuestSetArticleStarred(ctx, gen.GuestSetArticleStarredParams{
-			StateOwnerID:   stateOwnerID,
-			IsStarred:      isStarred,
-			ArticleID:      articleID,
-			ContentOwnerID: contentOwnerID,
-		})
-		if errors.Is(err, pgx.ErrNoRows) {
-			return errForbidden
+	_, err := s.GuestUpdateStateSnapshot(ctx, stateOwnerID, contentOwnerID, articleID, nil, &isStarred)
+	return err
+}
+
+func (s *ArticleService) GuestUpdateStateSnapshot(ctx context.Context, stateOwnerID, contentOwnerID, articleID int64, isRead, isStarred *bool) (statepkg.Snapshot, error) {
+	if isRead == nil && isStarred == nil {
+		return s.GetStateSnapshot(ctx, stateOwnerID, articleID)
+	}
+	states, err := s.stateMutations.Apply(ctx, stateOwnerID, func(q *gen.Queries) ([]int64, error) {
+		if isRead != nil {
+			_, err := q.GuestSetArticleRead(ctx, gen.GuestSetArticleReadParams{
+				StateOwnerID: stateOwnerID, IsRead: *isRead, ArticleID: articleID, ContentOwnerID: contentOwnerID,
+			})
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, errForbidden
+			}
+			if err != nil {
+				return nil, err
+			}
 		}
-		if err != nil {
-			return err
+		if isStarred != nil {
+			_, err := q.GuestSetArticleStarred(ctx, gen.GuestSetArticleStarredParams{
+				StateOwnerID: stateOwnerID, IsStarred: *isStarred, ArticleID: articleID, ContentOwnerID: contentOwnerID,
+			})
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, errForbidden
+			}
+			if err != nil {
+				return nil, err
+			}
 		}
-		return q.RecordStateChange(ctx, gen.RecordStateChangeParams{UserID: stateOwnerID, ArticleID: articleID})
+		return []int64{articleID}, nil
 	})
+	if err != nil {
+		return statepkg.Snapshot{}, err
+	}
+	return states[0], nil
 }
 
 func (s *ArticleService) GuestUpdateProgress(ctx context.Context, stateOwnerID, contentOwnerID, articleID int64, progress []byte) error {
@@ -514,34 +744,45 @@ func (s *ArticleService) GuestUpdateProgress(ctx context.Context, stateOwnerID, 
 }
 
 func (s *ArticleService) GuestBatchSetRead(ctx context.Context, stateOwnerID, contentOwnerID int64, scope string, isRead bool) ([]int64, error) {
+	states, err := s.GuestBatchSetReadStates(ctx, stateOwnerID, contentOwnerID, scope, isRead)
+	if err != nil {
+		return nil, err
+	}
+	return snapshotIDs(states), nil
+}
+
+func (s *ArticleService) GuestBatchSetReadStates(ctx context.Context, stateOwnerID, contentOwnerID int64, scope string, isRead bool) ([]statepkg.Snapshot, error) {
 	scope = strings.TrimSpace(scope)
-	if scope == "tab:today" {
-		return s.queries.GuestBatchSetReadToday(ctx, gen.GuestBatchSetReadTodayParams{
-			StateOwnerID:   stateOwnerID,
-			IsRead:         isRead,
-			ContentOwnerID: contentOwnerID,
-		})
-	}
-	if scope == "tab:stream" || scope == "tab:all" {
-		return s.queries.GuestBatchSetReadStream(ctx, gen.GuestBatchSetReadStreamParams{
-			StateOwnerID:   stateOwnerID,
-			IsRead:         isRead,
-			ContentOwnerID: contentOwnerID,
-		})
-	}
-	if after, ok := strings.CutPrefix(scope, "source:"); ok {
-		sourceID, err := strconv.ParseInt(after, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid scope: %s", scope)
+	return s.stateMutations.Apply(ctx, stateOwnerID, func(q *gen.Queries) ([]int64, error) {
+		if scope == "tab:today" {
+			return q.GuestBatchSetReadToday(ctx, gen.GuestBatchSetReadTodayParams{
+				StateOwnerID: stateOwnerID, IsRead: isRead, ContentOwnerID: contentOwnerID,
+			})
 		}
-		return s.queries.GuestBatchSetReadBySource(ctx, gen.GuestBatchSetReadBySourceParams{
-			StateOwnerID:   stateOwnerID,
-			IsRead:         isRead,
-			SourceID:       sourceID,
-			ContentOwnerID: contentOwnerID,
-		})
+		if scope == "tab:stream" || scope == "tab:all" {
+			return q.GuestBatchSetReadStream(ctx, gen.GuestBatchSetReadStreamParams{
+				StateOwnerID: stateOwnerID, IsRead: isRead, ContentOwnerID: contentOwnerID,
+			})
+		}
+		if after, ok := strings.CutPrefix(scope, "source:"); ok {
+			sourceID, err := strconv.ParseInt(after, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid scope: %s", scope)
+			}
+			return q.GuestBatchSetReadBySource(ctx, gen.GuestBatchSetReadBySourceParams{
+				StateOwnerID: stateOwnerID, IsRead: isRead, SourceID: sourceID, ContentOwnerID: contentOwnerID,
+			})
+		}
+		return nil, fmt.Errorf("unknown scope: %s", scope)
+	})
+}
+
+func snapshotIDs(states []statepkg.Snapshot) []int64 {
+	ids := make([]int64, len(states))
+	for i, state := range states {
+		ids[i] = state.ArticleID
 	}
-	return nil, fmt.Errorf("unknown scope: %s", scope)
+	return ids
 }
 
 func (s *ArticleService) GuestCountTodayByReadState(ctx context.Context, stateOwnerID, contentOwnerID int64) (ArticleReadCounts, error) {

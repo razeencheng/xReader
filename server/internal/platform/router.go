@@ -126,6 +126,7 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		authed.GET("/articles", articleH.List)
 		authed.GET("/articles/:id", articleH.GetByID)
 		authed.POST("/articles/:id/original", articleH.LoadOriginal)
+		authed.GET("/articles/:id/state", articleH.GetState)
 		authed.PATCH("/articles/:id/state", articleH.UpdateState)
 		authed.PUT("/articles/:id/progress", articleH.UpdateProgress)
 		authed.POST("/articles/batch/state", articleH.BatchState)

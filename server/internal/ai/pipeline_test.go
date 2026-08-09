@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/razeencheng/xreader/db/gen"
 	"github.com/razeencheng/xreader/internal/testutil"
 	"github.com/stretchr/testify/require"
@@ -65,8 +65,8 @@ func insertTestArticle(t *testing.T, queries *gen.Queries, ctx context.Context, 
 		Language:       lang,
 		ContentHtml:    "<p>" + contentText + "</p>",
 		ContentText:    contentText,
-		PublishedAt:   pgtype.Timestamptz{Time: time.Now(), Valid: true},
-		FetchedAt:     pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		PublishedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		FetchedAt:      pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	})
 	require.NoError(t, err)
 	return a
@@ -143,13 +143,60 @@ func TestEagerJob_TranslatesTitleAndSummary_Combined(t *testing.T) {
 }
 
 func TestParseCombinedResponse(t *testing.T) {
-	title, summary := parseCombinedResponse("TITLE: 测试标题\nSUMMARY: 这是摘要内容")
+	title, summary := parseCombinedResponse("TITLE: 测试标题\nSUMMARY_LEAD: 这是主旨\nSUMMARY_POINT: 要点一\nSUMMARY_POINT: 要点二")
 	require.Equal(t, "测试标题", title)
-	require.Equal(t, "这是摘要内容", summary)
+	require.Equal(t, "XREADER_SUMMARY_V1\nLEAD: 这是主旨\nPOINT: 要点一\nPOINT: 要点二", summary)
 
 	title2, summary2 := parseCombinedResponse("TITLE: 标题\n\n这是一段没有前缀的摘要")
 	require.Equal(t, "标题", title2)
 	require.Equal(t, "这是一段没有前缀的摘要", summary2)
+}
+
+func TestNormalizeSummaryResponse(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "valid protocol",
+			in:   "SUMMARY_LEAD: 一句主旨\nSUMMARY_POINT: 第一条\nSUMMARY_POINT: 第二条\nSUMMARY_POINT: 第三条",
+			want: "XREADER_SUMMARY_V1\nLEAD: 一句主旨\nPOINT: 第一条\nPOINT: 第二条\nPOINT: 第三条",
+		},
+		{
+			name: "malformed non-empty protocol becomes clean fallback",
+			in:   "SUMMARY_LEAD: 主旨\nSUMMARY_POINT: 只有一条\nSUMMARY_POINT:",
+			want: "主旨\n只有一条",
+		},
+		{
+			name: "plain fallback preserves payload order",
+			in:   "第一句。\n第二句。",
+			want: "第一句。\n第二句。",
+		},
+		{
+			name: "recognized prefixes without payload are empty",
+			in:   "SUMMARY_LEAD:\nSUMMARY_POINT:\nSUMMARY:",
+			want: "",
+		},
+		{
+			name: "whitespace is empty",
+			in:   "  \n\t",
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, normalizeSummaryResponse(tt.in))
+		})
+	}
+}
+
+func TestParseCombinedResponseStripsTitleFromFallback(t *testing.T) {
+	title, summary := parseCombinedResponse("TITLE: 标题\nSUMMARY: 摘要第一行\n摘要第二行")
+	require.Equal(t, "标题", title)
+	require.Equal(t, "摘要第一行\n摘要第二行", summary)
+	require.NotContains(t, summary, "标题")
 }
 
 func TestEagerTranslatesEnglishTitleOnChineseBody(t *testing.T) {

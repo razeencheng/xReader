@@ -74,13 +74,19 @@ interface Props {
   articleId: number;
   refreshKey?: number;
   children?: ReactNode;
+  onEditorOpenChange?: (open: boolean) => void;
 }
 
-export function HighlightLayer({ articleId, refreshKey, children }: Props) {
+export function HighlightLayer({ articleId, refreshKey, children, onEditorOpenChange }: Props) {
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [editor, setEditor] = useState<{ highlight: Highlight; top: number; left: number } | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    onEditorOpenChange?.(editor != null);
+    return () => onEditorOpenChange?.(false);
+  }, [editor, onEditorOpenChange]);
 
   useEffect(() => {
     let cancelled = false;

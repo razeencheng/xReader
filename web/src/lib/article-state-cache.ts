@@ -1,10 +1,32 @@
 import { type InfiniteData, type QueryClient } from '@tanstack/react-query';
 import type { ArticleItem, ArticleTab, ArticleListResponse } from '@/lib/types';
+import { compareStateVersions, type ReadSyncState } from '@/lib/read-state-coordinator';
 
 export interface ArticleStateChange {
   articleId: number;
   is_read?: boolean;
   is_starred?: boolean;
+  state_version?: ArticleItem['state_version'];
+}
+
+export function coordinatedReadStateChange(
+  article: Pick<ArticleItem, 'id' | 'is_read' | 'state_version'>,
+  coordinated: ReadSyncState | undefined,
+): ArticleStateChange | null {
+  if (
+    !coordinated
+    || (
+      coordinated.desired === Boolean(article.is_read)
+      && compareStateVersions(coordinated.serverVersion, article.state_version) <= 0
+    )
+  ) {
+    return null;
+  }
+  return {
+    articleId: article.id,
+    is_read: coordinated.desired,
+    state_version: coordinated.serverVersion,
+  };
 }
 
 type ArticleListData = InfiniteData<ArticleListResponse>;
@@ -18,6 +40,7 @@ function mergeArticleItem<T extends { id: number; is_read?: boolean; is_starred?
     ...item,
     ...(change.is_read === undefined ? {} : { is_read: change.is_read }),
     ...(change.is_starred === undefined ? {} : { is_starred: change.is_starred }),
+    ...(change.state_version === undefined ? {} : { state_version: change.state_version }),
   };
 }
 

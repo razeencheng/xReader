@@ -169,29 +169,89 @@ func (j *EagerJob) runSummaryOnly(ctx context.Context, article gen.Article) erro
 		})
 		return fmt.Errorf("summary: %w", err)
 	}
+	summary := normalizeSummaryResponse(resp.Content)
+	status := "done"
+	if summary == "" {
+		status = "failed"
+	}
 	return j.queries.UpsertSummary(ctx, gen.UpsertSummaryParams{
 		ArticleID:      j.articleID,
 		TargetLanguage: j.targetLang,
-		Summary:        resp.Content,
-		SummaryStatus:  "done",
+		Summary:        summary,
+		SummaryStatus:  status,
 	})
 }
 
 func parseCombinedResponse(content string) (title, summary string) {
 	lines := strings.Split(content, "\n")
+	summaryLines := make([]string, 0, len(lines))
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if t, ok := strings.CutPrefix(trimmed, "TITLE:"); ok {
 			title = strings.TrimSpace(t)
-		} else if s, ok := strings.CutPrefix(trimmed, "SUMMARY:"); ok {
-			summary = strings.TrimSpace(s)
+			continue
+		}
+		summaryLines = append(summaryLines, line)
+	}
+	return title, normalizeSummaryResponse(strings.Join(summaryLines, "\n"))
+}
+
+const summaryV1Header = "XREADER_SUMMARY_V1"
+
+func normalizeSummaryResponse(content string) string {
+	lines := strings.Split(strings.TrimSpace(content), "\n")
+	lead := ""
+	points := make([]string, 0, 4)
+	fallback := make([]string, 0, len(lines))
+	protocolOnly := true
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || trimmed == "```" || trimmed == summaryV1Header {
+			continue
+		}
+
+		if payload, ok := cutSummaryPrefix(trimmed, "SUMMARY_LEAD:", "LEAD:"); ok {
+			if payload != "" {
+				lead = payload
+				fallback = append(fallback, payload)
+			}
+			continue
+		}
+		if payload, ok := cutSummaryPrefix(trimmed, "SUMMARY_POINT:", "POINT:"); ok {
+			if payload != "" {
+				points = append(points, payload)
+				fallback = append(fallback, payload)
+			}
+			continue
+		}
+		if payload, ok := cutSummaryPrefix(trimmed, "SUMMARY:"); ok {
+			if payload != "" {
+				fallback = append(fallback, payload)
+			}
+			continue
+		}
+
+		protocolOnly = false
+		fallback = append(fallback, trimmed)
+	}
+
+	if protocolOnly && lead != "" && len(points) >= 2 && len(points) <= 4 {
+		result := []string{summaryV1Header, "LEAD: " + lead}
+		for _, point := range points {
+			result = append(result, "POINT: "+point)
+		}
+		return strings.Join(result, "\n")
+	}
+
+	return strings.TrimSpace(strings.Join(fallback, "\n"))
+}
+
+func cutSummaryPrefix(line string, prefixes ...string) (string, bool) {
+	for _, prefix := range prefixes {
+		if payload, ok := strings.CutPrefix(line, prefix); ok {
+			return strings.TrimSpace(payload), true
 		}
 	}
-	if summary == "" && title != "" {
-		parts := strings.SplitN(content, "\n\n", 2)
-		if len(parts) == 2 {
-			summary = strings.TrimSpace(parts[1])
-		}
-	}
-	return
+	return "", false
 }

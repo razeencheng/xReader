@@ -191,6 +191,16 @@ func TestFetchJob_FirstFetchMarksHistoricalBacklogRead(t *testing.T) {
 	`, src.ID, src.UserID).Scan(&readCount)
 	require.NoError(t, err)
 	require.Equal(t, 5, readCount)
+
+	var changeCount int
+	err = pool.QueryRow(ctx, `
+		SELECT count(*)
+		FROM article_state_changes sc
+		JOIN articles a ON a.id = sc.article_id
+		WHERE sc.user_id = $1 AND a.source_id = $2
+	`, src.UserID, src.ID).Scan(&changeCount)
+	require.NoError(t, err)
+	require.Equal(t, 5, changeCount)
 }
 
 func TestFetchJob_DoesNotApplyInitialBacklogRuleAfterFirstSuccess(t *testing.T) {

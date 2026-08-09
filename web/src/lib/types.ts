@@ -13,6 +13,10 @@ export interface ArticleItem {
   word_count?: number;
   is_read?: boolean;
   is_starred?: boolean;
+  state_version?: {
+    changed_at_micros: string;
+    article_id: number;
+  } | null;
 }
 
 export type Article = ArticleItem;

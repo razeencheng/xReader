@@ -266,14 +266,22 @@ WHERE a.source_id = $3
     OR ($4::text = 'unread' AND COALESCE(st.is_read, false) = false)
     OR ($4::text = 'read' AND COALESCE(st.is_read, false) = true)
   )
-ORDER BY a.published_at DESC
+  AND (
+    $5::timestamptz IS NULL
+    OR (a.published_at, a.id) < ($5, $6::bigint)
+  )
+ORDER BY a.published_at DESC, a.id DESC
+LIMIT $7
 `
 
 type ListArticlesBySourceEnrichedParams struct {
-	UserID         int64  `json:"user_id"`
-	TargetLanguage string `json:"target_language"`
-	SourceID       int64  `json:"source_id"`
-	ReadFilter     string `json:"read_filter"`
+	UserID            int64              `json:"user_id"`
+	TargetLanguage    string             `json:"target_language"`
+	SourceID          int64              `json:"source_id"`
+	ReadFilter        string             `json:"read_filter"`
+	CursorPublishedAt pgtype.Timestamptz `json:"cursor_published_at"`
+	CursorArticleID   int64              `json:"cursor_article_id"`
+	Lim               int32              `json:"lim"`
 }
 
 type ListArticlesBySourceEnrichedRow struct {
@@ -298,6 +306,9 @@ func (q *Queries) ListArticlesBySourceEnriched(ctx context.Context, arg ListArti
 		arg.TargetLanguage,
 		arg.SourceID,
 		arg.ReadFilter,
+		arg.CursorPublishedAt,
+		arg.CursorArticleID,
+		arg.Lim,
 	)
 	if err != nil {
 		return nil, err
@@ -386,10 +397,10 @@ WITH ranked AS (
          st.is_starred,
          row_number() OVER (PARTITION BY a.normalized_link ORDER BY a.published_at DESC, a.id DESC) AS rn
   FROM articles a
-  JOIN article_states st ON a.id = st.article_id AND st.user_id = $1
-  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
+  JOIN article_states st ON a.id = st.article_id AND st.user_id = $4
+  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $5
   JOIN sources s ON a.source_id = s.id
-  WHERE s.user_id = $1
+  WHERE s.user_id = $4
     AND s.deleted_at IS NULL
     AND st.is_starred = true
 )
@@ -397,13 +408,20 @@ SELECT id, source_id, title, link, language, author, published_at, content_text,
        title_translated, summary, source_title, is_read, is_starred
 FROM ranked
 WHERE rn = 1
+  AND (
+    $1::timestamptz IS NULL
+    OR (published_at, id) < ($1, $2::bigint)
+  )
 ORDER BY published_at DESC, id DESC
-LIMIT 100
+LIMIT $3
 `
 
 type ListArticlesStarredEnrichedParams struct {
-	UserID         int64  `json:"user_id"`
-	TargetLanguage string `json:"target_language"`
+	CursorPublishedAt pgtype.Timestamptz `json:"cursor_published_at"`
+	CursorArticleID   int64              `json:"cursor_article_id"`
+	Lim               int32              `json:"lim"`
+	UserID            int64              `json:"user_id"`
+	TargetLanguage    string             `json:"target_language"`
 }
 
 type ListArticlesStarredEnrichedRow struct {
@@ -423,7 +441,13 @@ type ListArticlesStarredEnrichedRow struct {
 }
 
 func (q *Queries) ListArticlesStarredEnriched(ctx context.Context, arg ListArticlesStarredEnrichedParams) ([]ListArticlesStarredEnrichedRow, error) {
-	rows, err := q.db.Query(ctx, listArticlesStarredEnriched, arg.UserID, arg.TargetLanguage)
+	rows, err := q.db.Query(ctx, listArticlesStarredEnriched,
+		arg.CursorPublishedAt,
+		arg.CursorArticleID,
+		arg.Lim,
+		arg.UserID,
+		arg.TargetLanguage,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -517,31 +541,35 @@ WITH ranked AS (
          row_number() OVER (PARTITION BY a.normalized_link ORDER BY a.published_at DESC, a.id DESC) AS rn
   FROM articles a
   JOIN sources s ON a.source_id = s.id
-  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $3
-  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
-  WHERE s.user_id = $1
+  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $4
+  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $5
+  WHERE s.user_id = $5
     AND s.deleted_at IS NULL
-    AND ($2::timestamptz IS NULL OR a.published_at < $2)
     AND (
-      $5::text = 'all'
-      OR ($5::text = 'unread' AND COALESCE(st.is_read, false) = false)
-      OR ($5::text = 'read' AND COALESCE(st.is_read, false) = true)
+      $6::text = 'all'
+      OR ($6::text = 'unread' AND COALESCE(st.is_read, false) = false)
+      OR ($6::text = 'read' AND COALESCE(st.is_read, false) = true)
     )
 )
 SELECT id, source_id, title, link, language, author, published_at, content_text,
        title_translated, summary, source_title, is_read, is_starred
 FROM ranked
 WHERE rn = 1
+  AND (
+    $1::timestamptz IS NULL
+    OR (published_at, id) < ($1, $2::bigint)
+  )
 ORDER BY published_at DESC, id DESC
-LIMIT $4
+LIMIT $3
 `
 
 type ListArticlesStreamEnrichedParams struct {
-	UserID         int64              `json:"user_id"`
-	Column2        pgtype.Timestamptz `json:"column_2"`
-	TargetLanguage string             `json:"target_language"`
-	Limit          int32              `json:"limit"`
-	ReadFilter     string             `json:"read_filter"`
+	CursorPublishedAt pgtype.Timestamptz `json:"cursor_published_at"`
+	CursorArticleID   int64              `json:"cursor_article_id"`
+	Lim               int32              `json:"lim"`
+	TargetLanguage    string             `json:"target_language"`
+	UserID            int64              `json:"user_id"`
+	ReadFilter        string             `json:"read_filter"`
 }
 
 type ListArticlesStreamEnrichedRow struct {
@@ -562,10 +590,11 @@ type ListArticlesStreamEnrichedRow struct {
 
 func (q *Queries) ListArticlesStreamEnriched(ctx context.Context, arg ListArticlesStreamEnrichedParams) ([]ListArticlesStreamEnrichedRow, error) {
 	rows, err := q.db.Query(ctx, listArticlesStreamEnriched,
-		arg.UserID,
-		arg.Column2,
+		arg.CursorPublishedAt,
+		arg.CursorArticleID,
+		arg.Lim,
 		arg.TargetLanguage,
-		arg.Limit,
+		arg.UserID,
 		arg.ReadFilter,
 	)
 	if err != nil {
@@ -655,29 +684,36 @@ WITH ranked AS (
          row_number() OVER (PARTITION BY a.normalized_link ORDER BY a.published_at DESC, a.id DESC) AS rn
   FROM articles a
   JOIN sources s ON a.source_id = s.id
-  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
-  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
-  WHERE s.user_id = $1
+  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $4
+  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $5
+  WHERE s.user_id = $5
     AND s.deleted_at IS NULL
     AND a.published_at >= now() - interval '24 hours'
     AND (
-      $3::text = 'all'
-      OR ($3::text = 'unread' AND COALESCE(st.is_read, false) = false)
-      OR ($3::text = 'read' AND COALESCE(st.is_read, false) = true)
+      $6::text = 'all'
+      OR ($6::text = 'unread' AND COALESCE(st.is_read, false) = false)
+      OR ($6::text = 'read' AND COALESCE(st.is_read, false) = true)
     )
 )
 SELECT id, source_id, title, link, language, author, published_at, content_text,
        title_translated, summary, source_title, is_read, is_starred
 FROM ranked
 WHERE rn = 1
+  AND (
+    $1::timestamptz IS NULL
+    OR (published_at, id) < ($1, $2::bigint)
+  )
 ORDER BY published_at DESC, id DESC
-LIMIT 100
+LIMIT $3
 `
 
 type ListArticlesTodayEnrichedParams struct {
-	UserID         int64  `json:"user_id"`
-	TargetLanguage string `json:"target_language"`
-	ReadFilter     string `json:"read_filter"`
+	CursorPublishedAt pgtype.Timestamptz `json:"cursor_published_at"`
+	CursorArticleID   int64              `json:"cursor_article_id"`
+	Lim               int32              `json:"lim"`
+	TargetLanguage    string             `json:"target_language"`
+	UserID            int64              `json:"user_id"`
+	ReadFilter        string             `json:"read_filter"`
 }
 
 type ListArticlesTodayEnrichedRow struct {
@@ -697,7 +733,14 @@ type ListArticlesTodayEnrichedRow struct {
 }
 
 func (q *Queries) ListArticlesTodayEnriched(ctx context.Context, arg ListArticlesTodayEnrichedParams) ([]ListArticlesTodayEnrichedRow, error) {
-	rows, err := q.db.Query(ctx, listArticlesTodayEnriched, arg.UserID, arg.TargetLanguage, arg.ReadFilter)
+	rows, err := q.db.Query(ctx, listArticlesTodayEnriched,
+		arg.CursorPublishedAt,
+		arg.CursorArticleID,
+		arg.Lim,
+		arg.TargetLanguage,
+		arg.UserID,
+		arg.ReadFilter,
+	)
 	if err != nil {
 		return nil, err
 	}

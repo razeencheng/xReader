@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { ApiError, apiFetch } from '@/lib/api-client';
-import { applyArticleStateChange } from '@/lib/article-state-cache';
+import { applyArticleStateChange, coordinatedReadStateChange } from '@/lib/article-state-cache';
 import { broadcast } from '@/lib/broadcast';
 import { estimateReadMinutes, formatRelativeTime, getDisplayTitle, isLikelySummaryOnly, isSameLanguage } from '@/lib/article-meta';
 import { useI18n } from '@/lib/i18n';
@@ -22,6 +22,10 @@ import { ReaderGestureHint } from '@/components/reader/ReaderGestureHint';
 import { SourceExcerptNotice } from '@/components/reader/SourceExcerptNotice';
 import { TweaksPanel } from '@/components/reader/TweaksPanel';
 import type { ArticleItem } from '@/lib/types';
+import { useReadStateCoordinator } from '@/components/providers/ReadStateProvider';
+import type { ArticleStateSnapshot } from '@/lib/read-state-coordinator';
+import { ReaderAdvanceButton } from '@/components/reader/ReaderAdvanceButton';
+import type { AdvanceMode, AdvancePhase } from '@/lib/reader-advance';
 
 export interface ArticleDetail extends ArticleItem {
   content_html?: string;
@@ -64,6 +68,10 @@ export interface ArticleReaderProps {
    * dwell debounce resets on every identity change.
    */
   next?: { id: number; language: string } | null;
+  advanceMode?: AdvanceMode;
+  advancePhase?: AdvancePhase;
+  advanceHidden?: boolean;
+  onAdvance?: () => void;
 }
 
 export function ArticleReader({
@@ -80,8 +88,13 @@ export function ArticleReader({
   className = '',
   onNotFound,
   next,
+  advanceMode = 'none',
+  advancePhase = 'idle',
+  advanceHidden = false,
+  onAdvance,
 }: ArticleReaderProps) {
   const queryClient = useQueryClient();
+  const readCoordinator = useReadStateCoordinator();
   const { t } = useI18n();
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoMarkedArticleIds = useRef(new Set<number>());
@@ -90,6 +103,10 @@ export function ArticleReader({
   const [loadingOriginalId, setLoadingOriginalId] = useState<string | null>(null);
   const [originalErrorState, setOriginalErrorState] = useState<{ articleId: string; message: string } | null>(null);
   const [tweaksOpen, setTweaksOpen] = useState(false);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const [hasSelection, setHasSelection] = useState(false);
+  const [highlightEditorOpen, setHighlightEditorOpen] = useState(false);
+  const scrollStopTimerRef = useRef<number | null>(null);
 
   const nativeLanguage = useUIStore((state) => state.nativeLanguage);
   const fontSize = useUIStore((state) => state.fontSize);
@@ -106,6 +123,18 @@ export function ArticleReader({
     queryKey: ['article', id],
     queryFn: () => apiFetch<ArticleDetail>(`/api/articles/${id}`),
   });
+
+  useEffect(() => {
+    if (!article) return;
+    readCoordinator.seed({
+      article_id: article.id,
+      is_read: Boolean(article.is_read),
+      is_starred: Boolean(article.is_starred),
+      state_version: article.state_version,
+    });
+    const reconciliation = coordinatedReadStateChange(article, readCoordinator.get(article.id));
+    if (reconciliation) applyArticleStateChange(queryClient, reconciliation);
+  }, [article, queryClient, readCoordinator]);
 
   useEffect(() => {
     if (!error || !onNotFound) {
@@ -141,6 +170,13 @@ export function ArticleReader({
     const element = scrollRef.current;
     if (!element) return;
 
+    setIsScrolling(true);
+    if (scrollStopTimerRef.current != null) window.clearTimeout(scrollStopTimerRef.current);
+    scrollStopTimerRef.current = window.setTimeout(() => {
+      setIsScrolling(false);
+      scrollStopTimerRef.current = null;
+    }, 300);
+
     const scrollHeight = element.scrollHeight - element.clientHeight;
     if (scrollHeight <= 0) {
       setProgressState({ articleId: id, value: 1 });
@@ -149,6 +185,20 @@ export function ArticleReader({
 
     setProgressState({ articleId: id, value: Math.min(1, element.scrollTop / scrollHeight) });
   }, [id]);
+
+  useEffect(() => () => {
+    if (scrollStopTimerRef.current != null) window.clearTimeout(scrollStopTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    const updateSelection = () => {
+      const selection = window.getSelection();
+      const anchorNode = selection?.anchorNode;
+      setHasSelection(Boolean(selection && !selection.isCollapsed && anchorNode && scrollRef.current?.contains(anchorNode)));
+    };
+    document.addEventListener('selectionchange', updateSelection);
+    return () => document.removeEventListener('selectionchange', updateSelection);
+  }, []);
 
   useEffect(() => {
     if (!article) return;
@@ -163,20 +213,10 @@ export function ArticleReader({
     }
 
     autoMarkedArticleIds.current.add(article.id);
-    applyArticleStateChange(queryClient, { articleId: article.id, is_read: true });
-
-    void apiFetch(`/api/articles/${article.id}/state`, {
-      method: 'PATCH',
-      body: JSON.stringify({ is_read: true }),
-    })
-      .then(() => {
-        broadcast({ type: 'state-change', articleId: article.id, is_read: true });
-      })
-      .catch(() => {
-        autoMarkedArticleIds.current.delete(article.id);
-        applyArticleStateChange(queryClient, { articleId: article.id, is_read: article.is_read });
-      });
-  }, [article, progress, queryClient]);
+    void readCoordinator.setDesired(article.id, true).catch(() => {
+      autoMarkedArticleIds.current.delete(article.id);
+    });
+  }, [article, progress, readCoordinator]);
 
   const handleToggleStar = useCallback(async () => {
     if (!article) return;
@@ -185,11 +225,12 @@ export function ArticleReader({
     applyArticleStateChange(queryClient, { articleId: article.id, is_starred: nextStarred });
 
     try {
-      await apiFetch(`/api/articles/${article.id}/state`, {
+      const snapshot = await apiFetch<ArticleStateSnapshot>(`/api/articles/${article.id}/state`, {
         method: 'PATCH',
         body: JSON.stringify({ is_starred: nextStarred }),
       });
-      broadcast({ type: 'state-change', articleId: article.id, is_starred: nextStarred });
+      applyArticleStateChange(queryClient, { articleId: article.id, is_read: snapshot.is_read, is_starred: snapshot.is_starred, state_version: snapshot.state_version });
+      broadcast({ type: 'state-change', articleId: article.id, is_read: snapshot.is_read, is_starred: snapshot.is_starred, state_version: snapshot.state_version });
     } catch {
       applyArticleStateChange(queryClient, { articleId: article.id, is_starred: article.is_starred });
     }
@@ -324,7 +365,7 @@ export function ArticleReader({
         className="flex-1 overflow-y-auto overflow-x-hidden overscroll-none touch-pan-y"
         {...touchHandlers}
       >
-        <HighlightLayer articleId={Number(id)}>
+        <HighlightLayer articleId={Number(id)} onEditorOpenChange={setHighlightEditorOpen}>
           <div className={`pb-12 pt-[44px] ${activeLayout === 'wide' ? 'px-7 md:px-14' : 'px-7 md:px-7'}`}>
             <article className={activeLayout === 'wide' ? 'mx-auto max-w-[960px]' : 'mx-auto max-w-[680px]'}>
               {titleLoading ? (
@@ -360,7 +401,7 @@ export function ArticleReader({
                 </div>
               ) : null}
 
-              {summary ? <KeyPointsCallout text={summary} /> : null}
+              {summary ? <KeyPointsCallout text={summary} locale={nativeLanguage} /> : null}
 
               {showSourceExcerptNotice ? (
                 <SourceExcerptNotice
@@ -390,6 +431,14 @@ export function ArticleReader({
       </div>
 
       {afterScroll}
+      {onAdvance ? (
+        <ReaderAdvanceButton
+          mode={advanceMode}
+          phase={advancePhase}
+          hidden={advanceHidden || isScrolling || hasSelection || highlightEditorOpen || tweaksOpen}
+          onAdvance={onAdvance}
+        />
+      ) : null}
       <TweaksPanel externalOpen={tweaksOpen} onExternalClose={() => setTweaksOpen(false)} />
     </div>
   );

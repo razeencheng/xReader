@@ -24,8 +24,12 @@ SELECT id, source_id, title, link, language, author, published_at, content_text,
        title_translated, summary, source_title, is_read, is_starred
 FROM ranked
 WHERE rn = 1
+  AND (
+    @cursor_published_at::timestamptz IS NULL
+    OR (published_at, id) < (@cursor_published_at, @cursor_article_id::bigint)
+  )
 ORDER BY published_at DESC, id DESC
-LIMIT 100;
+LIMIT @lim;
 
 -- name: GuestListArticlesStreamEnriched :many
 WITH ranked AS (
@@ -42,7 +46,6 @@ WITH ranked AS (
   LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = @state_owner_id
   WHERE s.user_id = @content_owner_id
     AND s.deleted_at IS NULL
-    AND (@cursor::timestamptz IS NULL OR a.published_at < @cursor)
     AND (
       @read_filter::text = 'all'
       OR (@read_filter::text = 'unread' AND COALESCE(st.is_read, false) = false)
@@ -53,6 +56,10 @@ SELECT id, source_id, title, link, language, author, published_at, content_text,
        title_translated, summary, source_title, is_read, is_starred
 FROM ranked
 WHERE rn = 1
+  AND (
+    @cursor_published_at::timestamptz IS NULL
+    OR (published_at, id) < (@cursor_published_at, @cursor_article_id::bigint)
+  )
 ORDER BY published_at DESC, id DESC
 LIMIT @lim;
 
@@ -77,8 +84,12 @@ SELECT id, source_id, title, link, language, author, published_at, content_text,
        title_translated, summary, source_title, is_read, is_starred
 FROM ranked
 WHERE rn = 1
+  AND (
+    @cursor_published_at::timestamptz IS NULL
+    OR (published_at, id) < (@cursor_published_at, @cursor_article_id::bigint)
+  )
 ORDER BY published_at DESC, id DESC
-LIMIT 100;
+LIMIT @lim;
 
 -- name: GuestListArticlesBySourceEnriched :many
 WITH ranked AS (
@@ -106,7 +117,12 @@ SELECT id, source_id, title, link, language, author, published_at, content_text,
        title_translated, summary, source_title, is_read, is_starred
 FROM ranked
 WHERE rn = 1
-ORDER BY published_at DESC, id DESC;
+  AND (
+    @cursor_published_at::timestamptz IS NULL
+    OR (published_at, id) < (@cursor_published_at, @cursor_article_id::bigint)
+  )
+ORDER BY published_at DESC, id DESC
+LIMIT @lim;
 
 -- name: GuestSearchArticles :many
 SELECT a.id, a.source_id, a.title, a.link, a.language, a.published_at,

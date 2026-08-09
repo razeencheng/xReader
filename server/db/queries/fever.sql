@@ -53,7 +53,7 @@ WHERE s.user_id = $1 AND s.deleted_at IS NULL
   AND st.is_starred = true
 ORDER BY a.id;
 
--- name: FeverBulkMarkFeedRead :exec
+-- name: FeverBulkMarkFeedRead :many
 INSERT INTO article_states (user_id, article_id, is_read, last_read_at)
 SELECT $1, a.id, true, now()
 FROM articles a
@@ -62,9 +62,10 @@ WHERE s.id = $2 AND s.user_id = $1 AND s.deleted_at IS NULL
   AND a.published_at < $3
 ON CONFLICT (user_id, article_id) DO UPDATE SET
   is_read = true,
-  last_read_at = now();
+  last_read_at = now()
+RETURNING article_id;
 
--- name: FeverBulkMarkAllRead :exec
+-- name: FeverBulkMarkAllRead :many
 INSERT INTO article_states (user_id, article_id, is_read, last_read_at)
 SELECT $1, a.id, true, now()
 FROM articles a
@@ -73,4 +74,5 @@ WHERE s.user_id = $1 AND s.deleted_at IS NULL
   AND a.published_at < $2
 ON CONFLICT (user_id, article_id) DO UPDATE SET
   is_read = true,
-  last_read_at = now();
+  last_read_at = now()
+RETURNING article_id;

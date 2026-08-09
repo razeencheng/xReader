@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { ReadStateProvider } from '@/components/providers/ReadStateProvider';
 
 vi.mock('react-intersection-observer', () => ({
   useInView: () => ({ ref: vi.fn(), inView: false }),
@@ -19,7 +20,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
     defaultOptions: { queries: { retry: false } },
   });
 
-  return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+  return <QueryClientProvider client={qc}><ReadStateProvider>{children}</ReadStateProvider></QueryClientProvider>;
 }
 
 beforeEach(() => {
@@ -322,11 +323,20 @@ test('can batch mark the current view read and undo it', async () => {
     }
 
     if (String(path) === '/api/articles/batch/state' && options?.method === 'POST') {
-      return { status: 'updated', updated: 2, article_ids: [1, 2] };
+      return {
+        status: 'updated',
+        updated: 2,
+        article_ids: [1, 2],
+        states: [
+          { article_id: 1, is_read: true, is_starred: false, state_version: { changed_at_micros: '101', article_id: 1 } },
+          { article_id: 2, is_read: true, is_starred: false, state_version: { changed_at_micros: '102', article_id: 2 } },
+        ],
+      };
     }
 
     if (String(path).startsWith('/api/articles/') && options?.method === 'PATCH') {
-      return { status: 'updated' };
+      const articleId = Number(String(path).match(/articles\/(\d+)/)?.[1]);
+      return { article_id: articleId, is_read: false, is_starred: false, state_version: { changed_at_micros: String(200 + articleId), article_id: articleId } };
     }
 
     return {};

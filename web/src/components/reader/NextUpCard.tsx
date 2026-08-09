@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useRef } from 'react';
 import { estimateReadMinutes, formatRelativeTime, getDisplayTitle, getOriginalTitle } from '@/lib/article-meta';
 import { useI18n } from '@/lib/i18n';
 import { getSourceColor } from '@/lib/source-meta';
@@ -8,14 +8,8 @@ import type { ArticleItem } from '@/lib/types';
 
 interface Props {
   next: ArticleItem;
-  currentId: number;
-  markRead: (id: number) => void | Promise<void>;
-}
-
-function buildHref(articleId: number, searchParams: URLSearchParams) {
-  const params = new URLSearchParams(searchParams.toString());
-  params.set('article', String(articleId));
-  return `/?${params.toString()}`;
+  onAdvance: () => void;
+  onVisibilityChange?: (visible: boolean) => void;
 }
 
 function langLabel(lang?: string) {
@@ -24,15 +18,13 @@ function langLabel(lang?: string) {
   return map[lang.toLowerCase()] ?? lang.slice(0, 2).toUpperCase();
 }
 
-export function NextUpCard({ next, currentId, markRead }: Props) {
+export function NextUpCard({ next, onAdvance, onVisibilityChange }: Props) {
   const { t } = useI18n();
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const cardRef = useRef<HTMLDivElement>(null);
   const displayTitle = getDisplayTitle(next);
   const originalTitle = getOriginalTitle(next);
   const publishedAt = formatRelativeTime(next.published_at);
   const readMinutes = estimateReadMinutes(next);
-  const summary = next.summary?.trim();
   const sourceColor = getSourceColor(next.source_title);
   const meta = [
     publishedAt ? t('article.ago', { time: publishedAt }) : null,
@@ -42,21 +34,22 @@ export function NextUpCard({ next, currentId, markRead }: Props) {
     .filter(Boolean)
     .join(' · ');
 
-  const handleClick = async () => {
-    try {
-      await markRead(currentId);
-    } catch {
-      // Keep navigation responsive even if the background mark-read call fails.
-    }
-
-    router.push(buildHref(next.id, searchParams));
-  };
+  useEffect(() => {
+    const element = cardRef.current;
+    if (!element || !onVisibilityChange || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(([entry]) => onVisibilityChange(entry.isIntersecting), { threshold: 0.15 });
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      onVisibilityChange(false);
+    };
+  }, [onVisibilityChange]);
 
   return (
-    <div className="mb-7 font-sans">
+    <div ref={cardRef} className="mb-7 font-sans">
       <button
         type="button"
-        onClick={handleClick}
+        onClick={onAdvance}
         className="group w-full rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-callout)] px-4 py-3 text-left text-sm leading-6 text-[var(--text-secondary)] transition-all hover:-translate-y-[1px] hover:border-[var(--accent)]"
       >
         <div className="min-w-0">

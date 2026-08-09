@@ -26,4 +26,28 @@ describe('i18n', () => {
     expect(translate('it-IT', 'nav.settings')).toBe('Settings');
     expect(translate('zh-CN', 'missing.key')).toBe('missing.key');
   });
+
+  test('localizes the compound reader advance action in every supported UI language', () => {
+    expect(Object.fromEntries(
+      ['en', 'zh-CN', 'zh-TW', 'ja', 'ko', 'es', 'fr', 'de', 'pt'].map((language) => [
+        language,
+        translate(language, 'reader.advanceNext'),
+      ]),
+    )).toEqual({
+      en: '✓ Next',
+      'zh-CN': '✓ 下一篇',
+      'zh-TW': '✓ 下一篇',
+      ja: '✓ 次の記事',
+      ko: '✓ 다음 글',
+      es: '✓ Siguiente',
+      fr: '✓ Suivant',
+      de: '✓ Weiter',
+      pt: '✓ Próximo',
+    });
+    for (const language of ['zh-CN', 'zh-TW', 'ja', 'ko', 'es', 'fr', 'de', 'pt']) {
+      expect(translate(language, 'reader.syncingRead')).not.toBe(translate('en', 'reader.syncingRead'));
+      expect(translate(language, 'reader.readUnsynced')).not.toBe(translate('en', 'reader.readUnsynced'));
+      expect(translate(language, 'reader.previousMarkFailed')).not.toBe(translate('en', 'reader.previousMarkFailed'));
+    }
+  });
 });

@@ -320,6 +320,14 @@ func TestFever_MarkItemRead(t *testing.T) {
 	).Scan(&isRead)
 	require.NoError(t, err)
 	assert.True(t, isRead)
+
+	var changeCount int
+	err = f.pool.QueryRow(context.Background(),
+		"SELECT count(*) FROM article_state_changes WHERE user_id = $1 AND article_id = $2",
+		f.userID, f.articleID,
+	).Scan(&changeCount)
+	require.NoError(t, err)
+	assert.Equal(t, 1, changeCount)
 }
 
 func TestFever_MarkItemUnread(t *testing.T) {
@@ -447,9 +455,9 @@ func TestFever_SetFeverPassword(t *testing.T) {
 
 	r.POST("/api/users/me/fever", func(c *gin.Context) {
 		c.Set("user", &middleware.User{
-			ID:            userID,
+			ID:             userID,
 			GitHubUsername: "pwduser",
-			Role:          "user",
+			Role:           "user",
 		})
 		c.Next()
 	}, h.SetFeverPassword)

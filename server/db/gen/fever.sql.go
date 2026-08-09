@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const feverBulkMarkAllRead = `-- name: FeverBulkMarkAllRead :exec
+const feverBulkMarkAllRead = `-- name: FeverBulkMarkAllRead :many
 INSERT INTO article_states (user_id, article_id, is_read, last_read_at)
 SELECT $1, a.id, true, now()
 FROM articles a
@@ -21,6 +21,7 @@ WHERE s.user_id = $1 AND s.deleted_at IS NULL
 ON CONFLICT (user_id, article_id) DO UPDATE SET
   is_read = true,
   last_read_at = now()
+RETURNING article_id
 `
 
 type FeverBulkMarkAllReadParams struct {
@@ -28,12 +29,27 @@ type FeverBulkMarkAllReadParams struct {
 	PublishedAt pgtype.Timestamptz `json:"published_at"`
 }
 
-func (q *Queries) FeverBulkMarkAllRead(ctx context.Context, arg FeverBulkMarkAllReadParams) error {
-	_, err := q.db.Exec(ctx, feverBulkMarkAllRead, arg.UserID, arg.PublishedAt)
-	return err
+func (q *Queries) FeverBulkMarkAllRead(ctx context.Context, arg FeverBulkMarkAllReadParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, feverBulkMarkAllRead, arg.UserID, arg.PublishedAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var article_id int64
+		if err := rows.Scan(&article_id); err != nil {
+			return nil, err
+		}
+		items = append(items, article_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
-const feverBulkMarkFeedRead = `-- name: FeverBulkMarkFeedRead :exec
+const feverBulkMarkFeedRead = `-- name: FeverBulkMarkFeedRead :many
 INSERT INTO article_states (user_id, article_id, is_read, last_read_at)
 SELECT $1, a.id, true, now()
 FROM articles a
@@ -43,6 +59,7 @@ WHERE s.id = $2 AND s.user_id = $1 AND s.deleted_at IS NULL
 ON CONFLICT (user_id, article_id) DO UPDATE SET
   is_read = true,
   last_read_at = now()
+RETURNING article_id
 `
 
 type FeverBulkMarkFeedReadParams struct {
@@ -51,9 +68,24 @@ type FeverBulkMarkFeedReadParams struct {
 	PublishedAt pgtype.Timestamptz `json:"published_at"`
 }
 
-func (q *Queries) FeverBulkMarkFeedRead(ctx context.Context, arg FeverBulkMarkFeedReadParams) error {
-	_, err := q.db.Exec(ctx, feverBulkMarkFeedRead, arg.UserID, arg.ID, arg.PublishedAt)
-	return err
+func (q *Queries) FeverBulkMarkFeedRead(ctx context.Context, arg FeverBulkMarkFeedReadParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, feverBulkMarkFeedRead, arg.UserID, arg.ID, arg.PublishedAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var article_id int64
+		if err := rows.Scan(&article_id); err != nil {
+			return nil, err
+		}
+		items = append(items, article_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const feverListItems = `-- name: FeverListItems :many

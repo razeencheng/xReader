@@ -13,16 +13,18 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/razeencheng/xreader/db/gen"
 	"github.com/razeencheng/xreader/internal/source"
+	statepkg "github.com/razeencheng/xreader/internal/state"
 )
 
 type FetchJob struct {
-	pool    *pgxpool.Pool
-	queries *gen.Queries
-	adapter source.SourceAdapter
+	pool           *pgxpool.Pool
+	queries        *gen.Queries
+	adapter        source.SourceAdapter
+	stateMutations *statepkg.Service
 }
 
 func NewFetchJob(pool *pgxpool.Pool, adapter source.SourceAdapter) *FetchJob {
-	return &FetchJob{pool: pool, queries: gen.New(pool), adapter: adapter}
+	return &FetchJob{pool: pool, queries: gen.New(pool), adapter: adapter, stateMutations: statepkg.NewService(pool)}
 }
 
 func (j *FetchJob) Run(ctx context.Context, src gen.Source) (inserted int, articleIDs []int64, err error) {
@@ -93,7 +95,9 @@ func (j *FetchJob) Run(ctx context.Context, src gen.Source) (inserted int, artic
 	}
 
 	if isInitialFetch {
-		if _, markErr := j.queries.MarkInitialSourceBacklogRead(ctx, src.ID); markErr != nil {
+		if _, markErr := j.stateMutations.Apply(ctx, src.UserID, func(q *gen.Queries) ([]int64, error) {
+			return q.MarkInitialSourceBacklogRead(ctx, src.ID)
+		}); markErr != nil {
 			return inserted, articleIDs, fmt.Errorf("mark initial backlog read for source %d: %w", src.ID, markErr)
 		}
 	}
