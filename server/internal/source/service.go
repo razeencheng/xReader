@@ -13,16 +13,18 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/razeencheng/xreader/db/gen"
 	"github.com/razeencheng/xreader/internal/ai"
+	statepkg "github.com/razeencheng/xreader/internal/state"
 )
 
 // ErrSourceNotFound is returned when a source does not exist or does not belong to the user.
 var ErrSourceNotFound = errors.New("source not found")
 
 type SourceService struct {
-	pool     *pgxpool.Pool
-	queries  *gen.Queries
-	adapters map[string]SourceAdapter
-	aiClient ai.AIClient
+	pool           *pgxpool.Pool
+	queries        *gen.Queries
+	adapters       map[string]SourceAdapter
+	aiClient       ai.AIClient
+	stateMutations *statepkg.Service
 }
 
 type SourceListItem struct {
@@ -43,7 +45,7 @@ func NewSourceService(pool *pgxpool.Pool, adapters ...SourceAdapter) *SourceServ
 	for _, a := range adapters {
 		m[a.Kind()] = a
 	}
-	return &SourceService{pool: pool, queries: gen.New(pool), adapters: m}
+	return &SourceService{pool: pool, queries: gen.New(pool), adapters: m, stateMutations: statepkg.NewService(pool)}
 }
 
 func (s *SourceService) SetAIClient(client ai.AIClient) {
@@ -190,7 +192,7 @@ func (s *SourceService) Refresh(ctx context.Context, userID int64, sourceID int6
 		return 0, fmt.Errorf("no adapter for kind %s", src.Kind)
 	}
 
-	inserted, articleIDs, err := runFetch(ctx, s.queries, adapter, src)
+	inserted, articleIDs, err := runFetch(ctx, s.queries, s.stateMutations, adapter, src)
 	if err != nil {
 		return inserted, err
 	}
@@ -296,7 +298,7 @@ func defaultCategory(category string) string {
 	return trimmed
 }
 
-func runFetch(ctx context.Context, queries *gen.Queries, adapter SourceAdapter, src gen.Source) (inserted int, articleIDs []int64, err error) {
+func runFetch(ctx context.Context, queries *gen.Queries, stateMutations *statepkg.Service, adapter SourceAdapter, src gen.Source) (inserted int, articleIDs []int64, err error) {
 	isInitialFetch := !src.LastSuccessAt.Valid
 	adapterSrc := Source{
 		ID:            src.ID,
@@ -360,7 +362,9 @@ func runFetch(ctx context.Context, queries *gen.Queries, adapter SourceAdapter, 
 	}
 
 	if isInitialFetch {
-		if _, markErr := queries.MarkInitialSourceBacklogRead(ctx, src.ID); markErr != nil {
+		if _, markErr := stateMutations.Apply(ctx, src.UserID, func(q *gen.Queries) ([]int64, error) {
+			return q.MarkInitialSourceBacklogRead(ctx, src.ID)
+		}); markErr != nil {
 			return inserted, articleIDs, fmt.Errorf("mark initial backlog read for source %d: %w", src.ID, markErr)
 		}
 	}

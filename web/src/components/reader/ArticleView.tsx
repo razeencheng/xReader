@@ -1,12 +1,9 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
-import { apiFetch } from '@/lib/api-client';
-import { broadcast } from '@/lib/broadcast';
-import { useQueryClient } from '@tanstack/react-query';
-import { applyArticleStateChange } from '@/lib/article-state-cache';
+import { useMemo, useState } from 'react';
 import { ArticleReader } from '@/components/reader/ArticleReader';
 import { NextUpCard } from '@/components/reader/NextUpCard';
+import type { AdvanceMode, AdvancePhase } from '@/lib/reader-advance';
 import type { ArticleItem } from '@/lib/types';
 
 interface ArticleViewProps {
@@ -16,10 +13,12 @@ interface ArticleViewProps {
   onPrev?: () => void;
   onNotFound?: () => void;
   className?: string;
-  prev?: ArticleItem | null;
   next?: ArticleItem | null;
   position?: number;
   total?: number;
+  onAdvance?: () => void;
+  advanceMode?: AdvanceMode;
+  advancePhase?: AdvancePhase;
 }
 
 export function ArticleView({
@@ -29,13 +28,14 @@ export function ArticleView({
   onPrev,
   onNotFound,
   className = '',
-  prev,
   next,
   position,
   total,
+  onAdvance,
+  advanceMode = 'none',
+  advancePhase = 'idle',
 }: ArticleViewProps) {
-  const articleId = Number(id);
-  const queryClient = useQueryClient();
+  const [nextCardVisible, setNextCardVisible] = useState(false);
 
   // Intentionally keyed on primitives, not the `next` object identity:
   // filteredItems can produce a new ArticleItem reference for the same article
@@ -47,26 +47,6 @@ export function ArticleView({
     [next?.id, next?.language],
   );
 
-  const markRead = useCallback(
-    async (articleIdToMark: number) => {
-      const cached = queryClient.getQueryData<ArticleItem>(['article', String(articleIdToMark)]);
-      const previousRead = cached?.is_read ?? false;
-      if (previousRead) return; // already read; nothing to do
-
-      applyArticleStateChange(queryClient, { articleId: articleIdToMark, is_read: true });
-      try {
-        await apiFetch(`/api/articles/${articleIdToMark}/state`, {
-          method: 'PATCH',
-          body: JSON.stringify({ is_read: true }),
-        });
-        broadcast({ type: 'state-change', articleId: articleIdToMark, is_read: true });
-      } catch {
-        applyArticleStateChange(queryClient, { articleId: articleIdToMark, is_read: previousRead });
-      }
-    },
-    [queryClient],
-  );
-
   return (
     <ArticleReader
       id={id}
@@ -75,11 +55,17 @@ export function ArticleView({
       onPrev={onPrev}
       onNotFound={onNotFound}
       className={className}
+      position={position}
+      total={total}
       next={nextForWarmup}
+      advanceMode={advanceMode}
+      advancePhase={advancePhase}
+      onAdvance={onAdvance}
+      advanceHidden={nextCardVisible}
       afterBody={
-        next ? (
+        next && onAdvance ? (
           <div className="mt-16 mb-12">
-            <NextUpCard next={next} currentId={articleId} markRead={markRead} />
+            <NextUpCard next={next} onAdvance={onAdvance} onVisibilityChange={setNextCardVisible} />
           </div>
         ) : undefined
       }

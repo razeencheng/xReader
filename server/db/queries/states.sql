@@ -37,6 +37,55 @@ RETURNING article_id;
 INSERT INTO article_state_changes (user_id, article_id)
 VALUES ($1, $2);
 
+-- name: AcquireStateOwnerLock :exec
+SELECT pg_advisory_xact_lock(621383735000000000::bigint + sqlc.arg(user_id)::bigint);
+
+-- name: AllocateStateChangeTime :one
+SELECT GREATEST(
+  clock_timestamp(),
+  COALESCE(MAX(changed_at) + interval '1 microsecond', '-infinity'::timestamptz)
+)::timestamptz AS changed_at
+FROM article_state_changes
+WHERE user_id = @user_id;
+
+-- name: RecordStateChangeAt :exec
+INSERT INTO article_state_changes (user_id, article_id, changed_at)
+VALUES (@user_id, @article_id, @changed_at);
+
+-- name: GetArticleStateSnapshot :one
+SELECT @article_id::bigint AS article_id,
+       COALESCE(st.is_read, false)::boolean AS is_read,
+       COALESCE(st.is_starred, false)::boolean AS is_starred,
+       latest.changed_at
+FROM (SELECT 1) seed
+LEFT JOIN article_states st
+  ON st.user_id = @user_id AND st.article_id = @article_id
+LEFT JOIN LATERAL (
+  SELECT changed_at
+  FROM article_state_changes
+  WHERE user_id = @user_id AND article_id = @article_id
+  ORDER BY changed_at DESC
+  LIMIT 1
+) latest ON true;
+
+-- name: GetStateChangeHighWater :one
+SELECT article_id, changed_at
+FROM article_state_changes
+WHERE user_id = @user_id
+ORDER BY changed_at DESC, article_id DESC
+LIMIT 1;
+
+-- name: ListStateChangeKeys :many
+SELECT article_id, changed_at
+FROM article_state_changes
+WHERE user_id = @user_id
+  AND (
+    changed_at > @cursor_changed_at
+    OR (changed_at = @cursor_changed_at AND article_id > @cursor_article_id)
+  )
+ORDER BY changed_at ASC, article_id ASC
+LIMIT @lim;
+
 -- name: ListStateChangesSince :many
 SELECT sc.article_id,
        sc.changed_at,
@@ -62,9 +111,6 @@ WITH upserted AS (
     is_read = $3,
     last_read_at = CASE WHEN $3 THEN now() ELSE NULL END
   RETURNING article_id
-), changes AS (
-  INSERT INTO article_state_changes (user_id, article_id)
-  SELECT $1, article_id FROM upserted
 )
 SELECT article_id FROM upserted;
 
@@ -82,9 +128,6 @@ WITH upserted AS (
     is_read = $2,
     last_read_at = CASE WHEN $2 THEN now() ELSE NULL END
   RETURNING article_id
-), changes AS (
-  INSERT INTO article_state_changes (user_id, article_id)
-  SELECT $1, article_id FROM upserted
 )
 SELECT article_id FROM upserted;
 
@@ -102,9 +145,6 @@ WITH upserted AS (
     is_read = $2,
     last_read_at = CASE WHEN $2 THEN now() ELSE NULL END
   RETURNING article_id
-), changes AS (
-  INSERT INTO article_state_changes (user_id, article_id)
-  SELECT $1, article_id FROM upserted
 )
 SELECT article_id FROM upserted;
 
@@ -128,9 +168,5 @@ WITH ranked AS (
     is_read = true,
     last_read_at = now()
   RETURNING article_id
-), changes AS (
-  INSERT INTO article_state_changes (user_id, article_id)
-  SELECT s.user_id, article_id FROM upserted
-  JOIN sources s ON s.id = $1 AND s.deleted_at IS NULL
 )
 SELECT article_id FROM upserted;

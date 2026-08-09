@@ -145,3 +145,31 @@ test('opens an inline note editor for existing highlights instead of a browser p
   expect(updateHighlightNote).toHaveBeenCalledWith(43, 'new note');
   promptSpy.mockRestore();
 });
+
+test('reports editor visibility so reader controls can stay out of the way', async () => {
+  const onEditorOpenChange = vi.fn();
+  highlightQueries.fetchHighlights.mockResolvedValue([
+    {
+      id: 44,
+      article_id: 7,
+      layer: 'original',
+      paragraph_index: 0,
+      text_start_offset: 0,
+      text_end_offset: 5,
+      quoted_text: 'Hello',
+      created_at: '2026-04-26T00:00:00Z',
+    },
+  ]);
+
+  const user = userEvent.setup();
+  render(
+    <HighlightLayer articleId={7} onEditorOpenChange={onEditorOpenChange}>
+      <div data-layer="original" data-paragraph-index="0">Hello world</div>
+    </HighlightLayer>,
+  );
+  await user.click(await screen.findByText('Hello'));
+  expect(onEditorOpenChange).toHaveBeenLastCalledWith(true);
+
+  await user.click(screen.getByRole('button', { name: '取消' }));
+  expect(onEditorOpenChange).toHaveBeenLastCalledWith(false);
+});

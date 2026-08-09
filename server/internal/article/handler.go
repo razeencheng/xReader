@@ -14,6 +14,7 @@ import (
 	"github.com/razeencheng/xreader/db/gen"
 	"github.com/razeencheng/xreader/internal/ai"
 	"github.com/razeencheng/xreader/internal/middleware"
+	statepkg "github.com/razeencheng/xreader/internal/state"
 )
 
 type ArticleHandler struct {
@@ -53,21 +54,22 @@ type articleDetailResponse struct {
 }
 
 type articleResponse struct {
-	ID              int64   `json:"id"`
-	SourceID        int64   `json:"source_id"`
-	Title           string  `json:"title"`
-	TitleTranslated string  `json:"title_translated,omitempty"`
-	Summary         string  `json:"summary,omitempty"`
-	SourceTitle     string  `json:"source_title,omitempty"`
-	Link            string  `json:"link"`
-	Language        string  `json:"language"`
-	Author          *string `json:"author,omitempty"`
-	PublishedAt     *string `json:"published_at,omitempty"`
-	ContentHtml     string  `json:"content_html,omitempty"`
-	ContentText     string  `json:"content_text,omitempty"`
-	WordCount       int     `json:"word_count,omitempty"`
-	IsRead          bool    `json:"is_read"`
-	IsStarred       bool    `json:"is_starred"`
+	ID              int64             `json:"id"`
+	SourceID        int64             `json:"source_id"`
+	Title           string            `json:"title"`
+	TitleTranslated string            `json:"title_translated,omitempty"`
+	Summary         string            `json:"summary,omitempty"`
+	SourceTitle     string            `json:"source_title,omitempty"`
+	Link            string            `json:"link"`
+	Language        string            `json:"language"`
+	Author          *string           `json:"author,omitempty"`
+	PublishedAt     *string           `json:"published_at,omitempty"`
+	ContentHtml     string            `json:"content_html,omitempty"`
+	ContentText     string            `json:"content_text,omitempty"`
+	WordCount       int               `json:"word_count,omitempty"`
+	IsRead          bool              `json:"is_read"`
+	IsStarred       bool              `json:"is_starred"`
+	StateVersion    *statepkg.Version `json:"state_version,omitempty"`
 }
 
 type articleReadCounts struct {
@@ -110,10 +112,14 @@ type batchStateRequest struct {
 }
 
 type batchStateResponse struct {
-	Status     string  `json:"status"`
-	Updated    int     `json:"updated"`
-	ArticleIDs []int64 `json:"article_ids"`
+	Status     string              `json:"status"`
+	Updated    int                 `json:"updated"`
+	ArticleIDs []int64             `json:"article_ids"`
+	States     []statepkg.Snapshot `json:"states"`
 }
+
+type articleStateResponse = statepkg.Snapshot
+type stateChangesResponse = statepkg.ChangePage
 
 func (h *ArticleHandler) List(c *gin.Context) {
 	user := middleware.GetUser(c)
@@ -128,14 +134,31 @@ func (h *ArticleHandler) List(c *gin.Context) {
 	q := c.Query("q")
 	sourceIDRaw := c.Query("source_id")
 	cursorRaw := c.Query("cursor")
+	afterArticleIDRaw := c.Query("after_article_id")
 	limit := parseLimit(c.DefaultQuery("limit", "50"))
 
 	stateOwnerID, contentOwnerID, isGuest := h.resolveOwners(c)
 
-	items, err := h.itemsForList(ctx, stateOwnerID, contentOwnerID, isGuest, user.NativeLanguage, tab, filter, q, sourceIDRaw, cursorRaw, limit)
+	items, nextCursor, err := h.itemsForList(ctx, stateOwnerID, contentOwnerID, isGuest, user.NativeLanguage, tab, filter, q, sourceIDRaw, cursorRaw, afterArticleIDRaw, limit)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+	articleIDs := make([]int64, len(items))
+	for i := range items {
+		articleIDs[i] = items[i].ID
+	}
+	stateSnapshots, err := h.Service.ListStateSnapshots(ctx, stateOwnerID, articleIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load article states"})
+		return
+	}
+	for i := range items {
+		if snapshot, ok := stateSnapshots[items[i].ID]; ok {
+			items[i].IsRead = snapshot.IsRead
+			items[i].IsStarred = snapshot.IsStarred
+			items[i].StateVersion = snapshot.StateVersion
+		}
 	}
 
 	// Only the non-search list paths go through the enriched query that
@@ -147,17 +170,12 @@ func (h *ArticleHandler) List(c *gin.Context) {
 		h.enqueueMissingTitleTranslations(items, isGuest, user.NativeLanguage)
 	}
 
-	resp := articleListResponse{Items: items}
+	resp := articleListResponse{Items: items, NextCursor: nextCursor}
 	if counts, err := h.countsForList(ctx, stateOwnerID, contentOwnerID, isGuest, tab, q, sourceIDRaw); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	} else if counts != nil {
 		resp.Counts = counts
-	}
-	if tab == "stream" && len(items) == int(clampListLimit(limit)) {
-		if last := items[len(items)-1]; last.PublishedAt != nil {
-			resp.NextCursor = *last.PublishedAt
-		}
 	}
 	c.JSON(http.StatusOK, resp)
 }
@@ -225,14 +243,20 @@ func (h *ArticleHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	state, err := h.Service.GetState(ctx, stateOwnerID, id)
+	storedState, err := h.Service.GetState(ctx, stateOwnerID, id)
 	if err != nil {
-		state = gen.ArticleState{}
+		storedState = gen.ArticleState{}
+	}
+	stateSnapshot, err := h.Service.GetStateSnapshot(ctx, stateOwnerID, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load article state"})
+		return
 	}
 
 	articleResp := toArticleResponse(result.Article, true)
 	articleResp.SourceTitle = result.SourceTitle
-	resp := articleDetailResponse{articleResponse: articleResp, IsRead: state.IsRead, IsStarred: state.IsStarred}
+	resp := articleDetailResponse{articleResponse: articleResp, IsRead: stateSnapshot.IsRead, IsStarred: stateSnapshot.IsStarred}
+	resp.StateVersion = stateSnapshot.StateVersion
 	targetLang := user.NativeLanguage
 	if targetLang == "" {
 		targetLang = "zh-CN"
@@ -244,8 +268,8 @@ func (h *ArticleHandler) GetByID(c *gin.Context) {
 		resp.TitleTranslated = aiRow.TitleTranslated
 		resp.Summary = aiRow.Summary
 	}
-	if len(state.ReadingProgress) > 0 {
-		resp.ReadingProgress = json.RawMessage(state.ReadingProgress)
+	if len(storedState.ReadingProgress) > 0 {
+		resp.ReadingProgress = json.RawMessage(storedState.ReadingProgress)
 	}
 	c.JSON(http.StatusOK, resp)
 }
@@ -272,40 +296,52 @@ func (h *ArticleHandler) UpdateState(c *gin.Context) {
 	ctx := c.Request.Context()
 	stateOwnerID, contentOwnerID, isGuest := h.resolveOwners(c)
 
-	if req.IsRead != nil {
-		var err error
-		if isGuest {
-			err = h.Service.GuestSetRead(ctx, stateOwnerID, contentOwnerID, id, *req.IsRead)
-		} else {
-			err = h.Service.SetRead(ctx, stateOwnerID, id, *req.IsRead)
-		}
-		if err != nil {
-			if errors.Is(err, errForbidden) {
-				c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
-				return
-			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update state"})
-			return
-		}
+	var snapshot statepkg.Snapshot
+	if isGuest {
+		snapshot, err = h.Service.GuestUpdateStateSnapshot(ctx, stateOwnerID, contentOwnerID, id, req.IsRead, req.IsStarred)
+	} else {
+		snapshot, err = h.Service.UpdateStateSnapshot(ctx, stateOwnerID, id, req.IsRead, req.IsStarred)
 	}
-	if req.IsStarred != nil {
-		var err error
-		if isGuest {
-			err = h.Service.GuestSetStarred(ctx, stateOwnerID, contentOwnerID, id, *req.IsStarred)
-		} else {
-			err = h.Service.SetStarred(ctx, stateOwnerID, id, *req.IsStarred)
-		}
-		if err != nil {
-			if errors.Is(err, errForbidden) {
-				c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
-				return
-			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update state"})
+	if err != nil {
+		if errors.Is(err, errForbidden) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
 			return
 		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update state"})
+		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "updated"})
+	c.JSON(http.StatusOK, snapshot)
+}
+
+func (h *ArticleHandler) GetState(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	ctx := c.Request.Context()
+	stateOwnerID, contentOwnerID, isGuest := h.resolveOwners(c)
+	if isGuest {
+		_, err = h.Service.GuestGetByID(ctx, contentOwnerID, id)
+	} else {
+		_, err = h.Service.GetByID(ctx, stateOwnerID, id)
+	}
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
+		return
+	}
+	snapshot, err := h.Service.GetStateSnapshot(ctx, stateOwnerID, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get state"})
+		return
+	}
+	c.JSON(http.StatusOK, snapshot)
 }
 
 func (h *ArticleHandler) UpdateProgress(c *gin.Context) {
@@ -359,18 +395,22 @@ func (h *ArticleHandler) BatchState(c *gin.Context) {
 	}
 
 	stateOwnerID, contentOwnerID, isGuest := h.resolveOwners(c)
-	var articleIDs []int64
+	var states []statepkg.Snapshot
 	var err error
 	if isGuest {
-		articleIDs, err = h.Service.GuestBatchSetRead(c.Request.Context(), stateOwnerID, contentOwnerID, req.Scope, req.IsRead)
+		states, err = h.Service.GuestBatchSetReadStates(c.Request.Context(), stateOwnerID, contentOwnerID, req.Scope, req.IsRead)
 	} else {
-		articleIDs, err = h.Service.BatchSetRead(c.Request.Context(), stateOwnerID, req.Scope, req.IsRead)
+		states, err = h.Service.BatchSetReadStates(c.Request.Context(), stateOwnerID, req.Scope, req.IsRead)
 	}
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, batchStateResponse{Status: "updated", Updated: len(articleIDs), ArticleIDs: articleIDs})
+	articleIDs := make([]int64, len(states))
+	for i, state := range states {
+		articleIDs[i] = state.ArticleID
+	}
+	c.JSON(http.StatusOK, batchStateResponse{Status: "updated", Updated: len(states), ArticleIDs: articleIDs, States: states})
 }
 
 func (h *ArticleHandler) Changes(c *gin.Context) {
@@ -380,29 +420,31 @@ func (h *ArticleHandler) Changes(c *gin.Context) {
 		return
 	}
 
-	sinceRaw := c.Query("since")
-	if sinceRaw == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "since parameter required"})
+	if sinceRaw := c.Query("since"); sinceRaw != "" && c.Query("cursor") == "" {
+		since, err := parseTime(sinceRaw)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid since format"})
+			return
+		}
+		changes, err := h.Service.ListChanges(c.Request.Context(), user.ID, since)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list changes"})
+			return
+		}
+		items := make([]articleChangeResponse, 0, len(changes))
+		for _, change := range changes {
+			items = append(items, toArticleChangeResponse(change))
+		}
+		c.JSON(http.StatusOK, gin.H{"items": items})
 		return
 	}
 
-	since, err := parseTime(sinceRaw)
+	page, err := h.Service.ListStateChanges(c.Request.Context(), user.ID, c.Query("cursor"), parseLimit(c.DefaultQuery("limit", "50")))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid since format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	changes, err := h.Service.ListChanges(c.Request.Context(), user.ID, since)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list changes"})
-		return
-	}
-
-	items := make([]articleChangeResponse, 0, len(changes))
-	for _, change := range changes {
-		items = append(items, toArticleChangeResponse(change))
-	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	c.JSON(http.StatusOK, page)
 }
 
 func (h *ArticleHandler) LoadOriginal(c *gin.Context) {
@@ -445,13 +487,13 @@ func (h *ArticleHandler) LoadOriginal(c *gin.Context) {
 	})
 }
 
-func (h *ArticleHandler) itemsForList(ctx context.Context, stateOwnerID, contentOwnerID int64, isGuest bool, lang, tab, filter, query, sourceIDRaw, cursorRaw string, limit int32) ([]articleResponse, error) {
+func (h *ArticleHandler) itemsForList(ctx context.Context, stateOwnerID, contentOwnerID int64, isGuest bool, lang, tab, filter, query, sourceIDRaw, cursorRaw, afterArticleIDRaw string, limit int32) ([]articleResponse, string, error) {
 
 	if strings.TrimSpace(query) != "" {
 		if isGuest {
 			rows, err := h.Service.GuestSearch(ctx, contentOwnerID, query)
 			if err != nil {
-				return nil, err
+				return nil, "", err
 			}
 			// Convert GuestSearchArticlesRow to articleResponse
 			resp := make([]articleResponse, 0, len(rows))
@@ -469,81 +511,61 @@ func (h *ArticleHandler) itemsForList(ctx context.Context, stateOwnerID, content
 				}
 				resp = append(resp, ar)
 			}
-			return resp, nil
+			return resp, "", nil
 		}
 		rows, err := h.Service.Search(ctx, stateOwnerID, query)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
-		return toArticleResponses(rows, false), nil
+		return toArticleResponses(rows, false), "", nil
 	}
 
+	var sourceID *int64
 	if strings.TrimSpace(sourceIDRaw) != "" {
-		sourceID, err := strconv.ParseInt(sourceIDRaw, 10, 64)
+		parsed, err := strconv.ParseInt(sourceIDRaw, 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("invalid source_id")
+			return nil, "", fmt.Errorf("invalid source_id")
 		}
-		if isGuest {
-			rows, err := h.Service.GuestListBySourceEnriched(ctx, stateOwnerID, contentOwnerID, sourceID, lang, filter)
-			if err != nil {
-				return nil, err
-			}
-			return enrichedToArticleResponses(rows), nil
-		}
-		rows, err := h.Service.ListBySourceEnriched(ctx, stateOwnerID, sourceID, lang, filter)
-		if err != nil {
-			return nil, err
-		}
-		return enrichedToArticleResponses(rows), nil
+		sourceID = &parsed
 	}
 
-	switch tab {
-	case "", "today":
-		if isGuest {
-			rows, err := h.Service.GuestListTodayEnriched(ctx, stateOwnerID, contentOwnerID, lang, filter)
-			if err != nil {
-				return nil, err
-			}
-			return enrichedToArticleResponses(rows), nil
-		}
-		rows, err := h.Service.ListTodayEnriched(ctx, stateOwnerID, lang, filter)
-		if err != nil {
-			return nil, err
-		}
-		return enrichedToArticleResponses(rows), nil
-	case "starred":
-		if isGuest {
-			rows, err := h.Service.GuestListStarredEnriched(ctx, stateOwnerID, contentOwnerID, lang)
-			if err != nil {
-				return nil, err
-			}
-			return enrichedToArticleResponses(rows), nil
-		}
-		rows, err := h.Service.ListStarredEnriched(ctx, stateOwnerID, lang)
-		if err != nil {
-			return nil, err
-		}
-		return enrichedToArticleResponses(rows), nil
-	case "stream", "all":
-		cursor, err := parseTimePtr(cursorRaw)
-		if err != nil {
-			return nil, fmt.Errorf("invalid cursor")
-		}
-		if isGuest {
-			rows, err := h.Service.GuestListStreamEnriched(ctx, stateOwnerID, contentOwnerID, cursor, clampListLimit(limit), lang, filter)
-			if err != nil {
-				return nil, err
-			}
-			return enrichedToArticleResponses(rows), nil
-		}
-		rows, err := h.Service.ListStreamEnriched(ctx, stateOwnerID, cursor, clampListLimit(limit), lang, filter)
-		if err != nil {
-			return nil, err
-		}
-		return enrichedToArticleResponses(rows), nil
-	default:
-		return nil, fmt.Errorf("invalid tab")
+	cursor, err := decodeArticleCursor(cursorRaw, tab)
+	if err != nil {
+		return nil, "", err
 	}
+	if afterArticleIDRaw != "" {
+		afterArticleID, err := strconv.ParseInt(afterArticleIDRaw, 10, 64)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid after_article_id")
+		}
+		var anchor ArticleWithSource
+		if isGuest {
+			anchor, err = h.Service.GuestGetByID(ctx, contentOwnerID, afterArticleID)
+		} else {
+			anchor, err = h.Service.GetByID(ctx, stateOwnerID, afterArticleID)
+		}
+		if err != nil {
+			return nil, "", fmt.Errorf("queue anchor not found")
+		}
+		if sourceID != nil && anchor.SourceID != *sourceID {
+			return nil, "", fmt.Errorf("queue anchor source mismatch")
+		}
+		if !anchor.PublishedAt.Valid {
+			return nil, "", fmt.Errorf("queue anchor has no published time")
+		}
+		cursor = &ArticleCursor{PublishedAt: anchor.PublishedAt.Time, ArticleID: anchor.ID}
+	}
+
+	var page EnrichedArticlePage
+	if isGuest {
+		page, err = h.Service.GuestListEnrichedPage(ctx, stateOwnerID, contentOwnerID, tab, sourceID, lang, filter, cursor, limit)
+	} else {
+		page, err = h.Service.ListEnrichedPage(ctx, stateOwnerID, tab, sourceID, lang, filter, cursor, limit)
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	return enrichedToArticleResponses(page.Items), page.NextCursor, nil
 }
 
 func (h *ArticleHandler) countsForList(ctx context.Context, stateOwnerID, contentOwnerID int64, isGuest bool, tab, query, sourceIDRaw string) (*articleReadCounts, error) {

@@ -125,30 +125,38 @@ WITH ranked AS (
          row_number() OVER (PARTITION BY a.normalized_link ORDER BY a.published_at DESC, a.id DESC) AS rn
   FROM articles a
   JOIN sources s ON a.source_id = s.id
-  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $1
-  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $2
-  WHERE s.user_id = $3
-    AND a.source_id = $4
+  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $4
+  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $5
+  WHERE s.user_id = $6
+    AND a.source_id = $7
     AND s.deleted_at IS NULL
     AND (
-      $5::text = 'all'
-      OR ($5::text = 'unread' AND COALESCE(st.is_read, false) = false)
-      OR ($5::text = 'read' AND COALESCE(st.is_read, false) = true)
+      $8::text = 'all'
+      OR ($8::text = 'unread' AND COALESCE(st.is_read, false) = false)
+      OR ($8::text = 'read' AND COALESCE(st.is_read, false) = true)
     )
 )
 SELECT id, source_id, title, link, language, author, published_at, content_text,
        title_translated, summary, source_title, is_read, is_starred
 FROM ranked
 WHERE rn = 1
+  AND (
+    $1::timestamptz IS NULL
+    OR (published_at, id) < ($1, $2::bigint)
+  )
 ORDER BY published_at DESC, id DESC
+LIMIT $3
 `
 
 type GuestListArticlesBySourceEnrichedParams struct {
-	TargetLanguage string `json:"target_language"`
-	StateOwnerID   int64  `json:"state_owner_id"`
-	ContentOwnerID int64  `json:"content_owner_id"`
-	SourceID       int64  `json:"source_id"`
-	ReadFilter     string `json:"read_filter"`
+	CursorPublishedAt pgtype.Timestamptz `json:"cursor_published_at"`
+	CursorArticleID   int64              `json:"cursor_article_id"`
+	Lim               int32              `json:"lim"`
+	TargetLanguage    string             `json:"target_language"`
+	StateOwnerID      int64              `json:"state_owner_id"`
+	ContentOwnerID    int64              `json:"content_owner_id"`
+	SourceID          int64              `json:"source_id"`
+	ReadFilter        string             `json:"read_filter"`
 }
 
 type GuestListArticlesBySourceEnrichedRow struct {
@@ -169,6 +177,9 @@ type GuestListArticlesBySourceEnrichedRow struct {
 
 func (q *Queries) GuestListArticlesBySourceEnriched(ctx context.Context, arg GuestListArticlesBySourceEnrichedParams) ([]GuestListArticlesBySourceEnrichedRow, error) {
 	rows, err := q.db.Query(ctx, guestListArticlesBySourceEnriched,
+		arg.CursorPublishedAt,
+		arg.CursorArticleID,
+		arg.Lim,
 		arg.TargetLanguage,
 		arg.StateOwnerID,
 		arg.ContentOwnerID,
@@ -218,9 +229,9 @@ WITH ranked AS (
          row_number() OVER (PARTITION BY a.normalized_link ORDER BY a.published_at DESC, a.id DESC) AS rn
   FROM articles a
   JOIN sources s ON a.source_id = s.id
-  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $1
-  JOIN article_states st ON st.article_id = a.id AND st.user_id = $2
-  WHERE s.user_id = $3
+  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $4
+  JOIN article_states st ON st.article_id = a.id AND st.user_id = $5
+  WHERE s.user_id = $6
     AND s.deleted_at IS NULL
     AND st.is_starred = true
 )
@@ -228,14 +239,21 @@ SELECT id, source_id, title, link, language, author, published_at, content_text,
        title_translated, summary, source_title, is_read, is_starred
 FROM ranked
 WHERE rn = 1
+  AND (
+    $1::timestamptz IS NULL
+    OR (published_at, id) < ($1, $2::bigint)
+  )
 ORDER BY published_at DESC, id DESC
-LIMIT 100
+LIMIT $3
 `
 
 type GuestListArticlesStarredEnrichedParams struct {
-	TargetLanguage string `json:"target_language"`
-	StateOwnerID   int64  `json:"state_owner_id"`
-	ContentOwnerID int64  `json:"content_owner_id"`
+	CursorPublishedAt pgtype.Timestamptz `json:"cursor_published_at"`
+	CursorArticleID   int64              `json:"cursor_article_id"`
+	Lim               int32              `json:"lim"`
+	TargetLanguage    string             `json:"target_language"`
+	StateOwnerID      int64              `json:"state_owner_id"`
+	ContentOwnerID    int64              `json:"content_owner_id"`
 }
 
 type GuestListArticlesStarredEnrichedRow struct {
@@ -255,7 +273,14 @@ type GuestListArticlesStarredEnrichedRow struct {
 }
 
 func (q *Queries) GuestListArticlesStarredEnriched(ctx context.Context, arg GuestListArticlesStarredEnrichedParams) ([]GuestListArticlesStarredEnrichedRow, error) {
-	rows, err := q.db.Query(ctx, guestListArticlesStarredEnriched, arg.TargetLanguage, arg.StateOwnerID, arg.ContentOwnerID)
+	rows, err := q.db.Query(ctx, guestListArticlesStarredEnriched,
+		arg.CursorPublishedAt,
+		arg.CursorArticleID,
+		arg.Lim,
+		arg.TargetLanguage,
+		arg.StateOwnerID,
+		arg.ContentOwnerID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -299,32 +324,36 @@ WITH ranked AS (
          row_number() OVER (PARTITION BY a.normalized_link ORDER BY a.published_at DESC, a.id DESC) AS rn
   FROM articles a
   JOIN sources s ON a.source_id = s.id
-  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
-  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $3
-  WHERE s.user_id = $4
+  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $4
+  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $5
+  WHERE s.user_id = $6
     AND s.deleted_at IS NULL
-    AND ($5::timestamptz IS NULL OR a.published_at < $5)
     AND (
-      $6::text = 'all'
-      OR ($6::text = 'unread' AND COALESCE(st.is_read, false) = false)
-      OR ($6::text = 'read' AND COALESCE(st.is_read, false) = true)
+      $7::text = 'all'
+      OR ($7::text = 'unread' AND COALESCE(st.is_read, false) = false)
+      OR ($7::text = 'read' AND COALESCE(st.is_read, false) = true)
     )
 )
 SELECT id, source_id, title, link, language, author, published_at, content_text,
        title_translated, summary, source_title, is_read, is_starred
 FROM ranked
 WHERE rn = 1
+  AND (
+    $1::timestamptz IS NULL
+    OR (published_at, id) < ($1, $2::bigint)
+  )
 ORDER BY published_at DESC, id DESC
-LIMIT $1
+LIMIT $3
 `
 
 type GuestListArticlesStreamEnrichedParams struct {
-	Lim            int32              `json:"lim"`
-	TargetLanguage string             `json:"target_language"`
-	StateOwnerID   int64              `json:"state_owner_id"`
-	ContentOwnerID int64              `json:"content_owner_id"`
-	Cursor         pgtype.Timestamptz `json:"cursor"`
-	ReadFilter     string             `json:"read_filter"`
+	CursorPublishedAt pgtype.Timestamptz `json:"cursor_published_at"`
+	CursorArticleID   int64              `json:"cursor_article_id"`
+	Lim               int32              `json:"lim"`
+	TargetLanguage    string             `json:"target_language"`
+	StateOwnerID      int64              `json:"state_owner_id"`
+	ContentOwnerID    int64              `json:"content_owner_id"`
+	ReadFilter        string             `json:"read_filter"`
 }
 
 type GuestListArticlesStreamEnrichedRow struct {
@@ -345,11 +374,12 @@ type GuestListArticlesStreamEnrichedRow struct {
 
 func (q *Queries) GuestListArticlesStreamEnriched(ctx context.Context, arg GuestListArticlesStreamEnrichedParams) ([]GuestListArticlesStreamEnrichedRow, error) {
 	rows, err := q.db.Query(ctx, guestListArticlesStreamEnriched,
+		arg.CursorPublishedAt,
+		arg.CursorArticleID,
 		arg.Lim,
 		arg.TargetLanguage,
 		arg.StateOwnerID,
 		arg.ContentOwnerID,
-		arg.Cursor,
 		arg.ReadFilter,
 	)
 	if err != nil {
@@ -395,30 +425,37 @@ WITH ranked AS (
          row_number() OVER (PARTITION BY a.normalized_link ORDER BY a.published_at DESC, a.id DESC) AS rn
   FROM articles a
   JOIN sources s ON a.source_id = s.id
-  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $1
-  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $2
-  WHERE s.user_id = $3
+  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $4
+  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $5
+  WHERE s.user_id = $6
     AND s.deleted_at IS NULL
     AND a.published_at >= now() - interval '24 hours'
     AND (
-      $4::text = 'all'
-      OR ($4::text = 'unread' AND COALESCE(st.is_read, false) = false)
-      OR ($4::text = 'read' AND COALESCE(st.is_read, false) = true)
+      $7::text = 'all'
+      OR ($7::text = 'unread' AND COALESCE(st.is_read, false) = false)
+      OR ($7::text = 'read' AND COALESCE(st.is_read, false) = true)
     )
 )
 SELECT id, source_id, title, link, language, author, published_at, content_text,
        title_translated, summary, source_title, is_read, is_starred
 FROM ranked
 WHERE rn = 1
+  AND (
+    $1::timestamptz IS NULL
+    OR (published_at, id) < ($1, $2::bigint)
+  )
 ORDER BY published_at DESC, id DESC
-LIMIT 100
+LIMIT $3
 `
 
 type GuestListArticlesTodayEnrichedParams struct {
-	TargetLanguage string `json:"target_language"`
-	StateOwnerID   int64  `json:"state_owner_id"`
-	ContentOwnerID int64  `json:"content_owner_id"`
-	ReadFilter     string `json:"read_filter"`
+	CursorPublishedAt pgtype.Timestamptz `json:"cursor_published_at"`
+	CursorArticleID   int64              `json:"cursor_article_id"`
+	Lim               int32              `json:"lim"`
+	TargetLanguage    string             `json:"target_language"`
+	StateOwnerID      int64              `json:"state_owner_id"`
+	ContentOwnerID    int64              `json:"content_owner_id"`
+	ReadFilter        string             `json:"read_filter"`
 }
 
 type GuestListArticlesTodayEnrichedRow struct {
@@ -439,6 +476,9 @@ type GuestListArticlesTodayEnrichedRow struct {
 
 func (q *Queries) GuestListArticlesTodayEnriched(ctx context.Context, arg GuestListArticlesTodayEnrichedParams) ([]GuestListArticlesTodayEnrichedRow, error) {
 	rows, err := q.db.Query(ctx, guestListArticlesTodayEnriched,
+		arg.CursorPublishedAt,
+		arg.CursorArticleID,
+		arg.Lim,
 		arg.TargetLanguage,
 		arg.StateOwnerID,
 		arg.ContentOwnerID,

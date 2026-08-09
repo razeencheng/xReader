@@ -16,18 +16,22 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/razeencheng/xreader/db/gen"
 	"github.com/razeencheng/xreader/internal/middleware"
+	statepkg "github.com/razeencheng/xreader/internal/state"
 )
 
 // Handler implements the Fever API compatibility endpoint.
 type Handler struct {
-	pool *pgxpool.Pool
+	pool           *pgxpool.Pool
+	stateMutations *statepkg.Service
 }
 
 // NewHandler creates a new Fever API handler.
 func NewHandler(pool *pgxpool.Pool) *Handler {
-	return &Handler{pool: pool}
+	return &Handler{pool: pool, stateMutations: statepkg.NewService(pool)}
 }
 
 // HashFeverKey computes SHA-256 of the given api_key string and returns a hex-encoded result.
@@ -396,44 +400,20 @@ func (h *Handler) handleMark(c *gin.Context, user *feverUser, mark, as string) {
 		if err != nil {
 			return
 		}
-		switch as {
-		case "read":
-			_, _ = h.pool.Exec(ctx,
-				`INSERT INTO article_states (user_id, article_id, is_read, last_read_at)
-				 SELECT $1, a.id, true, now()
-				 FROM articles a JOIN sources s ON a.source_id = s.id
-				 WHERE a.id = $2 AND s.user_id = $1 AND s.deleted_at IS NULL
-				 ON CONFLICT (user_id, article_id) DO UPDATE SET is_read = true, last_read_at = now()`,
-				user.ID, articleID,
-			)
-		case "unread":
-			_, _ = h.pool.Exec(ctx,
-				`INSERT INTO article_states (user_id, article_id, is_read)
-				 SELECT $1, a.id, false
-				 FROM articles a JOIN sources s ON a.source_id = s.id
-				 WHERE a.id = $2 AND s.user_id = $1 AND s.deleted_at IS NULL
-				 ON CONFLICT (user_id, article_id) DO UPDATE SET is_read = false`,
-				user.ID, articleID,
-			)
-		case "saved":
-			_, _ = h.pool.Exec(ctx,
-				`INSERT INTO article_states (user_id, article_id, is_starred)
-				 SELECT $1, a.id, true
-				 FROM articles a JOIN sources s ON a.source_id = s.id
-				 WHERE a.id = $2 AND s.user_id = $1 AND s.deleted_at IS NULL
-				 ON CONFLICT (user_id, article_id) DO UPDATE SET is_starred = true`,
-				user.ID, articleID,
-			)
-		case "unsaved":
-			_, _ = h.pool.Exec(ctx,
-				`INSERT INTO article_states (user_id, article_id, is_starred)
-				 SELECT $1, a.id, false
-				 FROM articles a JOIN sources s ON a.source_id = s.id
-				 WHERE a.id = $2 AND s.user_id = $1 AND s.deleted_at IS NULL
-				 ON CONFLICT (user_id, article_id) DO UPDATE SET is_starred = false`,
-				user.ID, articleID,
-			)
-		}
+		_, _ = h.stateMutations.Apply(ctx, user.ID, func(q *gen.Queries) ([]int64, error) {
+			switch as {
+			case "read", "unread":
+				isRead := as == "read"
+				id, err := q.SetArticleRead(ctx, gen.SetArticleReadParams{UserID: user.ID, ID: articleID, IsRead: isRead})
+				return []int64{id}, err
+			case "saved", "unsaved":
+				isStarred := as == "saved"
+				id, err := q.SetArticleStarred(ctx, gen.SetArticleStarredParams{UserID: user.ID, ID: articleID, IsStarred: isStarred})
+				return []int64{id}, err
+			default:
+				return nil, nil
+			}
+		})
 
 	case "feed":
 		feedID, err := strconv.ParseInt(id, 10, 64)
@@ -443,16 +423,11 @@ func (h *Handler) handleMark(c *gin.Context, user *feverUser, mark, as string) {
 		beforeTS, _ := strconv.ParseInt(c.PostForm("before"), 10, 64)
 		if beforeTS > 0 {
 			before := time.Unix(beforeTS, 0)
-			_, _ = h.pool.Exec(ctx,
-				`INSERT INTO article_states (user_id, article_id, is_read, last_read_at)
-				 SELECT $1, a.id, true, now()
-				 FROM articles a
-				 JOIN sources s ON a.source_id = s.id
-				 WHERE s.id = $2 AND s.user_id = $1 AND s.deleted_at IS NULL
-				   AND a.published_at < $3
-				 ON CONFLICT (user_id, article_id) DO UPDATE SET is_read = true, last_read_at = now()`,
-				user.ID, feedID, before,
-			)
+			_, _ = h.stateMutations.Apply(ctx, user.ID, func(q *gen.Queries) ([]int64, error) {
+				return q.FeverBulkMarkFeedRead(ctx, gen.FeverBulkMarkFeedReadParams{
+					UserID: user.ID, ID: feedID, PublishedAt: pgtype.Timestamptz{Time: before, Valid: true},
+				})
+			})
 		}
 
 	case "group":
@@ -462,16 +437,11 @@ func (h *Handler) handleMark(c *gin.Context, user *feverUser, mark, as string) {
 		beforeTS, _ := strconv.ParseInt(c.PostForm("before"), 10, 64)
 		if beforeTS > 0 {
 			before := time.Unix(beforeTS, 0)
-			_, _ = h.pool.Exec(ctx,
-				`INSERT INTO article_states (user_id, article_id, is_read, last_read_at)
-				 SELECT $1, a.id, true, now()
-				 FROM articles a
-				 JOIN sources s ON a.source_id = s.id
-				 WHERE s.user_id = $1 AND s.deleted_at IS NULL
-				   AND a.published_at < $2
-				 ON CONFLICT (user_id, article_id) DO UPDATE SET is_read = true, last_read_at = now()`,
-				user.ID, before,
-			)
+			_, _ = h.stateMutations.Apply(ctx, user.ID, func(q *gen.Queries) ([]int64, error) {
+				return q.FeverBulkMarkAllRead(ctx, gen.FeverBulkMarkAllReadParams{
+					UserID: user.ID, PublishedAt: pgtype.Timestamptz{Time: before, Valid: true},
+				})
+			})
 		}
 	}
 }

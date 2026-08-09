@@ -23,9 +23,6 @@ WITH upserted AS (
     is_read = $2,
     last_read_at = CASE WHEN $2 THEN now() ELSE NULL END
   RETURNING article_id
-), changes AS (
-  INSERT INTO article_state_changes (user_id, article_id)
-  SELECT $1, article_id FROM upserted
 )
 SELECT article_id FROM upserted
 `
@@ -76,9 +73,6 @@ WITH upserted AS (
     is_read = $2,
     last_read_at = CASE WHEN $2 THEN now() ELSE NULL END
   RETURNING article_id
-), changes AS (
-  INSERT INTO article_state_changes (user_id, article_id)
-  SELECT $1, article_id FROM upserted
 )
 SELECT article_id FROM upserted
 `
@@ -123,9 +117,6 @@ WITH upserted AS (
     is_read = $2,
     last_read_at = CASE WHEN $2 THEN now() ELSE NULL END
   RETURNING article_id
-), changes AS (
-  INSERT INTO article_state_changes (user_id, article_id)
-  SELECT $1, article_id FROM upserted
 )
 SELECT article_id FROM upserted
 `

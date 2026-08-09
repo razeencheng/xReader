@@ -97,9 +97,9 @@ WITH ranked AS (
          row_number() OVER (PARTITION BY a.normalized_link ORDER BY a.published_at DESC, a.id DESC) AS rn
   FROM articles a
   JOIN sources s ON a.source_id = s.id
-  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
-  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
-  WHERE s.user_id = $1
+  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = @target_language
+  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = @user_id
+  WHERE s.user_id = @user_id
     AND s.deleted_at IS NULL
     AND a.published_at >= now() - interval '24 hours'
     AND (
@@ -112,8 +112,12 @@ SELECT id, source_id, title, link, language, author, published_at, content_text,
        title_translated, summary, source_title, is_read, is_starred
 FROM ranked
 WHERE rn = 1
+  AND (
+    @cursor_published_at::timestamptz IS NULL
+    OR (published_at, id) < (@cursor_published_at, @cursor_article_id::bigint)
+  )
 ORDER BY published_at DESC, id DESC
-LIMIT 100;
+LIMIT @lim;
 
 -- name: ListArticlesStreamEnriched :many
 WITH ranked AS (
@@ -126,11 +130,10 @@ WITH ranked AS (
          row_number() OVER (PARTITION BY a.normalized_link ORDER BY a.published_at DESC, a.id DESC) AS rn
   FROM articles a
   JOIN sources s ON a.source_id = s.id
-  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $3
-  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = $1
-  WHERE s.user_id = $1
+  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = @target_language
+  LEFT JOIN article_states st ON st.article_id = a.id AND st.user_id = @user_id
+  WHERE s.user_id = @user_id
     AND s.deleted_at IS NULL
-    AND ($2::timestamptz IS NULL OR a.published_at < $2)
     AND (
       @read_filter::text = 'all'
       OR (@read_filter::text = 'unread' AND COALESCE(st.is_read, false) = false)
@@ -141,8 +144,12 @@ SELECT id, source_id, title, link, language, author, published_at, content_text,
        title_translated, summary, source_title, is_read, is_starred
 FROM ranked
 WHERE rn = 1
+  AND (
+    @cursor_published_at::timestamptz IS NULL
+    OR (published_at, id) < (@cursor_published_at, @cursor_article_id::bigint)
+  )
 ORDER BY published_at DESC, id DESC
-LIMIT $4;
+LIMIT @lim;
 
 -- name: ListArticlesStarredEnriched :many
 WITH ranked AS (
@@ -154,10 +161,10 @@ WITH ranked AS (
          st.is_starred,
          row_number() OVER (PARTITION BY a.normalized_link ORDER BY a.published_at DESC, a.id DESC) AS rn
   FROM articles a
-  JOIN article_states st ON a.id = st.article_id AND st.user_id = $1
-  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = $2
+  JOIN article_states st ON a.id = st.article_id AND st.user_id = @user_id
+  LEFT JOIN article_ai ai ON ai.article_id = a.id AND ai.target_language = @target_language
   JOIN sources s ON a.source_id = s.id
-  WHERE s.user_id = $1
+  WHERE s.user_id = @user_id
     AND s.deleted_at IS NULL
     AND st.is_starred = true
 )
@@ -165,8 +172,12 @@ SELECT id, source_id, title, link, language, author, published_at, content_text,
        title_translated, summary, source_title, is_read, is_starred
 FROM ranked
 WHERE rn = 1
+  AND (
+    @cursor_published_at::timestamptz IS NULL
+    OR (published_at, id) < (@cursor_published_at, @cursor_article_id::bigint)
+  )
 ORDER BY published_at DESC, id DESC
-LIMIT 100;
+LIMIT @lim;
 
 -- name: ListArticlesBySourceEnriched :many
 SELECT a.id, a.source_id, a.title, a.link, a.language, a.author, a.published_at, a.content_text,
@@ -185,7 +196,12 @@ WHERE a.source_id = @source_id
     OR (@read_filter::text = 'unread' AND COALESCE(st.is_read, false) = false)
     OR (@read_filter::text = 'read' AND COALESCE(st.is_read, false) = true)
   )
-ORDER BY a.published_at DESC;
+  AND (
+    @cursor_published_at::timestamptz IS NULL
+    OR (a.published_at, a.id) < (@cursor_published_at, @cursor_article_id::bigint)
+  )
+ORDER BY a.published_at DESC, a.id DESC
+LIMIT @lim;
 
 -- name: CountArticlesTodayByReadState :one
 WITH grouped AS (

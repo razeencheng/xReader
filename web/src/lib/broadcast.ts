@@ -8,6 +8,7 @@ export interface StateChangeMessage {
   articleId: number;
   is_read?: boolean;
   is_starred?: boolean;
+  state_version?: { changed_at_micros: string; article_id: number } | null;
   origin: string;
 }
 

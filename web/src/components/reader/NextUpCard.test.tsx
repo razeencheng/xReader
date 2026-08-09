@@ -1,15 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { beforeEach, expect, test, vi } from 'vitest';
 import { NextUpCard } from './NextUpCard';
 import type { ArticleItem } from '@/lib/types';
-
-const push = vi.fn();
-const useSearchParams = vi.fn();
-
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push }),
-  useSearchParams: () => useSearchParams(),
-}));
 
 const next: ArticleItem = {
   id: 3,
@@ -24,24 +17,49 @@ const next: ArticleItem = {
 };
 
 beforeEach(() => {
-  push.mockReset();
-  useSearchParams.mockReturnValue(new URLSearchParams('ctx=today'));
+  vi.unstubAllGlobals();
 });
 
 test('renders original subtitle when translated title exists', () => {
-  render(<NextUpCard next={next} currentId={2} markRead={vi.fn()} />);
+  render(<NextUpCard next={next} onAdvance={vi.fn()} />);
 
   expect(screen.getByText('翻译后的标题')).toBeInTheDocument();
   expect(screen.getByText('Original headline')).toBeInTheDocument();
   expect(screen.getByText('Cloudflare')).toBeInTheDocument();
 });
 
-test('clicking card marks current article read before navigation', async () => {
-  const markRead = vi.fn();
-  render(<NextUpCard next={next} currentId={2} markRead={markRead} />);
+test('delegates clicks without owning navigation or read-state mutation', async () => {
+  const onAdvance = vi.fn();
+  render(<NextUpCard next={next} onAdvance={onAdvance} />);
 
   await userEvent.click(screen.getByRole('button', { name: /翻译后的标题/i }));
+  expect(onAdvance).toHaveBeenCalledTimes(1);
+});
 
-  expect(markRead).toHaveBeenCalledWith(2);
-  expect(push).toHaveBeenCalledWith('/?ctx=today&article=3');
+test('reports whether the end card is visible', () => {
+  let observerCallback: IntersectionObserverCallback | undefined;
+  const disconnect = vi.fn();
+  class MockIntersectionObserver {
+    root = null;
+    rootMargin = '';
+    thresholds: number[] = [];
+    observe = vi.fn();
+    unobserve = vi.fn();
+    takeRecords = vi.fn(() => []);
+    disconnect = disconnect;
+
+    constructor(callback: IntersectionObserverCallback) {
+      observerCallback = callback;
+    }
+  }
+  vi.stubGlobal('IntersectionObserver', MockIntersectionObserver);
+  const onVisibilityChange = vi.fn();
+
+  const { unmount } = render(<NextUpCard next={next} onAdvance={vi.fn()} onVisibilityChange={onVisibilityChange} />);
+  observerCallback?.([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+  expect(onVisibilityChange).toHaveBeenCalledWith(true);
+
+  unmount();
+  expect(disconnect).toHaveBeenCalled();
+  expect(onVisibilityChange).toHaveBeenLastCalledWith(false);
 });

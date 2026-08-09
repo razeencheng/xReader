@@ -11,6 +11,31 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const acquireStateOwnerLock = `-- name: AcquireStateOwnerLock :exec
+SELECT pg_advisory_xact_lock(621383735000000000::bigint + $1::bigint)
+`
+
+func (q *Queries) AcquireStateOwnerLock(ctx context.Context, userID int64) error {
+	_, err := q.db.Exec(ctx, acquireStateOwnerLock, userID)
+	return err
+}
+
+const allocateStateChangeTime = `-- name: AllocateStateChangeTime :one
+SELECT GREATEST(
+  clock_timestamp(),
+  COALESCE(MAX(changed_at) + interval '1 microsecond', '-infinity'::timestamptz)
+)::timestamptz AS changed_at
+FROM article_state_changes
+WHERE user_id = $1
+`
+
+func (q *Queries) AllocateStateChangeTime(ctx context.Context, userID int64) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, allocateStateChangeTime, userID)
+	var changed_at pgtype.Timestamptz
+	err := row.Scan(&changed_at)
+	return changed_at, err
+}
+
 const batchSetReadBySource = `-- name: BatchSetReadBySource :many
 WITH upserted AS (
   INSERT INTO article_states (user_id, article_id, is_read, last_read_at)
@@ -25,9 +50,6 @@ WITH upserted AS (
     is_read = $3,
     last_read_at = CASE WHEN $3 THEN now() ELSE NULL END
   RETURNING article_id
-), changes AS (
-  INSERT INTO article_state_changes (user_id, article_id)
-  SELECT $1, article_id FROM upserted
 )
 SELECT article_id FROM upserted
 `
@@ -72,9 +94,6 @@ WITH upserted AS (
     is_read = $2,
     last_read_at = CASE WHEN $2 THEN now() ELSE NULL END
   RETURNING article_id
-), changes AS (
-  INSERT INTO article_state_changes (user_id, article_id)
-  SELECT $1, article_id FROM upserted
 )
 SELECT article_id FROM upserted
 `
@@ -118,9 +137,6 @@ WITH upserted AS (
     is_read = $2,
     last_read_at = CASE WHEN $2 THEN now() ELSE NULL END
   RETURNING article_id
-), changes AS (
-  INSERT INTO article_state_changes (user_id, article_id)
-  SELECT $1, article_id FROM upserted
 )
 SELECT article_id FROM upserted
 `
@@ -172,6 +188,116 @@ func (q *Queries) GetArticleState(ctx context.Context, arg GetArticleStateParams
 		&i.LastReadAt,
 	)
 	return i, err
+}
+
+const getArticleStateSnapshot = `-- name: GetArticleStateSnapshot :one
+SELECT $1::bigint AS article_id,
+       COALESCE(st.is_read, false)::boolean AS is_read,
+       COALESCE(st.is_starred, false)::boolean AS is_starred,
+       latest.changed_at
+FROM (SELECT 1) seed
+LEFT JOIN article_states st
+  ON st.user_id = $2 AND st.article_id = $1
+LEFT JOIN LATERAL (
+  SELECT changed_at
+  FROM article_state_changes
+  WHERE user_id = $2 AND article_id = $1
+  ORDER BY changed_at DESC
+  LIMIT 1
+) latest ON true
+`
+
+type GetArticleStateSnapshotParams struct {
+	ArticleID int64 `json:"article_id"`
+	UserID    int64 `json:"user_id"`
+}
+
+type GetArticleStateSnapshotRow struct {
+	ArticleID int64              `json:"article_id"`
+	IsRead    bool               `json:"is_read"`
+	IsStarred bool               `json:"is_starred"`
+	ChangedAt pgtype.Timestamptz `json:"changed_at"`
+}
+
+func (q *Queries) GetArticleStateSnapshot(ctx context.Context, arg GetArticleStateSnapshotParams) (GetArticleStateSnapshotRow, error) {
+	row := q.db.QueryRow(ctx, getArticleStateSnapshot, arg.ArticleID, arg.UserID)
+	var i GetArticleStateSnapshotRow
+	err := row.Scan(
+		&i.ArticleID,
+		&i.IsRead,
+		&i.IsStarred,
+		&i.ChangedAt,
+	)
+	return i, err
+}
+
+const getStateChangeHighWater = `-- name: GetStateChangeHighWater :one
+SELECT article_id, changed_at
+FROM article_state_changes
+WHERE user_id = $1
+ORDER BY changed_at DESC, article_id DESC
+LIMIT 1
+`
+
+type GetStateChangeHighWaterRow struct {
+	ArticleID int64              `json:"article_id"`
+	ChangedAt pgtype.Timestamptz `json:"changed_at"`
+}
+
+func (q *Queries) GetStateChangeHighWater(ctx context.Context, userID int64) (GetStateChangeHighWaterRow, error) {
+	row := q.db.QueryRow(ctx, getStateChangeHighWater, userID)
+	var i GetStateChangeHighWaterRow
+	err := row.Scan(&i.ArticleID, &i.ChangedAt)
+	return i, err
+}
+
+const listStateChangeKeys = `-- name: ListStateChangeKeys :many
+SELECT article_id, changed_at
+FROM article_state_changes
+WHERE user_id = $1
+  AND (
+    changed_at > $2
+    OR (changed_at = $2 AND article_id > $3)
+  )
+ORDER BY changed_at ASC, article_id ASC
+LIMIT $4
+`
+
+type ListStateChangeKeysParams struct {
+	UserID          int64              `json:"user_id"`
+	CursorChangedAt pgtype.Timestamptz `json:"cursor_changed_at"`
+	CursorArticleID int64              `json:"cursor_article_id"`
+	Lim             int32              `json:"lim"`
+}
+
+type ListStateChangeKeysRow struct {
+	ArticleID int64              `json:"article_id"`
+	ChangedAt pgtype.Timestamptz `json:"changed_at"`
+}
+
+func (q *Queries) ListStateChangeKeys(ctx context.Context, arg ListStateChangeKeysParams) ([]ListStateChangeKeysRow, error) {
+	rows, err := q.db.Query(ctx, listStateChangeKeys,
+		arg.UserID,
+		arg.CursorChangedAt,
+		arg.CursorArticleID,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListStateChangeKeysRow{}
+	for rows.Next() {
+		var i ListStateChangeKeysRow
+		if err := rows.Scan(&i.ArticleID, &i.ChangedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listStateChangesSince = `-- name: ListStateChangesSince :many
@@ -243,10 +369,6 @@ WITH ranked AS (
     is_read = true,
     last_read_at = now()
   RETURNING article_id
-), changes AS (
-  INSERT INTO article_state_changes (user_id, article_id)
-  SELECT s.user_id, article_id FROM upserted
-  JOIN sources s ON s.id = $1 AND s.deleted_at IS NULL
 )
 SELECT article_id FROM upserted
 `
@@ -283,6 +405,22 @@ type RecordStateChangeParams struct {
 
 func (q *Queries) RecordStateChange(ctx context.Context, arg RecordStateChangeParams) error {
 	_, err := q.db.Exec(ctx, recordStateChange, arg.UserID, arg.ArticleID)
+	return err
+}
+
+const recordStateChangeAt = `-- name: RecordStateChangeAt :exec
+INSERT INTO article_state_changes (user_id, article_id, changed_at)
+VALUES ($1, $2, $3)
+`
+
+type RecordStateChangeAtParams struct {
+	UserID    int64              `json:"user_id"`
+	ArticleID int64              `json:"article_id"`
+	ChangedAt pgtype.Timestamptz `json:"changed_at"`
+}
+
+func (q *Queries) RecordStateChangeAt(ctx context.Context, arg RecordStateChangeAtParams) error {
+	_, err := q.db.Exec(ctx, recordStateChangeAt, arg.UserID, arg.ArticleID, arg.ChangedAt)
 	return err
 }
 
