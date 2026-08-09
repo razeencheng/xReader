@@ -6,6 +6,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-08-09
+
+### Added
+- A low-distraction reader action for touch devices that marks the current
+  article read before advancing, supports undo, and completes the final item.
+- Versioned read-state coordination across navigation, automatic marking,
+  batch actions, cross-device polling, and rollback paths.
+- Cursor pagination for the Today and Starred queues.
+- Structured AI summaries with a concise lead and two to four key points.
+
+### Fixed
+- Legacy summaries now preserve explicit bullet boundaries instead of merging
+  adjacent points during sentence-based paragraph balancing.
+
 ## [0.1.7] - 2026-05-23
 
 ### Added
