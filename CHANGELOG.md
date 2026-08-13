@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-08-13
+
+### Changed
+- Refreshed Go and frontend dependencies, including pgx, testcontainers-go,
+  React, and MSW.
+- Updated the GitHub Actions used by CI and the release workflow.
+
+### Fixed
+- Increased key-point summary text size and line spacing for easier reading.
+
 ## [0.1.8] - 2026-08-09
 
 ### Added
