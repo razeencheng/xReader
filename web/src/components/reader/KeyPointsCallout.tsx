@@ -19,8 +19,8 @@ export function KeyPointsCallout({ text, locale }: Props) {
       </div>
       {summary.kind === 'structured' ? (
         <>
-          <p className="mb-3 text-[0.95em] font-medium leading-relaxed text-[var(--text-body)]">{summary.lead}</p>
-          <ul className="pl-5 text-[0.9em] leading-relaxed text-[var(--text-2)]">
+          <p className="mb-3 text-[1.02em] font-medium leading-[1.85] text-[var(--text-body)]">{summary.lead}</p>
+          <ul className="pl-5 text-[1em] leading-[1.85] text-[var(--text-2)]">
             {summary.points.map((point, index) => (
               <li key={index} className="mb-[5px]">
                 {point}
@@ -29,7 +29,7 @@ export function KeyPointsCallout({ text, locale }: Props) {
           </ul>
         </>
       ) : summary.kind === 'bulleted' ? (
-        <ul className="pl-5 text-[0.9em] leading-relaxed text-[var(--text-2)]">
+        <ul className="pl-5 text-[1em] leading-[1.85] text-[var(--text-2)]">
           {summary.points.map((point, index) => (
             <li key={index} className="mb-[5px]">
               {point}
@@ -37,7 +37,7 @@ export function KeyPointsCallout({ text, locale }: Props) {
           ))}
         </ul>
       ) : (
-        <div className="space-y-2 text-[0.9em] leading-relaxed text-[var(--text-2)]">
+        <div className="space-y-2 text-[1em] leading-[1.85] text-[var(--text-2)]">
           {summary.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
         </div>
       )}
