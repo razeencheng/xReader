@@ -415,7 +415,10 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
       clearPending();
       removeClient();
     });
-    client.onError(() => {
+    client.onError((_error, willReconnect) => {
+      if (willReconnect) {
+        return;
+      }
       requestIndices.forEach((index) => requestedIndicesRef.current.delete(index));
       clearPending();
       removeClient();

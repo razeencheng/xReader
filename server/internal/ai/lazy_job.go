@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"strconv"
@@ -11,6 +12,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/razeencheng/xreader/db/gen"
 )
+
+var ErrInvalidParagraphTranslation = errors.New("invalid paragraph translation response")
 
 type TranslatedParagraph struct {
 	Index       int    `json:"index"`
@@ -101,16 +104,44 @@ func (j *LazyJob) ensureAI(ctx context.Context) error {
 }
 
 func (j *LazyJob) translateBatch(ctx context.Context, batch []Paragraph) ([]TranslatedParagraph, error) {
+	return TranslateParagraphBatch(ctx, j.client, batch, j.targetLang)
+}
+
+// TranslateParagraphBatch translates a batch strictly. If the model returns an
+// ambiguous multi-paragraph format, retrying one paragraph at a time preserves
+// the one-to-one mapping without guessing whether bracketed numbers are labels
+// or references in the translated text.
+func TranslateParagraphBatch(ctx context.Context, client AIClient, batch []Paragraph, targetLang string) ([]TranslatedParagraph, error) {
+	translated, err := requestParagraphTranslations(ctx, client, batch, targetLang, true, len(batch) > 1)
+	if err == nil {
+		return translated, nil
+	}
+	if len(batch) <= 1 || !errors.Is(err, ErrInvalidParagraphTranslation) {
+		return nil, err
+	}
+
+	translated = make([]TranslatedParagraph, 0, len(batch))
+	for _, paragraph := range batch {
+		result, singleErr := requestParagraphTranslations(ctx, client, []Paragraph{paragraph}, targetLang, false, false)
+		if singleErr != nil {
+			return nil, singleErr
+		}
+		translated = append(translated, result[0])
+	}
+	return translated, nil
+}
+
+func requestParagraphTranslations(ctx context.Context, client AIClient, batch []Paragraph, targetLang string, allowOrdinalLabels, requireLabels bool) ([]TranslatedParagraph, error) {
 	var prompt strings.Builder
 	for _, paragraph := range batch {
 		fmt.Fprintf(&prompt, "[%d] %s\n", paragraph.Index, paragraph.Original)
 	}
 
-	resp, err := j.client.ChatCompletion(ctx, ChatRequest{
+	resp, err := client.ChatCompletion(ctx, ChatRequest{
 		Messages: []ChatMessage{
 			{
 				Role:    "system",
-				Content: fmt.Sprintf("Translate each numbered paragraph into %s. Preserve each [index] label exactly, do not reorder paragraphs, and do not merge separate paragraphs.", j.targetLang),
+				Content: fmt.Sprintf("Translate each numbered paragraph into %s. Put every translation on its own line, preserve each leading [index] label exactly, do not reorder paragraphs, and do not merge separate paragraphs.", targetLang),
 			},
 			{
 				Role:    "user",
@@ -122,17 +153,39 @@ func (j *LazyJob) translateBatch(ctx context.Context, batch []Paragraph) ([]Tran
 		return nil, err
 	}
 
-	return ParseParagraphTranslations(batch, resp.Content), nil
+	translated := parseParagraphTranslations(batch, resp.Content, allowOrdinalLabels, requireLabels)
+	if len(translated) != len(batch) {
+		return nil, ErrInvalidParagraphTranslation
+	}
+	return translated, nil
 }
 
-
 func ParseParagraphTranslations(batch []Paragraph, response string) []TranslatedParagraph {
-	lines := splitNonEmptyTranslationLines(response)
-	segments, labelOrder := collectNumberedTranslationSegments(lines, batch)
+	return parseParagraphTranslations(batch, response, true, false)
+}
 
-	useNumberedOrder := len(labelOrder) > 0
-	if useNumberedOrder && labelsMatchBatchIndexes(labelOrder, batch) {
-		useNumberedOrder = false
+func parseParagraphTranslations(batch []Paragraph, response string, allowOrdinalLabels, requireLabels bool) []TranslatedParagraph {
+	lines := splitNonEmptyTranslationLines(response)
+	segments, labelOrder, labelsValid := collectNumberedTranslationSegments(lines, batch)
+	if !labelsValid {
+		return nil
+	}
+
+	useNumberedOrder := false
+	if len(labelOrder) > 0 {
+		switch {
+		case labelsMatchBatchIndexes(labelOrder, batch):
+		case allowOrdinalLabels && (labelsMatchOrdinalIndexes(labelOrder, len(batch), 0) || labelsMatchOrdinalIndexes(labelOrder, len(batch), 1)):
+			useNumberedOrder = true
+		default:
+			return nil
+		}
+	} else if requireLabels {
+		return nil
+	} else if len(batch) == 1 {
+		lines = []string{strings.Join(lines, "\n")}
+	} else if len(lines) != len(batch) {
+		return nil
 	}
 
 	results := make([]TranslatedParagraph, 0, len(batch))
@@ -146,11 +199,15 @@ func ParseParagraphTranslations(batch []Paragraph, response string) []Translated
 		case i < len(lines):
 			translation = stripTranslationLabel(lines[i])
 		}
+		translation = strings.TrimSpace(translation)
+		if translation == "" {
+			return nil
+		}
 
 		results = append(results, TranslatedParagraph{
 			Index:       paragraph.Index,
 			Original:    paragraph.Original,
-			Translation: strings.TrimSpace(translation),
+			Translation: translation,
 		})
 	}
 
@@ -169,9 +226,10 @@ func splitNonEmptyTranslationLines(response string) []string {
 	return lines
 }
 
-func collectNumberedTranslationSegments(lines []string, batch []Paragraph) (map[int][]string, []int) {
+func collectNumberedTranslationSegments(lines []string, batch []Paragraph) (map[int][]string, []int, bool) {
 	segments := make(map[int][]string)
 	labelOrder := make([]int, 0)
+	seenLabels := make(map[int]struct{})
 	currentIndex := -1
 	batchIndexes := make(map[int]struct{}, len(batch))
 	for _, paragraph := range batch {
@@ -180,10 +238,12 @@ func collectNumberedTranslationSegments(lines []string, batch []Paragraph) (map[
 
 	for _, line := range lines {
 		if index, text, ok := parseTranslationLabel(line, batchIndexes, len(batch)); ok {
-			currentIndex = index
-			if _, exists := segments[index]; !exists {
-				labelOrder = append(labelOrder, index)
+			if _, duplicate := seenLabels[index]; duplicate {
+				return nil, nil, false
 			}
+			seenLabels[index] = struct{}{}
+			currentIndex = index
+			labelOrder = append(labelOrder, index)
 			if strings.TrimSpace(text) != "" {
 				segments[index] = append(segments[index], strings.TrimSpace(text))
 			} else if _, exists := segments[index]; !exists {
@@ -197,15 +257,27 @@ func collectNumberedTranslationSegments(lines []string, batch []Paragraph) (map[
 		}
 	}
 
-	return segments, labelOrder
+	return segments, labelOrder, true
 }
 
 func labelsMatchBatchIndexes(labels []int, batch []Paragraph) bool {
-	if len(labels) < len(batch) {
+	if len(labels) != len(batch) {
 		return false
 	}
 	for i, paragraph := range batch {
 		if labels[i] != paragraph.Index {
+			return false
+		}
+	}
+	return true
+}
+
+func labelsMatchOrdinalIndexes(labels []int, batchLen, start int) bool {
+	if len(labels) != batchLen {
+		return false
+	}
+	for i, label := range labels {
+		if label != i+start {
 			return false
 		}
 	}

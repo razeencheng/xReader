@@ -3,7 +3,9 @@ package source
 import (
 	"context"
 	"fmt"
+	"html"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/mmcdole/gofeed"
@@ -11,6 +13,9 @@ import (
 )
 
 const feedMaxResponseBytes = 10 * 1024 * 1024 // 10 MB
+const articleImageRecoveryMaxBytes = 2 * 1024 * 1024
+const articleImageRecoveryBudget = 20 * time.Second
+const unsupportedImageBlockMarker = "unsupported block: image"
 
 type RSSAdapter struct {
 	parser     *gofeed.Parser
@@ -56,13 +61,19 @@ func (a *RSSAdapter) Fetch(ctx context.Context, src Source) ([]RawItem, error) {
 		return nil, fmt.Errorf("parse feed: %w", err)
 	}
 
+	recoveryCtx, cancelRecovery := context.WithTimeout(ctx, articleImageRecoveryBudget)
+	defer cancelRecovery()
 	items := make([]RawItem, 0, len(feed.Items))
 	for _, item := range feed.Items {
+		rawContent := bestContent(item)
+		contentHTML := SanitizeHTML(rawContent)
+		contentHTML = a.recoverDroppedImages(recoveryCtx, item.Link, rawContent, contentHTML)
+		contentHTML = preserveItemArtwork(contentHTML, item, feed.Image)
 		ri := RawItem{
 			ExternalID:  item.GUID,
 			Link:        item.Link,
 			Title:       item.Title,
-			ContentHTML: SanitizeHTML(bestContent(item)),
+			ContentHTML: contentHTML,
 		}
 		if item.PublishedParsed != nil {
 			ri.PublishedAt = *item.PublishedParsed
@@ -75,6 +86,70 @@ func (a *RSSAdapter) Fetch(ctx context.Context, src Source) ([]RawItem, error) {
 		items = append(items, ri)
 	}
 	return items, nil
+}
+
+func (a *RSSAdapter) recoverDroppedImages(ctx context.Context, articleURL, rawContent, fallbackHTML string) string {
+	if !strings.Contains(strings.ToLower(rawContent), unsupportedImageBlockMarker) {
+		return fallbackHTML
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, articleURL, nil)
+	if err != nil {
+		return fallbackHTML
+	}
+	req.Header.Set("Accept", "text/html,application/xhtml+xml")
+	req.Header.Set("User-Agent", "xReader article image recovery")
+
+	resp, err := a.safeClient.Do(req)
+	if err != nil {
+		return fallbackHTML
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 || !isHTMLResponse(resp.Header.Get("Content-Type")) {
+		return fallbackHTML
+	}
+
+	body, err := safenet.ReadLimited(resp.Body, articleImageRecoveryMaxBytes)
+	if err != nil {
+		return fallbackHTML
+	}
+	baseURL := req.URL
+	if resp.Request != nil && resp.Request.URL != nil {
+		baseURL = resp.Request.URL
+	}
+	content, err := ExtractReadableContent(body, baseURL)
+	if err != nil || !hasUsableReadableImage(content.ContentHTML) {
+		return fallbackHTML
+	}
+	return content.ContentHTML
+}
+
+func isHTMLResponse(contentType string) bool {
+	mediaType := strings.ToLower(strings.TrimSpace(strings.Split(contentType, ";")[0]))
+	return mediaType == "text/html" || mediaType == "application/xhtml+xml"
+}
+
+func preserveItemArtwork(contentHTML string, item *gofeed.Item, feedImage *gofeed.Image) string {
+	if item == nil || strings.Contains(strings.ToLower(contentHTML), "<img") {
+		return contentHTML
+	}
+
+	image := item.Image
+	if image == nil {
+		image = feedImage
+	}
+	if image == nil {
+		return contentHTML
+	}
+
+	imageURL := strings.TrimSpace(image.URL)
+	if imageURL == "" || safenet.ValidateURL(imageURL) != nil {
+		return contentHTML
+	}
+
+	figure := fmt.Sprintf(`<figure><img src="%s" alt="%s"></figure>`,
+		html.EscapeString(imageURL), html.EscapeString(strings.TrimSpace(item.Title)))
+	return SanitizeHTML(figure + contentHTML)
 }
 
 func (a *RSSAdapter) Validate(ctx context.Context, url string) (SourceMetadata, error) {

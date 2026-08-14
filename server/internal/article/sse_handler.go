@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -173,6 +174,9 @@ func validCachedTranslations(payload []byte, paragraphs []ai.Paragraph) (map[int
 		if normalizeSSEText(item.Original) != paragraphs[item.Index].Original {
 			return cached, true
 		}
+		if strings.TrimSpace(item.Translation) == "" {
+			continue
+		}
 		cached[item.Index] = item
 	}
 
@@ -228,7 +232,18 @@ func (h *SSEHandler) streamTranslation(ctx context.Context, w http.ResponseWrite
 		results, err := h.translateBatch(ctx, batch, targetLang)
 		if err != nil {
 			log.Printf("sse: translate batch for article %d: %v", articleID, err)
-			break
+			persistCtx, cancelPersist := context.WithTimeout(context.Background(), 5*time.Second)
+			if persistErr := h.persistMergedBodyTranslation(persistCtx, articleID, targetLang, allParagraphs, newlyTranslated); persistErr != nil {
+				log.Printf("sse: persist partial body translation for article %d: %v", articleID, persistErr)
+			}
+			if statusErr := h.queries.SetBodyTranslationStatus(persistCtx, gen.SetBodyTranslationStatusParams{
+				ArticleID: articleID, TargetLanguage: targetLang, BodyTranslationStatus: "failed",
+			}); statusErr != nil {
+				log.Printf("sse: set failed body translation status for article %d: %v", articleID, statusErr)
+			}
+			cancelPersist()
+			writeSSENamedEvent(w, "error", map[string]any{"message": "translation failed"})
+			return
 		}
 
 		for _, tp := range results {
@@ -298,22 +313,7 @@ func orderedCachedTranslations(paragraphs []ai.Paragraph, cached map[int]ai.Tran
 }
 
 func (h *SSEHandler) translateBatch(ctx context.Context, batch []ai.Paragraph, targetLang string) ([]ai.TranslatedParagraph, error) {
-	var prompt strings.Builder
-	for _, p := range batch {
-		fmt.Fprintf(&prompt, "[%d] %s\n", p.Index, p.Original)
-	}
-
-	resp, err := h.aiClient.ChatCompletion(ctx, ai.ChatRequest{
-		Messages: []ai.ChatMessage{
-			{Role: "system", Content: fmt.Sprintf("Translate each numbered paragraph into %s. Preserve each [index] label exactly, do not reorder paragraphs, and do not merge separate paragraphs.", targetLang)},
-			{Role: "user", Content: prompt.String()},
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return ai.ParseParagraphTranslations(batch, resp.Content), nil
+	return ai.TranslateParagraphBatch(ctx, h.aiClient, batch, targetLang)
 }
 
 func writeCachedBodyTranslationRange(w http.ResponseWriter, paragraphs []ai.Paragraph, cached map[int]ai.TranslatedParagraph) {

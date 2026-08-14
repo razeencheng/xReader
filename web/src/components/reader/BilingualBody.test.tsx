@@ -10,6 +10,7 @@ const sse = vi.hoisted(() => {
     url: string;
     paragraphHandler: ((paragraph: { index: number; translation: string }) => void) | null;
     doneHandler: (() => void) | null;
+    errorHandler: ((error: Event, willReconnect: boolean) => void) | null;
     close: ReturnType<typeof vi.fn>;
   };
 
@@ -19,6 +20,7 @@ const sse = vi.hoisted(() => {
       url,
       paragraphHandler: null,
       doneHandler: null,
+      errorHandler: null,
       close: vi.fn(),
     };
     clients.push(client);
@@ -29,7 +31,9 @@ const sse = vi.hoisted(() => {
       onDone: (callback: NonNullable<ClientRecord['doneHandler']>) => {
         client.doneHandler = callback;
       },
-      onError: vi.fn(),
+      onError: (callback: NonNullable<ClientRecord['errorHandler']>) => {
+        client.errorHandler = callback;
+      },
       close: client.close,
     };
   });
@@ -43,6 +47,8 @@ const sse = vi.hoisted(() => {
       clients[clientIndex]?.paragraphHandler?.(paragraph);
     },
     pushDone: (clientIndex: number) => clients[clientIndex]?.doneHandler?.(),
+    pushError: (clientIndex: number, willReconnect: boolean) =>
+      clients[clientIndex]?.errorHandler?.(new Event('error'), willReconnect),
     reset: () => {
       clients.splice(0, clients.length);
       createSSEClient.mockClear();
@@ -128,6 +134,20 @@ test('opens an SSE stream for the visible paragraph range and renders translatio
   });
   expect(screen.getByText('第二段翻译')).toBeInTheDocument();
   expect(screen.queryByTestId('translation-loading')).not.toBeInTheDocument();
+});
+
+test('keeps a reconnecting SSE client tracked so unmount can close it', () => {
+  const { container, unmount } = render(
+    <BilingualBody articleId={1} contentHtml={contentHtml} language="en" nativeLanguage="zh-CN" />,
+  );
+
+  enterParagraph(container, 0);
+  expect(sse.clients).toHaveLength(1);
+
+  act(() => sse.pushError(0, true));
+  unmount();
+
+  expect(sse.clients[0]?.close).toHaveBeenCalledOnce();
 });
 
 test('renders translated paragraphs without decorative left rule', () => {

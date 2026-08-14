@@ -1,7 +1,6 @@
 package article
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -13,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/razeencheng/xreader/internal/source"
 )
 
@@ -91,7 +89,7 @@ func fetchOriginalContent(ctx context.Context, rawURL string) (OriginalContent, 
 		return OriginalContent{}, err
 	}
 
-	content, err := extractReadableContent(body)
+	content, err := extractReadableContentFromURL(body, resp.Request.URL)
 	if err != nil {
 		return OriginalContent{}, err
 	}
@@ -174,123 +172,21 @@ func readLimited(r io.Reader, max int64) ([]byte, error) {
 	return body, nil
 }
 
-var boilerplateSelectors = strings.Join([]string{
-	"script", "style", "noscript", "svg", "iframe", "form",
-	"nav", "header", "footer", "aside",
-	".author-info", ".author-bio", ".author-card", ".post-author",
-	".share-buttons", ".social-share", ".sharing", ".share-bar",
-	".related-posts", ".related-articles", ".recommended",
-	".comments", ".comment-section", "#comments", "#disqus_thread",
-	".sidebar", ".widget", ".ad", ".advertisement", ".banner",
-	".newsletter", ".subscribe-form", ".cta",
-	".breadcrumb", ".breadcrumbs", ".pagination",
-	".post-meta-bottom", ".post-footer", ".entry-footer", ".article-footer",
-	".post-tags", ".tag-list",
-	"[role='complementary']", "[role='navigation']", "[role='banner']",
-}, ", ")
-
 func extractReadableContent(body []byte) (OriginalContent, error) {
-	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
-	if err != nil {
-		return OriginalContent{}, err
-	}
+	return extractReadableContentFromURL(body, nil)
+}
 
-	title := strings.TrimSpace(doc.Find("title").First().Text())
-	doc.Find(boilerplateSelectors).Remove()
-
-	container := bestContentContainer(doc)
-	container.Find(boilerplateSelectors).Remove()
-	removeBoilerplateByAttr(container)
-	stripPresentationAttrs(container)
-	container.Find("a").Each(func(_ int, sel *goquery.Selection) {
-		sel.RemoveAttr("href")
-	})
-
-	html, err := container.Html()
-	if err != nil {
-		return OriginalContent{}, err
-	}
-	html = source.SanitizeHTML(html)
-	text := strings.Join(strings.Fields(container.Text()), " ")
-	if len([]rune(text)) < 80 {
+func extractReadableContentFromURL(body []byte, baseURL *url.URL) (OriginalContent, error) {
+	content, err := source.ExtractReadableContent(body, baseURL)
+	if errors.Is(err, source.ErrNoReadableContent) {
 		return OriginalContent{}, errOriginalNoContent
 	}
-
+	if err != nil {
+		return OriginalContent{}, err
+	}
 	return OriginalContent{
-		Title:       title,
-		ContentHTML: html,
-		ContentText: text,
+		Title:       content.Title,
+		ContentHTML: content.ContentHTML,
+		ContentText: content.ContentText,
 	}, nil
-}
-
-func bestContentContainer(doc *goquery.Document) *goquery.Selection {
-	candidates := []string{
-		"article .content",
-		"article .post-body",
-		"article .article-body",
-		"article .entry-content",
-		".post-content",
-		".entry-content",
-		".article-content",
-		".article-body",
-		".post-body",
-		"article",
-		"main article",
-		"main",
-		"[role='main']",
-		"[itemprop='articleBody']",
-		".content",
-	}
-
-	var best *goquery.Selection
-	bestScore := 0
-	for _, selector := range candidates {
-		doc.Find(selector).EachWithBreak(func(_ int, sel *goquery.Selection) bool {
-			score := readableScore(sel)
-			if score > bestScore {
-				best = sel
-				bestScore = score
-			}
-			return true
-		})
-	}
-	if best != nil && bestScore >= 80 {
-		return best
-	}
-	return doc.Find("body").First()
-}
-
-var boilerplateAttrPatterns = []string{
-	"author", "share", "social", "comment", "related",
-	"sidebar", "widget", "footer", "nav", "breadcrumb",
-	"subscribe", "newsletter", "recommend", "ad-",
-	"follow", "tag-list", "post-meta",
-}
-
-func removeBoilerplateByAttr(container *goquery.Selection) {
-	container.Find("div, section, span").Each(func(_ int, sel *goquery.Selection) {
-		cls, _ := sel.Attr("class")
-		id, _ := sel.Attr("id")
-		combined := strings.ToLower(cls + " " + id)
-		for _, pattern := range boilerplateAttrPatterns {
-			if strings.Contains(combined, pattern) {
-				sel.Remove()
-				return
-			}
-		}
-	})
-}
-
-func stripPresentationAttrs(container *goquery.Selection) {
-	container.Find("*").Each(func(_ int, sel *goquery.Selection) {
-		sel.RemoveAttr("class")
-		sel.RemoveAttr("style")
-		sel.RemoveAttr("id")
-	})
-}
-
-func readableScore(sel *goquery.Selection) int {
-	textLen := len([]rune(strings.Join(strings.Fields(sel.Text()), " ")))
-	blockCount := sel.Find("p, li, blockquote, pre, h1, h2, h3").Length()
-	return textLen + blockCount*60
 }
