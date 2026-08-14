@@ -6,6 +6,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-08-14
+
+### Fixed
+- Preserved podcast artwork and recovered valid article images when feeds omit
+  readable image blocks.
+- Enforced one-to-one bilingual paragraph translation, including headings, and
+  rejected ambiguous AI responses instead of misaligning content.
+- Made streamed translation retries and partial-result persistence more robust.
+
 ## [0.1.9] - 2026-08-13
 
 ### Changed
