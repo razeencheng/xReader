@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -12,6 +13,17 @@ import (
 	"github.com/razeencheng/xreader/internal/testutil"
 	"github.com/stretchr/testify/require"
 )
+
+type scriptedBatchClient struct {
+	responses []ChatResponse
+	calls     int
+}
+
+func (c *scriptedBatchClient) ChatCompletion(_ context.Context, _ ChatRequest) (ChatResponse, error) {
+	response := c.responses[c.calls]
+	c.calls++
+	return response, nil
+}
 
 func TestLazyJob_TranslatesAndPersists(t *testing.T) {
 	ctx := context.Background()
@@ -82,6 +94,95 @@ func TestParseParagraphTranslations_AcceptsOrdinalLabelsForRequestedRange(t *tes
 	require.Len(t, results, 2)
 	require.Equal(t, "第一段翻译", results[0].Translation)
 	require.Equal(t, "第二段翻译", results[1].Translation)
+}
+
+func TestParseParagraphTranslations_AcceptsMultipleLabelsOnOneLine(t *testing.T) {
+	batch := []Paragraph{
+		{Index: 0, Original: "First"},
+		{Index: 1, Original: "Second"},
+		{Index: 2, Original: "Heading"},
+	}
+	client := &scriptedBatchClient{responses: []ChatResponse{
+		{Content: "[0] 第一段翻译 [1] 第二段翻译 [2] 标题翻译"},
+		{Content: "[0] 第一段翻译"},
+		{Content: "[1] 第二段翻译"},
+		{Content: "[2] 标题翻译"},
+	}}
+
+	results, err := TranslateParagraphBatch(context.Background(), client, batch, "zh-CN")
+
+	require.NoError(t, err)
+	require.Len(t, results, 3)
+	require.Equal(t, "第一段翻译", results[0].Translation)
+	require.Equal(t, "第二段翻译", results[1].Translation)
+	require.Equal(t, "标题翻译", results[2].Translation)
+	require.Equal(t, 4, client.calls)
+}
+
+func TestParseParagraphTranslations_DoesNotTreatInlineCitationAsNextLabel(t *testing.T) {
+	results := ParseParagraphTranslations(
+		[]Paragraph{{Index: 0, Original: "First"}, {Index: 1, Original: "Second"}},
+		"[0] 参见文献 [1] 的结论",
+	)
+
+	require.Nil(t, results)
+}
+
+func TestTranslateParagraphBatch_RetriesUnlabelledMultiParagraphResponseAsSingletons(t *testing.T) {
+	client := &scriptedBatchClient{responses: []ChatResponse{
+		{Content: "第一段翻译\n第二段翻译"},
+		{Content: "[0] 第一段翻译"},
+		{Content: "[1] 第二段翻译"},
+	}}
+
+	results, err := TranslateParagraphBatch(context.Background(), client, []Paragraph{
+		{Index: 0, Original: "First"},
+		{Index: 1, Original: "Second"},
+	}, "zh-CN")
+
+	require.NoError(t, err)
+	require.Equal(t, []TranslatedParagraph{
+		{Index: 0, Original: "First", Translation: "第一段翻译"},
+		{Index: 1, Original: "Second", Translation: "第二段翻译"},
+	}, results)
+	require.Equal(t, 3, client.calls)
+}
+
+func TestTranslateParagraphBatch_DoesNotRetryTransportErrorsPerParagraph(t *testing.T) {
+	transportErr := errors.New("rate limited")
+	client := &MockClient{Err: transportErr}
+
+	_, err := TranslateParagraphBatch(context.Background(), client, []Paragraph{
+		{Index: 0, Original: "First"},
+		{Index: 1, Original: "Second"},
+	}, "zh-CN")
+
+	require.ErrorIs(t, err, transportErr)
+	require.Len(t, client.Calls, 1)
+}
+
+func TestParseParagraphTranslations_RejectsIncompleteNumberedResponse(t *testing.T) {
+	results := ParseParagraphTranslations(
+		[]Paragraph{
+			{Index: 0, Original: "First"},
+			{Index: 1, Original: "Second"},
+		},
+		"[0] 第一段翻译",
+	)
+
+	require.Nil(t, results)
+}
+
+func TestParseParagraphTranslations_RejectsExtraNumberedResponse(t *testing.T) {
+	results := ParseParagraphTranslations(
+		[]Paragraph{
+			{Index: 0, Original: "First"},
+			{Index: 1, Original: "Second"},
+		},
+		"[0] 第一段翻译 [1] 第二段翻译 [2] 多余翻译",
+	)
+
+	require.Nil(t, results)
 }
 
 func insertAIJobUser(t *testing.T, ctx context.Context, pool *pgxpool.Pool) int64 {

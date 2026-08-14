@@ -14,6 +14,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type scriptedTranslationClient struct {
+	responses []ai.ChatResponse
+	calls     int
+}
+
+func (c *scriptedTranslationClient) ChatCompletion(_ context.Context, _ ai.ChatRequest) (ai.ChatResponse, error) {
+	response := c.responses[c.calls]
+	c.calls++
+	return response, nil
+}
+
 func TestSSE_ServesCachedTranslation(t *testing.T) {
 	r, _, queries, pool, userID, sourceID, cleanup := setupArticleHandlerTest(t)
 	t.Cleanup(cleanup)
@@ -45,6 +56,25 @@ func TestSSE_ServesCachedTranslation(t *testing.T) {
 	require.Contains(t, w.Body.String(), `data: {}`)
 }
 
+func TestValidCachedTranslations_TreatsEmptyTranslationAsMissing(t *testing.T) {
+	paragraphs := []ai.Paragraph{
+		{Index: 0, Original: "First"},
+		{Index: 1, Original: "Heading"},
+	}
+	payload, err := json.Marshal([]ai.TranslatedParagraph{
+		{Index: 0, Original: "First", Translation: "第一段"},
+		{Index: 1, Original: "Heading", Translation: ""},
+	})
+	require.NoError(t, err)
+
+	cached, stale := validCachedTranslations(payload, paragraphs)
+
+	require.False(t, stale)
+	require.Contains(t, cached, 0)
+	require.NotContains(t, cached, 1)
+	require.Equal(t, []ai.Paragraph{{Index: 1, Original: "Heading"}}, missingCachedParagraphs(paragraphs, cached))
+}
+
 func TestSSE_IgnoreStaleCachedTranslationAndRebuild(t *testing.T) {
 	r, _, queries, pool, userID, sourceID, cleanup := setupArticleHandlerTest(t)
 	t.Cleanup(cleanup)
@@ -62,7 +92,7 @@ func TestSSE_IgnoreStaleCachedTranslationAndRebuild(t *testing.T) {
 		ArticleID: article.ID, TargetLanguage: "zh-CN", BodyTranslationContent: payload,
 	}))
 
-	job := &ai.MockClient{}
+	job := &ai.MockClient{Response: ai.ChatResponse{Content: "[0] 不匹配"}}
 	h := NewSSEHandler(pool, job, 1)
 	r.Use(withArticleUser(userID))
 	r.GET("/api/articles/:id/body-translation", h.BodyTranslation)
@@ -75,7 +105,7 @@ func TestSSE_IgnoreStaleCachedTranslationAndRebuild(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Contains(t, w.Header().Get("Content-Type"), "text/event-stream")
 	require.Contains(t, w.Body.String(), `event: paragraph`)
-	require.Contains(t, w.Body.String(), `data: {"index":0,"original":"mismatch","translation":""}`)
+	require.Contains(t, w.Body.String(), `data: {"index":0,"original":"mismatch","translation":"不匹配"}`)
 	require.NotContains(t, w.Body.String(), `"index":1`)
 	require.NotContains(t, w.Body.String(), `"original":"First"`)
 	require.Contains(t, w.Body.String(), `event: done`)
@@ -168,7 +198,11 @@ func TestSSE_MapsUnnumberedTranslationLinesByRequestedOrder(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	job := &ai.MockClient{Response: ai.ChatResponse{Content: "第一段\n第二段"}}
+	job := &scriptedTranslationClient{responses: []ai.ChatResponse{
+		{Content: "第一段\n第二段"},
+		{Content: "[0] 第一段"},
+		{Content: "[1] 第二段"},
+	}}
 	h := NewSSEHandler(pool, job, 10)
 	r.Use(withArticleUser(userID))
 	r.GET("/api/articles/:id/body-translation", h.BodyTranslation)
@@ -209,6 +243,78 @@ func TestSSE_KeepsWrappedNumberedParagraphTranslationsTogether(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Contains(t, w.Body.String(), `"index":0,"original":"One","translation":"第一段第一行\n继续第一段"`)
 	require.Contains(t, w.Body.String(), `data: {"index":1,"original":"Two","translation":"第二段"}`)
+}
+
+func TestSSE_EmitsErrorForIncompleteTranslationBatch(t *testing.T) {
+	r, _, queries, pool, userID, sourceID, cleanup := setupArticleHandlerTest(t)
+	t.Cleanup(cleanup)
+
+	ctx := context.Background()
+	article := insertHandlerArticle(t, queries, ctx, sourceID, "incomplete", time.Now())
+	article, err := queries.UpdateArticleContent(ctx, gen.UpdateArticleContentParams{
+		ID:          article.ID,
+		ContentHtml: "<p>One</p><p>Two</p>",
+		ContentText: "One Two",
+	})
+	require.NoError(t, err)
+
+	job := &scriptedTranslationClient{responses: []ai.ChatResponse{
+		{Content: "[0] 第一段"},
+		{Content: "[0] 第一段"},
+		{Content: "[1]"},
+	}}
+	h := NewSSEHandler(pool, job, 10)
+	r.Use(withArticleUser(userID))
+	r.GET("/api/articles/:id/body-translation", h.BodyTranslation)
+
+	w := httptest.NewRecorder()
+	req, err := http.NewRequest("GET", fmt.Sprintf("/api/articles/%d/body-translation?start=0&count=2", article.ID), nil)
+	require.NoError(t, err)
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), "event: error")
+	require.NotContains(t, w.Body.String(), "event: paragraph")
+	require.NotContains(t, w.Body.String(), "event: done")
+}
+
+func TestSSE_PersistsCompletedBatchesAndMarksFailedWhenLaterBatchIsIncomplete(t *testing.T) {
+	r, _, queries, pool, userID, sourceID, cleanup := setupArticleHandlerTest(t)
+	t.Cleanup(cleanup)
+
+	ctx := context.Background()
+	article := insertHandlerArticle(t, queries, ctx, sourceID, "partial-failure", time.Now())
+	article, err := queries.UpdateArticleContent(ctx, gen.UpdateArticleContentParams{
+		ID:          article.ID,
+		ContentHtml: "<p>One</p><p>Two</p>",
+		ContentText: "One Two",
+	})
+	require.NoError(t, err)
+
+	client := &scriptedTranslationClient{responses: []ai.ChatResponse{
+		{Content: "[0] 第一段"},
+		{Content: "[1]"},
+	}}
+	h := NewSSEHandler(pool, client, 1)
+	r.Use(withArticleUser(userID))
+	r.GET("/api/articles/:id/body-translation", h.BodyTranslation)
+
+	w := httptest.NewRecorder()
+	req, err := http.NewRequest("GET", fmt.Sprintf("/api/articles/%d/body-translation?start=0&count=2", article.ID), nil)
+	require.NoError(t, err)
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), `data: {"index":0,"original":"One","translation":"第一段"}`)
+	require.Contains(t, w.Body.String(), "event: error")
+	require.NotContains(t, w.Body.String(), "event: done")
+
+	aiRow, err := queries.GetArticleAI(ctx, gen.GetArticleAIParams{ArticleID: article.ID, TargetLanguage: "zh-CN"})
+	require.NoError(t, err)
+	require.Equal(t, "failed", aiRow.BodyTranslationStatus)
+	var content []ai.TranslatedParagraph
+	require.NoError(t, json.Unmarshal(aiRow.BodyTranslationContent, &content))
+	require.Equal(t, []ai.TranslatedParagraph{{Index: 0, Original: "One", Translation: "第一段"}}, content)
 }
 
 func TestSSE_PersistsPartialTranslationWithoutMarkingDone(t *testing.T) {
@@ -258,7 +364,7 @@ func TestSSE_StreamsTranslationForNewRequest(t *testing.T) {
 	ctx := context.Background()
 	article := insertHandlerArticle(t, queries, ctx, sourceID, "new", time.Now())
 
-	h := NewSSEHandler(pool, &ai.MockClient{}, 1)
+	h := NewSSEHandler(pool, &ai.MockClient{Response: ai.ChatResponse{Content: "[0] 新译文"}}, 1)
 	r.Use(withArticleUser(userID))
 	r.GET("/api/articles/:id/body-translation", h.BodyTranslation)
 
@@ -270,7 +376,7 @@ func TestSSE_StreamsTranslationForNewRequest(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Contains(t, w.Header().Get("Content-Type"), "text/event-stream")
 	require.Contains(t, w.Body.String(), `event: paragraph`)
-	require.Contains(t, w.Body.String(), `data: {"index":0,"original":"new","translation":""}`)
+	require.Contains(t, w.Body.String(), `data: {"index":0,"original":"new","translation":"新译文"}`)
 	require.Contains(t, w.Body.String(), `event: done`)
 }
 
@@ -283,7 +389,7 @@ func TestSSE_ProcessingStreamsTranslation(t *testing.T) {
 	require.NoError(t, queries.EnsureArticleAI(ctx, gen.EnsureArticleAIParams{ArticleID: article.ID, TargetLanguage: "zh-CN"}))
 	require.NoError(t, queries.SetBodyTranslationStatus(ctx, gen.SetBodyTranslationStatusParams{ArticleID: article.ID, TargetLanguage: "zh-CN", BodyTranslationStatus: "processing"}))
 
-	h := NewSSEHandler(pool, &ai.MockClient{}, 1)
+	h := NewSSEHandler(pool, &ai.MockClient{Response: ai.ChatResponse{Content: "[0] 处理中译文"}}, 1)
 	r.Use(withArticleUser(userID))
 	r.GET("/api/articles/:id/body-translation", h.BodyTranslation)
 
@@ -295,6 +401,6 @@ func TestSSE_ProcessingStreamsTranslation(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Contains(t, w.Header().Get("Content-Type"), "text/event-stream")
 	require.Contains(t, w.Body.String(), `event: paragraph`)
-	require.Contains(t, w.Body.String(), `data: {"index":0,"original":"processing","translation":""}`)
+	require.Contains(t, w.Body.String(), `data: {"index":0,"original":"processing","translation":"处理中译文"}`)
 	require.Contains(t, w.Body.String(), `event: done`)
 }

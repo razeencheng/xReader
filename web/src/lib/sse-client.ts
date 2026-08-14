@@ -7,13 +7,13 @@ export interface SSEParagraphEvent {
 export interface SSEClient {
   onParagraph(callback: (paragraph: SSEParagraphEvent) => void): void;
   onDone(callback: () => void): void;
-  onError(callback: (error: Event) => void): void;
+  onError(callback: (error: Event, willReconnect: boolean) => void): void;
   close(): void;
 }
 
 type EventCallback = () => void;
 
-type ErrorCallback = (error: Event) => void;
+type ErrorCallback = (error: Event, willReconnect: boolean) => void;
 
 type ParagraphCallback = (paragraph: SSEParagraphEvent) => void;
 
@@ -99,7 +99,8 @@ export function createSSEClient(url: string): SSEClient {
   }
 
   function handleError(event: Event) {
-    errorListeners.forEach((listener) => listener(event));
+    const willReconnect = !closed && !reconnectAttempted;
+    errorListeners.forEach((listener) => listener(event, willReconnect));
 
     if (closed) {
       return;
@@ -107,7 +108,7 @@ export function createSSEClient(url: string): SSEClient {
 
     cleanupSource();
 
-    if (reconnectAttempted) {
+    if (!willReconnect) {
       return;
     }
 

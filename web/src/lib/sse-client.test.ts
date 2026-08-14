@@ -32,6 +32,10 @@ class FakeEventSource {
     this.listeners.get(event)?.delete(listener);
   }
 
+  emit(event: string) {
+    this.listeners.get(event)?.forEach((listener) => listener(new Event(event)));
+  }
+
   close() {}
 }
 
@@ -68,4 +72,21 @@ test('delivers early paragraph events after listeners are registered', async () 
   expect(FakeEventSource.instances).toHaveLength(1);
   expect(FakeEventSource.instances[0]?.url).toBe('/api/articles/1/body-translation');
   expect(onParagraph).toHaveBeenCalledWith(paragraph);
+});
+
+test('reports whether an error will reconnect and marks the second error final', async () => {
+  vi.useFakeTimers();
+  const onError = vi.fn();
+  const client = createSSEClient('/api/articles/1/body-translation');
+  client.onError(onError);
+  await Promise.resolve();
+
+  FakeEventSource.instances[0]?.emit('error');
+  expect(onError).toHaveBeenLastCalledWith(expect.any(Event), true);
+
+  await vi.advanceTimersByTimeAsync(500);
+  FakeEventSource.instances[1]?.emit('error');
+  expect(onError).toHaveBeenLastCalledWith(expect.any(Event), false);
+  client.close();
+  vi.useRealTimers();
 });
