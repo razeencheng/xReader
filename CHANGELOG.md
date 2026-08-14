@@ -6,6 +6,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-08-14
+
+### Fixed
+- Built static frontend assets on the native CI runner during multi-platform
+  image releases, avoiding QEMU arm64 package-install crashes.
+
 ## [0.1.10] - 2026-08-14
 
 ### Fixed
