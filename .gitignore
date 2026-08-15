@@ -26,6 +26,7 @@ docs/ai-development-guidelines.md
 dist/
 build/
 node_modules/
+.pnpm-store/
 web/.next/
 web/out/
 
