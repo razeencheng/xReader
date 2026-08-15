@@ -31,3 +31,34 @@ func TestSplitParagraphs_SplitsListItems(t *testing.T) {
 	require.Equal(t, "Two", paragraphs[2].Original)
 	require.Equal(t, "Outro", paragraphs[3].Original)
 }
+
+func TestSplitParagraphs_SplitsTableCellsInDocumentOrder(t *testing.T) {
+	source := `<p>Intro</p>
+		<table>
+			<caption>What breaks</caption>
+			<thead><tr><th>Consequence</th><th>Mechanism</th></tr></thead>
+			<tbody>
+				<tr><td>The scope widens</td><td>Cyber-enabled crime is elastic.</td></tr>
+				<tr><td></td><td>Evidence may not survive court.</td></tr>
+			</tbody>
+		</table>
+		<p>Outro</p>`
+
+	paragraphs := SplitParagraphs(source)
+	originals := make([]string, len(paragraphs))
+	for index, paragraph := range paragraphs {
+		require.Equal(t, index, paragraph.Index)
+		originals[index] = paragraph.Original
+	}
+
+	require.Equal(t, []string{
+		"Intro",
+		"What breaks",
+		"Consequence",
+		"Mechanism",
+		"The scope widens",
+		"Cyber-enabled crime is elastic.",
+		"Evidence may not survive court.",
+		"Outro",
+	}, originals)
+}

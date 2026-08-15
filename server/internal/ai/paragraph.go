@@ -72,6 +72,16 @@ func collectParagraphs(node *html.Node, paragraphs *[]Paragraph) {
 		if _, skipIfEmpty := skipEmptyTags[tag]; skipIfEmpty && normalizeText(nodeText(node)) == "" {
 			return
 		}
+		if tag == "table" {
+			before := len(*paragraphs)
+			collectTableParagraphs(node, paragraphs)
+			if len(*paragraphs) == before {
+				if text := normalizeText(nodeText(node)); text != "" {
+					*paragraphs = append(*paragraphs, Paragraph{Index: len(*paragraphs), Original: text})
+				}
+			}
+			return
+		}
 
 		if _, isWrapper := wrapperTags[tag]; isWrapper {
 			for child := node.FirstChild; child != nil; child = child.NextSibling {
@@ -95,6 +105,21 @@ func collectParagraphs(node *html.Node, paragraphs *[]Paragraph) {
 
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
 		collectParagraphs(child, paragraphs)
+	}
+}
+
+func collectTableParagraphs(node *html.Node, paragraphs *[]Paragraph) {
+	for child := node.FirstChild; child != nil; child = child.NextSibling {
+		if child.Type == html.ElementNode {
+			tag := strings.ToLower(child.Data)
+			if tag == "caption" || tag == "th" || tag == "td" {
+				if text := normalizeText(nodeText(child)); text != "" {
+					*paragraphs = append(*paragraphs, Paragraph{Index: len(*paragraphs), Original: text})
+				}
+				continue
+			}
+		}
+		collectTableParagraphs(child, paragraphs)
 	}
 }
 
