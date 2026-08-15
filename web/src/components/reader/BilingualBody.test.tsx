@@ -167,6 +167,73 @@ test('renders translated paragraphs without decorative left rule', () => {
   expect(translationLayer?.className).not.toContain('pl-4');
 });
 
+test('requests every visible table cell and renders each translation inside its matching cell', () => {
+  const tableHtml = `
+    <table>
+      <caption>What Breaks</caption>
+      <thead><tr><th>Consequence</th><th>Mechanism</th></tr></thead>
+      <tbody><tr><td rowspan="2"><a href="/scope">The scope widens</a></td><td>Crime is elastic.</td></tr></tbody>
+    </table>
+    <p>After table</p>
+  `;
+  const { container } = render(
+    <BilingualBody articleId={1} contentHtml={tableHtml} language="en" nativeLanguage="zh-CN" />,
+  );
+
+  enterParagraph(container, 0);
+  expect(sse.createSSEClient).toHaveBeenCalledWith('/api/articles/1/body-translation?start=0&count=5');
+
+  act(() => {
+    sse.pushParagraph(0, { index: 0, translation: '哪里出了问题' });
+    sse.pushParagraph(0, { index: 1, translation: '后果' });
+    sse.pushParagraph(0, { index: 2, translation: '机制' });
+    sse.pushParagraph(0, { index: 3, translation: '范围扩大' });
+    sse.pushParagraph(0, { index: 4, translation: '犯罪具有弹性' });
+  });
+
+  const tableTargets = Array.from(container.querySelectorAll('table caption, table th, table td'));
+  expect(tableTargets).toHaveLength(5);
+  expect(tableTargets.map((target) => target.querySelector('[data-layer="translation"]')?.textContent)).toEqual([
+    '哪里出了问题',
+    '后果',
+    '机制',
+    '范围扩大',
+    '犯罪具有弹性',
+  ]);
+  tableTargets.forEach((target, index) => {
+    expect(target.querySelector('[data-layer="original"]')).toHaveAttribute('data-paragraph-index', String(index));
+    expect(target.querySelector('[data-layer="translation"]')).toHaveAttribute('data-paragraph-index', String(index));
+  });
+  expect(container.querySelector('td[rowspan="2"] a')).toHaveAttribute('href', '/scope');
+  expect(container.querySelector('[data-block-tag="table"] > [data-layer="translation"]')).not.toBeInTheDocument();
+});
+
+test('continues paragraph indices after all table cells', () => {
+  const { container } = render(
+    <BilingualBody
+      articleId={1}
+      contentHtml="<table><tr><th>Consequence</th><th>Mechanism</th></tr></table><p>After table</p>"
+      language="en"
+      nativeLanguage="zh-CN"
+    />,
+  );
+
+  enterParagraph(container, 0);
+  expect(sse.createSSEClient).toHaveBeenLastCalledWith('/api/articles/1/body-translation?start=0&count=2');
+
+  enterParagraph(container, 2);
+  expect(sse.createSSEClient).toHaveBeenLastCalledWith('/api/articles/1/body-translation?start=2&count=1');
+  act(() => {
+    sse.pushParagraph(1, { index: 2, translation: '表格之后' });
+  });
+
+  expect(screen.getByText('表格之后')).toBeInTheDocument();
+  expect(screen.getByText('表格之后').closest('[data-layer="translation"]')).toHaveAttribute(
+    'data-paragraph-index',
+    '2',
+  );
+});
+
 test('does not render loading placeholders for prefetched paragraphs', () => {
   const longContent = Array.from({ length: 6 }, (_, index) => `<p>Paragraph ${index}</p>`).join('');
   const { container } = render(

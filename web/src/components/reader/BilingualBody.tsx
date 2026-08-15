@@ -53,6 +53,7 @@ type ReaderBlock = {
   html: string;
   blockTag?: string;
   translationIndex: number | null;
+  translationCount: number;
 };
 
 function escapeHtml(text: string) {
@@ -143,6 +144,27 @@ function hasStandaloneMedia(element: HTMLElement) {
   return element.querySelector('img, picture, video, audio, canvas, svg, table') !== null;
 }
 
+function tableTranslationTargets(table: HTMLElement) {
+  const targets: HTMLElement[] = [];
+
+  const visit = (element: HTMLElement) => {
+    Array.from(element.children).forEach((child) => {
+      const childElement = child as HTMLElement;
+      const tag = childElement.tagName.toLowerCase();
+      if (tag === 'caption' || tag === 'th' || tag === 'td') {
+        if (normalizeBlockText(childElement.textContent ?? '')) {
+          targets.push(childElement);
+        }
+        return;
+      }
+      visit(childElement);
+    });
+  };
+
+  visit(table);
+  return targets;
+}
+
 function isHeadingTag(tag: string) {
   return /^h[1-6]$/.test(tag);
 }
@@ -177,6 +199,47 @@ function translationClassName(blockTag: string) {
   return 'mt-1 text-[0.92em] leading-[1.85] text-[var(--text-translation)]';
 }
 
+function tableHtmlWithTranslations(
+  block: ReaderBlock,
+  translations: Map<number, string>,
+  originalFont: string,
+  translationFont: string,
+) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<body>${block.html}</body>`, 'text/html');
+  const table = doc.body.querySelector('table');
+  if (!table || block.translationIndex === null) {
+    return block.html;
+  }
+  const firstTranslationIndex = block.translationIndex;
+
+  tableTranslationTargets(table).forEach((target, offset) => {
+    const paragraphIndex = firstTranslationIndex + offset;
+    const originalLayer = doc.createElement('div');
+    originalLayer.dataset.layer = 'original';
+    originalLayer.dataset.paragraphIndex = String(paragraphIndex);
+    originalLayer.style.fontFamily = originalFont;
+    while (target.firstChild) {
+      originalLayer.appendChild(target.firstChild);
+    }
+    target.appendChild(originalLayer);
+
+    const translation = translations.get(paragraphIndex);
+    if (!translation) {
+      return;
+    }
+    const translationLayer = doc.createElement('div');
+    translationLayer.dataset.layer = 'translation';
+    translationLayer.dataset.paragraphIndex = String(paragraphIndex);
+    translationLayer.className = 'mt-1 text-[0.9em] leading-[1.65] text-[var(--text-translation)]';
+    translationLayer.style.fontFamily = translationFont;
+    translationLayer.innerHTML = escapeHtml(translation).replaceAll('\n', '<br />');
+    target.appendChild(translationLayer);
+  });
+
+  return table.outerHTML;
+}
+
 function sanitizeHtml(html: string): string {
   return DOMPurify.sanitize(html, {
     USE_PROFILES: { html: true },
@@ -194,11 +257,15 @@ function splitContentHtml(contentHtml: string) {
   const blocks: ReaderBlock[] = [];
   let translationIndex = 0;
 
-  const pushBlock = (html: string, translatable: boolean, blockTag?: string) => {
-    blocks.push({ html, blockTag, translationIndex: translatable ? translationIndex : null });
-    if (translatable) {
-      translationIndex += 1;
-    }
+  const pushBlock = (html: string, translatable: boolean, blockTag?: string, count = translatable ? 1 : 0) => {
+    const translationCount = translatable ? count : 0;
+    blocks.push({
+      html,
+      blockTag,
+      translationIndex: translationCount > 0 ? translationIndex : null,
+      translationCount,
+    });
+    translationIndex += translationCount;
   };
 
   const pushText = (text: string) => {
@@ -239,6 +306,14 @@ function splitContentHtml(contentHtml: string) {
       return;
     }
 
+    if (tag === 'table') {
+      const targetCount = tableTranslationTargets(element).length;
+      if (targetCount > 0 || hasStandaloneMedia(element)) {
+        pushBlock(element.outerHTML, targetCount > 0, 'table', targetCount);
+      }
+      return;
+    }
+
     if (BLOCK_TAGS.has(tag)) {
       const hasText = normalizeBlockText(element.textContent ?? '') !== '';
       if (hasText || hasStandaloneMedia(element)) {
@@ -261,7 +336,7 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
   const { t } = useI18n();
   const blocks = useMemo(() => splitContentHtml(contentHtml), [contentHtml]);
   const translatableCount = useMemo(
-    () => blocks.reduce((count, block) => (block.translationIndex === null ? count : count + 1), 0),
+    () => blocks.reduce((count, block) => count + block.translationCount, 0),
     [blocks],
   );
   const sameLanguage = isSameLanguage(language, nativeLanguage);
@@ -347,12 +422,13 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
     };
   }, [articleId, nativeLanguage, resetKey, shouldTranslate]);
 
-  const requestTranslationRange = useCallback((visibleIndex: number) => {
+  const requestTranslationRange = useCallback((visibleIndex: number, visibleCount?: number) => {
     if (!shouldTranslate || visibleIndex < 0 || visibleIndex >= translatableCount) {
       return;
     }
 
-    const rangeEnd = Math.min(translatableCount, visibleIndex + TRANSLATION_PREFETCH_COUNT);
+    const requestCount = visibleCount ?? TRANSLATION_PREFETCH_COUNT;
+    const rangeEnd = Math.min(translatableCount, visibleIndex + requestCount);
     const rangeIndices = Array.from(
       { length: rangeEnd - visibleIndex },
       (_, offset) => visibleIndex + offset,
@@ -436,8 +512,9 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
           return;
         }
         const index = Number.parseInt((entry.target as HTMLElement).dataset.observeIndex ?? '', 10);
+        const count = Number.parseInt((entry.target as HTMLElement).dataset.observeCount ?? '', 10);
         if (Number.isFinite(index)) {
-          requestTranslationRange(index);
+          requestTranslationRange(index, Number.isFinite(count) && count > 0 ? count : undefined);
         }
       });
     }, { rootMargin: '320px 0px 520px 0px', threshold: 0.01 });
@@ -478,8 +555,29 @@ export function BilingualBody({ articleId, contentHtml, language, nativeLanguage
     <div className="reader-content" onLoadCapture={updateReaderImageState} onErrorCapture={updateReaderImageState}>
       {blocks.map((block, index) => {
         const blockTag = block.blockTag ?? primaryTagFromHtml(block.html);
-        const isCode = blockTag === 'pre';
         const translationIndex = block.translationIndex;
+
+        if (blockTag === 'table') {
+          return (
+            <div
+              key={index}
+              ref={(node) => {
+                if (translationIndex !== null) {
+                  paragraphRefs.current[translationIndex] = node;
+                }
+              }}
+              data-observe-index={translationIndex ?? undefined}
+              data-observe-count={block.translationCount || undefined}
+              data-block-tag={blockTag}
+              className="paragraph-container"
+              dangerouslySetInnerHTML={{
+                __html: tableHtmlWithTranslations(block, translations, originalFont, translationFont),
+              }}
+            />
+          );
+        }
+
+        const isCode = blockTag === 'pre';
         const translation = translationIndex === null ? undefined : translations.get(translationIndex);
         const isLoading = translationIndex !== null && pendingTranslations.has(translationIndex) && !translation;
         const translationHtml = translation ? translationHtmlForBlock(block, blockTag, translation) : '';
