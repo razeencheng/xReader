@@ -6,6 +6,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-08-14
+
+### Fixed
+- Preserved bilingual table structure by translating captions, headers, and
+  data cells independently and rendering each translation in its matching cell.
+
 ## [0.1.11] - 2026-08-14
 
 ### Fixed
