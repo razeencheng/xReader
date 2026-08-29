@@ -257,6 +257,19 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.operation-edge-anchor {
+  --operation-edge-offset: 1rem;
+  right: max(var(--operation-edge-offset), env(safe-area-inset-right));
+  left: auto;
+}
+
+@media (max-width: 767px) {
+  html[data-operation-side="left"] .operation-edge-anchor {
+    right: auto;
+    left: max(var(--operation-edge-offset), env(safe-area-inset-left));
+  }
+}
+
 a {
   color: inherit;
   text-decoration: none;

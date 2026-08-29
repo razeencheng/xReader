@@ -6,6 +6,7 @@ import { formatRelativeTime, getDisplayTitle, getOriginalTitle } from '@/lib/art
 import { useI18n } from '@/lib/i18n';
 import { getSourceColor } from '@/lib/source-meta';
 import type { ArticleItem } from '@/lib/types';
+import { useUIStore } from '@/stores/useUIStore';
 
 interface Props {
   item: ArticleItem & { is_read?: boolean; is_starred?: boolean };
@@ -18,6 +19,7 @@ interface Props {
 
 export function FeedRowCompact({ item, selected = false, pendingRead = false, onClick, onMarkRead, onUndoRead }: Props) {
   const { t } = useI18n();
+  const compactLeft = useUIStore((state) => state.operationSide === 'left');
   const sourceName = (item.source_title?.trim() || t('article.untitledSource')).toUpperCase();
   const relativeTime = formatRelativeTime(item.published_at);
   const displayTitle = getDisplayTitle(item);
@@ -59,30 +61,37 @@ export function FeedRowCompact({ item, selected = false, pendingRead = false, on
 
         <div className="text-[13px] font-semibold leading-[1.38] text-[var(--text)]">{displayTitle}</div>
         {originalTitle ? <div className="mt-[3px] text-[11px] italic leading-[1.35] text-[var(--text-3)]">{originalTitle}</div> : null}
-        {pendingRead ? (
-          <button
-            type="button"
-            aria-label={t('feed.undoReadAria')}
-            onClick={(event) => {
-              event.stopPropagation();
-              onUndoRead?.();
-            }}
-            className="mt-[6px] inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] bg-[var(--bg-elevated)] px-3 py-2 text-[10.5px] font-medium text-[var(--text-3)] shadow-[inset_0_0_0_1px_var(--border)] transition-colors hover:text-[var(--accent)] md:min-h-0 md:min-w-0 md:px-2 md:py-[3px]"
+        {pendingRead || (onMarkRead && !item.is_read) ? (
+          <div
+            data-testid="feed-row-actions"
+            className={`mt-[6px] flex w-full ${compactLeft ? 'justify-start' : 'justify-end md:justify-start'}`}
           >
-            {t('feed.readUndo')}
-          </button>
-        ) : onMarkRead && !item.is_read ? (
-          <button
-            type="button"
-            aria-label={t('feed.markRead')}
-            onClick={(event) => {
-              event.stopPropagation();
-              onMarkRead();
-            }}
-            className="mt-[6px] inline-flex min-h-11 min-w-11 items-center justify-center rounded p-[3px] text-[var(--text-3)] opacity-100 transition-[color,opacity] hover:text-[var(--accent)] md:min-h-0 md:min-w-0 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
-          >
-            <CircleCheck size={15} strokeWidth={1.5} />
-          </button>
+            {pendingRead ? (
+              <button
+                type="button"
+                aria-label={t('feed.undoReadAria')}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onUndoRead?.();
+                }}
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] bg-[var(--bg-elevated)] px-3 py-2 text-[10.5px] font-medium text-[var(--text-3)] shadow-[inset_0_0_0_1px_var(--border)] transition-colors hover:text-[var(--accent)] md:min-h-0 md:min-w-0 md:px-2 md:py-[3px]"
+              >
+                {t('feed.readUndo')}
+              </button>
+            ) : (
+              <button
+                type="button"
+                aria-label={t('feed.markRead')}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onMarkRead?.();
+                }}
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded p-[3px] text-[var(--text-3)] opacity-100 transition-[color,opacity] hover:text-[var(--accent)] md:min-h-0 md:min-w-0 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
+              >
+                <CircleCheck size={15} strokeWidth={1.5} />
+              </button>
+            )}
+          </div>
         ) : null}
       </article>
     </div>

@@ -46,6 +46,12 @@ const en: MessageMap = {
   'language.title': 'Native Language',
   'language.description': 'Titles, buttons, labels, summaries, and translations follow this language.',
 
+  'operationSide.title': 'One-handed controls',
+  'operationSide.description': 'Place common phone controls on the side that feels easiest to reach.',
+  'operationSide.left': 'Left',
+  'operationSide.right': 'Right',
+  'operationSide.changed': ({ side }) => `One-handed controls moved to the ${side}`,
+
   'shortcuts.title': 'Keyboard Shortcuts',
   'shortcuts.subtitle': 'Keep reading without leaving the keyboard.',
   'shortcuts.open': 'Keyboard shortcuts',
@@ -277,7 +283,7 @@ const en: MessageMap = {
   'settings.breadcrumb': 'Home / Settings',
   'settings.badge': 'Preferences',
   'settings.title': 'Settings',
-  'settings.description': 'Account-level settings stay here. Reading preferences live in the reader panel at the bottom-right of article pages.',
+  'settings.description': 'Account-level settings stay here. Reading preferences live in the reading settings panel in the article reader.',
   'settings.loading': 'Loading settings…',
   'settings.nativeLanguageTitle': 'Native Language',
   'settings.nativeLanguageDescription': 'Controls UI labels, translation target, summaries, and article language display.',
@@ -431,6 +437,12 @@ const zh: MessageMap = {
 
   'language.title': '母语',
   'language.description': '标题、按钮、标签、摘要和翻译都会跟随这个语言。',
+
+  'operationSide.title': '单手操作',
+  'operationSide.description': '将手机上的常用操作放到顺手的一侧。',
+  'operationSide.left': '左侧',
+  'operationSide.right': '右侧',
+  'operationSide.changed': ({ side }) => `单手操作已切换到${side}`,
 
   'shortcuts.title': '快捷键',
   'shortcuts.subtitle': '不用离开键盘，也能继续阅读。',
@@ -663,7 +675,7 @@ const zh: MessageMap = {
   'settings.breadcrumb': '主页 / 设置',
   'settings.badge': '偏好设置',
   'settings.title': '设置',
-  'settings.description': '账户级设置会保留在这里；阅读偏好请在文章详情右下角的阅读设置中调整。',
+  'settings.description': '账户级设置会保留在这里；阅读偏好位于文章阅读器的阅读设置面板。',
   'settings.loading': '加载设置中…',
   'settings.nativeLanguageTitle': '母语',
   'settings.nativeLanguageDescription': '控制界面标签、翻译目标、摘要和文章语言展示。',
@@ -796,6 +808,7 @@ function withOverrides(overrides: MessageMap): MessageMap {
 }
 
 const traditionalReplacements: [string, string][] = [
+  ['单', '單'], ['侧', '側'], ['换', '換'], ['将', '將'], ['机', '機'], ['顺', '順'],
   ['订阅源', '訂閱源'], ['订阅', '訂閱'], ['快捷键', '快捷鍵'], ['设置', '設定'],
   ['返回首页', '返回首頁'], ['首页', '首頁'], ['母语', '母語'], ['未读', '未讀'],
   ['已读', '已讀'], ['阅读', '閱讀'], ['标记', '標記'], ['撤销', '復原'],
@@ -881,6 +894,7 @@ const dictionaries: Record<UILanguage, MessageMap> = {
 
 const supplementalDictionaries: Partial<Record<UILanguage, MessageMap>> = {
   ja: {
+    'operationSide.title': '片手操作', 'operationSide.description': 'スマートフォンのよく使う操作を、片手で届きやすい側に配置します。', 'operationSide.left': '左側', 'operationSide.right': '右側', 'operationSide.changed': ({ side }) => `片手操作を${side}に切り替えました`,
     'common.loading': '読み込み中…', 'common.source': 'ソース', 'common.back': '戻る',
     'article.minRead': ({ count }) => `${count}分で読了`, 'article.untitledSource': '無題のソース', 'article.ago': ({ time }) => `${time}前`,
     'sources.backHome': 'ホームに戻る', 'sources.manage': 'ソース管理', 'sources.description': 'RSS購読、OPMLのインポート/エクスポート、取得結果の更新を管理します。', 'sources.synced': '同期済み', 'sources.syncing': '同期中…', 'sources.count': ({ count }) => `${count}件のソース`, 'sources.addTitle': 'ソースを追加', 'sources.addDescription': 'ドメイン、サイトのホームページ、RSS / Atom URLを入力すると、購読可能なフィードを自動検出します。', 'sources.finding': '検索中…', 'sources.findAndAdd': '検索して追加', 'sources.listTitle': 'ソース一覧', 'sources.loading': '読み込み中…', 'sources.empty': 'ソースはまだありません。', 'sources.refresh': '更新', 'sources.delete': '削除', 'sources.opmlTitle': 'OPML インポート / エクスポート', 'sources.uploadImport': 'アップロードしてインポート', 'sources.exportOpml': 'OPMLをエクスポート',
@@ -892,6 +906,7 @@ const supplementalDictionaries: Partial<Record<UILanguage, MessageMap>> = {
     'setup.loading': 'セットアップ状態を確認中…', 'setup.title': 'xReader セットアップ', 'setup.subtitle': 'xReaderインスタンスを設定します。後から変更できます。', 'setup.tokenTitle': 'セットアップトークン', 'setup.tokenDescription': 'サーバーコンソールに表示されたトークンを入力してください。', 'setup.tokenPlaceholder': 'コンソールのトークンを貼り付け', 'setup.oauthTitle': 'GitHub OAuth', 'setup.oauthDescPrefix': '', 'setup.oauthDescSuffix': ' でGitHub OAuth Appを作成し、以下に認証情報を入力してください。', 'setup.clientId': 'Client ID', 'setup.clientSecret': 'Client Secret', 'setup.callbackUrl': 'コールバックURL', 'setup.callbackUrlHint': 'GitHub OAuth Appの設定と一致する必要があります。', 'setup.aiTitle': 'AIサービス', 'setup.aiSkip': '後で設定', 'setup.aiDescription': 'オプション。タイトル翻訳と要約に使うOpenAI互換APIを設定します。後から設定でも変更できます。', 'setup.aiEndpoint': 'エンドポイント', 'setup.aiModel': 'モデル', 'setup.aiApiKey': 'APIキー', 'setup.adminTitle': '管理者アカウント', 'setup.adminDescription': 'GitHubユーザー名を入力してください。最初の管理者になります。', 'setup.adminUsername': 'GitHubユーザー名', 'setup.submitting': 'セットアップ中…', 'setup.submit': 'セットアップ完了', 'setup.statusError': 'セットアップ状態の確認に失敗しました',
   },
   ko: {
+    'operationSide.title': '한 손 조작', 'operationSide.description': '휴대전화의 자주 쓰는 조작을 한 손으로 닿기 쉬운 쪽에 배치합니다.', 'operationSide.left': '왼쪽', 'operationSide.right': '오른쪽', 'operationSide.changed': ({ side }) => `한 손 조작을 ${side}으로 전환했습니다`,
     'common.loading': '불러오는 중…', 'common.source': '소스', 'common.back': '뒤로',
     'article.minRead': ({ count }) => `${count}분 읽기`, 'article.untitledSource': '이름 없는 소스', 'article.ago': ({ time }) => `${time} 전`,
     'sources.backHome': '홈으로 돌아가기', 'sources.manage': '소스 관리', 'sources.description': 'RSS 구독, OPML 가져오기/내보내기, 가져오기 결과 새로고침을 관리합니다.', 'sources.synced': '동기화됨', 'sources.syncing': '동기화 중…', 'sources.count': ({ count }) => `${count}개 소스`, 'sources.addTitle': '소스 추가', 'sources.addDescription': '도메인, 홈페이지, RSS / Atom URL을 입력하면 구독 가능한 피드를 자동으로 찾습니다.', 'sources.finding': '검색 중…', 'sources.findAndAdd': '찾아서 추가', 'sources.listTitle': '소스 목록', 'sources.loading': '불러오는 중…', 'sources.empty': '아직 소스가 없습니다.', 'sources.refresh': '새로고침', 'sources.delete': '삭제', 'sources.opmlTitle': 'OPML 가져오기 / 내보내기', 'sources.uploadImport': '업로드하여 가져오기', 'sources.exportOpml': 'OPML 내보내기',
@@ -903,6 +918,7 @@ const supplementalDictionaries: Partial<Record<UILanguage, MessageMap>> = {
     'setup.loading': '설정 상태 확인 중…', 'setup.title': 'xReader 설정', 'setup.subtitle': 'xReader 인스턴스를 구성합니다. 나중에 변경할 수 있습니다.', 'setup.tokenTitle': '설정 토큰', 'setup.tokenDescription': '서버 콘솔에 표시된 설정 토큰을 입력하세요.', 'setup.tokenPlaceholder': '콘솔의 토큰을 붙여넣기', 'setup.oauthTitle': 'GitHub OAuth', 'setup.oauthDescPrefix': '', 'setup.oauthDescSuffix': '에서 GitHub OAuth App을 만들고 아래에 자격 증명을 입력하세요.', 'setup.clientId': 'Client ID', 'setup.clientSecret': 'Client Secret', 'setup.callbackUrl': '콜백 URL', 'setup.callbackUrlHint': 'GitHub OAuth App 설정의 콜백 URL과 일치해야 합니다.', 'setup.aiTitle': 'AI 서비스', 'setup.aiSkip': '나중에 설정', 'setup.aiDescription': '선택 사항. 제목 번역 및 요약에 사용할 OpenAI 호환 API를 구성합니다. 나중에 설정에서 변경할 수 있습니다.', 'setup.aiEndpoint': '엔드포인트', 'setup.aiModel': '모델', 'setup.aiApiKey': 'API 키', 'setup.adminTitle': '관리자 계정', 'setup.adminDescription': 'GitHub 사용자명을 입력하세요. 이 계정이 첫 번째 관리자가 됩니다.', 'setup.adminUsername': 'GitHub 사용자명', 'setup.submitting': '설정 중…', 'setup.submit': '설정 완료', 'setup.statusError': '설정 상태를 확인할 수 없습니다',
   },
   es: {
+    'operationSide.title': 'Uso con una mano', 'operationSide.description': 'Coloca los controles habituales del teléfono en el lado más fácil de alcanzar.', 'operationSide.left': 'Izquierda', 'operationSide.right': 'Derecha', 'operationSide.changed': ({ side }) => `Controles movidos a la ${side}`,
     'common.loading': 'Cargando…', 'common.source': 'Fuente', 'common.back': 'Volver',
     'article.minRead': ({ count }) => `${count} min de lectura`, 'article.untitledSource': 'Fuente sin título', 'article.ago': ({ time }) => `hace ${time}`,
     'sources.backHome': 'Volver al inicio', 'sources.manage': 'Gestionar fuentes', 'sources.description': 'Gestiona suscripciones RSS, importa/exporta OPML y actualiza resultados.', 'sources.synced': 'Sincronizado', 'sources.syncing': 'Sincronizando…', 'sources.count': ({ count }) => `${count} fuentes`, 'sources.addTitle': 'Añadir fuente', 'sources.addDescription': 'Introduce un dominio, página principal, URL RSS o Atom; buscaremos la fuente automáticamente.', 'sources.finding': 'Buscando…', 'sources.findAndAdd': 'Buscar y añadir', 'sources.listTitle': 'Lista de fuentes', 'sources.loading': 'Cargando…', 'sources.empty': 'Aún no hay fuentes.', 'sources.refresh': 'Actualizar', 'sources.delete': 'Eliminar', 'sources.opmlTitle': 'Importar / exportar OPML', 'sources.uploadImport': 'Subir e importar', 'sources.exportOpml': 'Exportar OPML',
@@ -914,6 +930,7 @@ const supplementalDictionaries: Partial<Record<UILanguage, MessageMap>> = {
     'setup.loading': 'Comprobando el estado de configuración…', 'setup.title': 'Configuración de xReader', 'setup.subtitle': 'Configura tu instancia de xReader. Puedes cambiar estos ajustes después.', 'setup.tokenTitle': 'Token de configuración', 'setup.tokenDescription': 'Introduce el token que aparece en la consola del servidor.', 'setup.tokenPlaceholder': 'Pega el token de la consola', 'setup.oauthTitle': 'GitHub OAuth', 'setup.oauthDescPrefix': 'Crea una GitHub OAuth App en ', 'setup.oauthDescSuffix': ' e introduce las credenciales a continuación.', 'setup.clientId': 'Client ID', 'setup.clientSecret': 'Client Secret', 'setup.callbackUrl': 'URL de callback', 'setup.callbackUrlHint': 'Debe coincidir con la URL de callback en la configuración de tu GitHub OAuth App.', 'setup.aiTitle': 'Servicio de IA', 'setup.aiSkip': 'Omitir por ahora', 'setup.aiDescription': 'Opcional. Configura una API compatible con OpenAI para traducción de títulos y resúmenes. Puedes configurarla después en Ajustes.', 'setup.aiEndpoint': 'Endpoint', 'setup.aiModel': 'Modelo', 'setup.aiApiKey': 'Clave API', 'setup.adminTitle': 'Cuenta de administrador', 'setup.adminDescription': 'Introduce tu nombre de usuario de GitHub. Esta cuenta será el primer administrador.', 'setup.adminUsername': 'Usuario de GitHub', 'setup.submitting': 'Configurando…', 'setup.submit': 'Completar configuración', 'setup.statusError': 'No se pudo comprobar el estado de configuración',
   },
   fr: {
+    'operationSide.title': 'Utilisation à une main', 'operationSide.description': 'Placez les commandes courantes du téléphone du côté le plus facile à atteindre.', 'operationSide.left': 'Gauche', 'operationSide.right': 'Droite', 'operationSide.changed': ({ side }) => `Commandes déplacées à ${side}`,
     'common.loading': 'Chargement…', 'common.source': 'Source', 'common.back': 'Retour',
     'article.minRead': ({ count }) => `${count} min de lecture`, 'article.untitledSource': 'Source sans titre', 'article.ago': ({ time }) => `il y a ${time}`,
     'sources.backHome': 'Retour à l’accueil', 'sources.manage': 'Gérer les sources', 'sources.addTitle': 'Ajouter une source', 'sources.finding': 'Recherche…', 'sources.findAndAdd': 'Trouver et ajouter', 'sources.listTitle': 'Liste des sources', 'sources.loading': 'Chargement…', 'sources.empty': 'Aucune source pour le moment.', 'sources.refresh': 'Actualiser', 'sources.delete': 'Supprimer', 'sources.opmlTitle': 'Importer / exporter OPML', 'sources.uploadImport': 'Importer', 'sources.exportOpml': 'Exporter OPML',
@@ -925,6 +942,7 @@ const supplementalDictionaries: Partial<Record<UILanguage, MessageMap>> = {
     'setup.loading': 'Vérification de l\'état de configuration…', 'setup.title': 'Configuration de xReader', 'setup.subtitle': 'Configurez votre instance xReader. Vous pourrez modifier ces réglages plus tard.', 'setup.tokenTitle': 'Jeton de configuration', 'setup.tokenDescription': 'Entrez le jeton affiché dans la console du serveur.', 'setup.tokenPlaceholder': 'Collez le jeton de la console', 'setup.oauthTitle': 'GitHub OAuth', 'setup.oauthDescPrefix': 'Créez une GitHub OAuth App sur ', 'setup.oauthDescSuffix': ' et entrez les identifiants ci-dessous.', 'setup.clientId': 'Client ID', 'setup.clientSecret': 'Client Secret', 'setup.callbackUrl': 'URL de rappel', 'setup.callbackUrlHint': 'Doit correspondre à l\'URL de rappel dans les paramètres de votre GitHub OAuth App.', 'setup.aiTitle': 'Service IA', 'setup.aiSkip': 'Passer pour l\'instant', 'setup.aiDescription': 'Optionnel. Configurez une API compatible OpenAI pour la traduction des titres et les résumés. Vous pourrez le faire plus tard dans les Réglages.', 'setup.aiEndpoint': 'Endpoint', 'setup.aiModel': 'Modèle', 'setup.aiApiKey': 'Clé API', 'setup.adminTitle': 'Compte administrateur', 'setup.adminDescription': 'Entrez votre nom d\'utilisateur GitHub. Ce compte sera le premier administrateur.', 'setup.adminUsername': 'Utilisateur GitHub', 'setup.submitting': 'Configuration en cours…', 'setup.submit': 'Terminer la configuration', 'setup.statusError': 'Impossible de vérifier l\'état de configuration',
   },
   de: {
+    'operationSide.title': 'Einhandbedienung', 'operationSide.description': 'Lege häufige Bedienelemente auf dem Smartphone auf die leichter erreichbare Seite.', 'operationSide.left': 'Links', 'operationSide.right': 'Rechts', 'operationSide.changed': ({ side }) => `Einhandbedienung auf ${side} umgestellt`,
     'common.loading': 'Lädt…', 'common.source': 'Quelle', 'common.back': 'Zurück',
     'article.minRead': ({ count }) => `${count} Min. Lesezeit`, 'article.untitledSource': 'Unbenannte Quelle', 'article.ago': ({ time }) => `vor ${time}`,
     'sources.backHome': 'Zur Startseite', 'sources.manage': 'Quellen verwalten', 'sources.addTitle': 'Quelle hinzufügen', 'sources.finding': 'Sucht…', 'sources.findAndAdd': 'Suchen und hinzufügen', 'sources.listTitle': 'Quellenliste', 'sources.loading': 'Lädt…', 'sources.empty': 'Noch keine Quellen.', 'sources.refresh': 'Aktualisieren', 'sources.delete': 'Löschen', 'sources.opmlTitle': 'OPML importieren / exportieren', 'sources.uploadImport': 'Importieren', 'sources.exportOpml': 'OPML exportieren',
@@ -936,6 +954,7 @@ const supplementalDictionaries: Partial<Record<UILanguage, MessageMap>> = {
     'setup.loading': 'Einrichtungsstatus wird geprüft…', 'setup.title': 'xReader Einrichtung', 'setup.subtitle': 'Konfiguriere deine xReader-Instanz. Du kannst diese Einstellungen später ändern.', 'setup.tokenTitle': 'Einrichtungstoken', 'setup.tokenDescription': 'Gib das in der Serverkonsole angezeigte Token ein.', 'setup.tokenPlaceholder': 'Token aus der Konsole einfügen', 'setup.oauthTitle': 'GitHub OAuth', 'setup.oauthDescPrefix': 'Erstelle eine GitHub OAuth App unter ', 'setup.oauthDescSuffix': ' und gib die Anmeldedaten unten ein.', 'setup.clientId': 'Client ID', 'setup.clientSecret': 'Client Secret', 'setup.callbackUrl': 'Callback-URL', 'setup.callbackUrlHint': 'Muss mit der Callback-URL in deinen GitHub OAuth App-Einstellungen übereinstimmen.', 'setup.aiTitle': 'KI-Dienst', 'setup.aiSkip': 'Vorerst überspringen', 'setup.aiDescription': 'Optional. Konfiguriere eine OpenAI-kompatible API für Titelübersetzung und Zusammenfassungen. Du kannst dies später in den Einstellungen ändern.', 'setup.aiEndpoint': 'Endpunkt', 'setup.aiModel': 'Modell', 'setup.aiApiKey': 'API-Schlüssel', 'setup.adminTitle': 'Admin-Konto', 'setup.adminDescription': 'Gib deinen GitHub-Benutzernamen ein. Dieses Konto wird der erste Administrator.', 'setup.adminUsername': 'GitHub-Benutzername', 'setup.submitting': 'Wird eingerichtet…', 'setup.submit': 'Einrichtung abschließen', 'setup.statusError': 'Einrichtungsstatus konnte nicht geprüft werden',
   },
   pt: {
+    'operationSide.title': 'Uso com uma mão', 'operationSide.description': 'Posicione os controles mais usados do celular no lado mais fácil de alcançar.', 'operationSide.left': 'Esquerda', 'operationSide.right': 'Direita', 'operationSide.changed': ({ side }) => `Controles movidos para a ${side}`,
     'common.loading': 'Carregando…', 'common.source': 'Fonte', 'common.back': 'Voltar',
     'article.minRead': ({ count }) => `${count} min de leitura`, 'article.untitledSource': 'Fonte sem título', 'article.ago': ({ time }) => `há ${time}`,
     'sources.backHome': 'Voltar ao início', 'sources.manage': 'Gerenciar fontes', 'sources.addTitle': 'Adicionar fonte', 'sources.finding': 'Procurando…', 'sources.findAndAdd': 'Encontrar e adicionar', 'sources.listTitle': 'Lista de fontes', 'sources.loading': 'Carregando…', 'sources.empty': 'Ainda não há fontes.', 'sources.refresh': 'Atualizar', 'sources.delete': 'Excluir', 'sources.opmlTitle': 'Importar / exportar OPML', 'sources.uploadImport': 'Importar', 'sources.exportOpml': 'Exportar OPML',

@@ -9,6 +9,7 @@ export type Layout = 'classic' | 'focus' | 'wide';
 export type AccentColor = 'blue' | 'sage' | 'ember' | 'rose';
 export type ReadFilter = 'unread' | 'all' | 'read';
 export type ViewTab = 'today' | 'all' | 'starred' | 'sources';
+export type OperationSide = 'left' | 'right';
 
 export interface SourceImportJob {
   id: string;
@@ -28,6 +29,8 @@ interface UIState {
   selectedSourceId: number | null;
   nativeLanguage: string;
   isShortcutsOpen: boolean;
+  operationSide: OperationSide;
+  operationSideNotice: OperationSide | null;
   sourceImportJob: SourceImportJob | null;
   _hydrated: boolean;
 
@@ -43,6 +46,8 @@ interface UIState {
   setNativeLanguage: (l: string) => void;
   openShortcuts: () => void;
   closeShortcuts: () => void;
+  setOperationSide: (side: OperationSide) => void;
+  clearOperationSideNotice: () => void;
   startSourceImport: (jobId: string, fileName: string) => void;
   clearSourceImport: () => void;
 
@@ -73,35 +78,43 @@ const isValidReadFilter = (v: unknown): v is ReadFilter => validReadFilters.incl
 const validViewTabs: readonly ViewTab[] = ['today', 'all', 'starred', 'sources'];
 const isValidViewTab = (v: unknown): v is ViewTab => validViewTabs.includes(v as ViewTab);
 
+const validOperationSides: readonly OperationSide[] = ['left', 'right'];
+const isValidOperationSide = (v: unknown): v is OperationSide => validOperationSides.includes(v as OperationSide);
+
 function isValidFontSize(v: unknown): v is number {
   const n = Number(v);
   return Number.isFinite(n) && n >= 10 && n <= 32;
 }
 
 function readStoredValue(key: string): string | null {
-  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-    return null;
-  }
-  if (typeof localStorage.getItem !== 'function') {
+  if (typeof window === 'undefined') {
     return null;
   }
 
   try {
-    return localStorage.getItem(`xreader:${key}`);
+    const storage = window.localStorage;
+    if (typeof storage.getItem !== 'function') {
+      return null;
+    }
+    return storage.getItem(`xreader:${key}`);
   } catch {
     return null;
   }
 }
 
 function persist(key: string, value: unknown) {
-  if (typeof window === 'undefined' || typeof localStorage === 'undefined' || typeof localStorage.setItem !== 'function') {
+  if (typeof window === 'undefined') {
     return;
   }
 
   const valStr = String(value);
 
   try {
-    localStorage.setItem(`xreader:${key}`, valStr);
+    const storage = window.localStorage;
+    if (typeof storage.setItem !== 'function') {
+      return;
+    }
+    storage.setItem(`xreader:${key}`, valStr);
   } catch {
     return;
   }
@@ -117,12 +130,16 @@ function persist(key: string, value: unknown) {
 }
 
 function removeStoredValue(key: string) {
-  if (typeof window === 'undefined' || typeof localStorage === 'undefined' || typeof localStorage.removeItem !== 'function') {
+  if (typeof window === 'undefined') {
     return;
   }
 
   try {
-    localStorage.removeItem(`xreader:${key}`);
+    const storage = window.localStorage;
+    if (typeof storage.removeItem !== 'function') {
+      return;
+    }
+    storage.removeItem(`xreader:${key}`);
   } catch {
     return;
   }
@@ -141,6 +158,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   selectedSourceId: null,
   nativeLanguage: 'zh-CN',
   isShortcutsOpen: false,
+  operationSide: 'right',
+  operationSideNotice: null,
   sourceImportJob: null,
   _hydrated: false,
 
@@ -190,6 +209,13 @@ export const useUIStore = create<UIState>((set, get) => ({
   },
   openShortcuts: () => set({ isShortcutsOpen: true }),
   closeShortcuts: () => set({ isShortcutsOpen: false }),
+  setOperationSide: (operationSide) => {
+    if (get().operationSide === operationSide) return;
+
+    set({ operationSide, operationSideNotice: operationSide });
+    persist('operationSide', operationSide);
+  },
+  clearOperationSideNotice: () => set({ operationSideNotice: null }),
   startSourceImport: (jobId, fileName) => {
     const job = { id: jobId, fileName, startedAt: Date.now() };
     set({ sourceImportJob: job });
@@ -225,6 +251,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     const storedCurrentView = readStoredValue('currentView');
     const storedSelectedSourceId = readStoredValue('selectedSourceId');
     const storedNativeLanguage = readStoredValue('nativeLanguage');
+    const storedOperationSide = readStoredValue('operationSide');
     const storedImportJobId = readStoredValue('sourceImportJobId');
     const storedImportFileName = readStoredValue('sourceImportFileName');
     const storedImportStartedAt = readStoredValue('sourceImportStartedAt');
@@ -243,6 +270,7 @@ export const useUIStore = create<UIState>((set, get) => ({
       update.selectedSourceId = Number(storedSelectedSourceId);
     }
     if (storedNativeLanguage) update.nativeLanguage = storedNativeLanguage;
+    if (isValidOperationSide(storedOperationSide)) update.operationSide = storedOperationSide;
     if (storedImportJobId) {
       const startedAt = Number(storedImportStartedAt);
       update.sourceImportJob = {

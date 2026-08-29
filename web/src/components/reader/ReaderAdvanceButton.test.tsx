@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 vi.mock('@/hooks/useTouchCapability', () => ({ useTouchCapability: () => true }));
 
@@ -9,7 +10,12 @@ test('renders a touch-sized mark-read-and-next control', async () => {
   const onAdvance = vi.fn();
   render(<ReaderAdvanceButton mode="next" phase="idle" hidden={false} onAdvance={onAdvance} />);
   const button = screen.getByRole('button', { name: /标为已读.*下一篇/ });
-  expect(button).toHaveClass('min-h-12', 'min-w-12');
+  expect(button).toHaveClass('operation-edge-anchor', 'min-h-12', 'min-w-12');
+  expect(button).toHaveStyle({ '--operation-edge-offset': '1rem' });
+  const staticStyle = renderToStaticMarkup(
+    <ReaderAdvanceButton mode="next" phase="idle" hidden={false} onAdvance={vi.fn()} />,
+  ).match(/style="([^"]+)"/)?.[1];
+  expect(staticStyle?.split(';')).toContain('bottom:max(1rem, env(safe-area-inset-bottom))');
   await userEvent.click(button);
   expect(onAdvance).toHaveBeenCalledTimes(1);
 });

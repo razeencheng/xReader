@@ -908,7 +908,6 @@
 
 .tweaksButton {
   position: fixed;
-  right: 16px;
   bottom: max(16px, calc(env(safe-area-inset-bottom) + 8px));
   z-index: 80;
   box-shadow: 0 10px 30px oklch(0 0 0 / 0.10);
@@ -916,7 +915,6 @@
 
 .tweaksPanel {
   position: fixed;
-  right: 16px;
   bottom: max(58px, calc(env(safe-area-inset-bottom) + 50px));
   z-index: 81;
   width: 280px;
