@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ChevronDown, Globe, Highlighter, Keyboard, LogOut, PlusCircle, Settings, ShieldCheck } from 'lucide-react';
 import { LanguageModal } from '@/components/layout/LanguageModal';
 import { getLanguageOption, PRIMARY_NAV_ITEMS } from '@/components/layout/navigationConfig';
+import { OperationSideControl } from '@/components/settings/OperationSideControl';
 import { useI18n } from '@/lib/i18n';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useUIStore, type ViewTab } from '@/stores/useUIStore';
@@ -192,6 +193,7 @@ export function TabletTopNav({ focusMode }: { focusMode: boolean }) {
 export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLanguageOpen, setIsLanguageOpen] = useState(false);
+  const operationSide = useUIStore((state) => state.operationSide);
   const nav = useAppNavigation();
   const isListPage = nav.pathname === '/';
   const menuLabel = isListPage ? nav.t(NAV_LABEL_KEYS[nav.currentView]) : nav.t('nav.more');
@@ -200,26 +202,48 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
     return null;
   }
 
+  const brandButton = (
+    <button
+      key="brand"
+      type="button"
+      onClick={() => nav.goToView('today')}
+      className="font-serif text-xl font-bold italic tracking-tight text-[var(--accent)]"
+    >
+      xReader
+    </button>
+  );
+  const menuButton = (
+    <button
+      key="menu"
+      type="button"
+      data-testid="mobile-menu-trigger"
+      onClick={() => setIsMenuOpen((value) => !value)}
+      className="inline-flex min-h-11 items-center gap-1 rounded-[10px] border border-[var(--border)] bg-[var(--bg-panel)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-2)] shadow-[0_10px_30px_rgba(65,52,35,0.08)]"
+      aria-expanded={isMenuOpen}
+    >
+      {menuLabel}
+      <ChevronDown size={13} strokeWidth={1.8} />
+    </button>
+  );
+
   return (
     <>
       <header className="glass-effect h-14 shrink-0 border-b border-[var(--border-light)] md:hidden">
-        <div className="flex h-14 items-center justify-between px-4">
-          <button
-            type="button"
-            onClick={() => nav.goToView('today')}
-            className="font-serif text-xl font-bold italic tracking-tight text-[var(--accent)]"
-          >
-            xReader
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsMenuOpen((value) => !value)}
-            className="inline-flex min-h-11 items-center gap-1 rounded-[10px] border border-[var(--border)] bg-[var(--bg-panel)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-2)] shadow-[0_10px_30px_rgba(65,52,35,0.08)]"
-            aria-expanded={isMenuOpen}
-          >
-            {menuLabel}
-            <ChevronDown size={13} strokeWidth={1.8} />
-          </button>
+        <div
+          data-testid="mobile-topbar-row"
+          className="flex h-14 items-center justify-between px-4"
+        >
+          {operationSide === 'left' ? (
+            <>
+              {menuButton}
+              {brandButton}
+            </>
+          ) : (
+            <>
+              {brandButton}
+              {menuButton}
+            </>
+          )}
         </div>
       </header>
 
@@ -359,6 +383,11 @@ export function MobileTopBar({ focusMode }: { focusMode: boolean }) {
               <LogOut size={17} />
               {nav.t('nav.logOut')}
             </button>
+
+            <OperationSideControl
+              className="mt-5 border-t border-[var(--border-light)] pt-5"
+              onSelected={() => setIsMenuOpen(false)}
+            />
           </div>
         </>
       ) : null}

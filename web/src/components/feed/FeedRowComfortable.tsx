@@ -6,6 +6,7 @@ import { estimateReadMinutes, formatRelativeTime, getDisplayTitle, getOriginalTi
 import { useI18n } from '@/lib/i18n';
 import { getSourceColor } from '@/lib/source-meta';
 import type { ArticleItem } from '@/lib/types';
+import { useUIStore } from '@/stores/useUIStore';
 
 interface Props {
   item: ArticleItem & { is_starred?: boolean; is_read?: boolean };
@@ -27,6 +28,7 @@ export function FeedRowComfortable({
   onUndoRead,
 }: Props) {
   const { t } = useI18n();
+  const compactLeft = useUIStore((state) => state.operationSide === 'left');
   const displayTitle = getDisplayTitle(item);
   const originalTitle = getOriginalTitle(item);
   const relativeTime = formatRelativeTime(item.published_at);
@@ -34,6 +36,7 @@ export function FeedRowComfortable({
   const sourceName = (item.source_title?.trim() || t('article.untitledSource')).toUpperCase();
   const sourceColor = getSourceColor(item.source_title);
   const dimmed = (item.is_read || pendingRead) && !selected;
+  const hasInteractiveActions = Boolean(pendingRead || (onMarkRead && !item.is_read) || onStar);
 
   return (
     <div
@@ -75,50 +78,65 @@ export function FeedRowComfortable({
 
         <div className="mt-1 flex items-center">
           {readMinutes ? <span className="text-[11px] text-[var(--text-3)]">{t('article.minRead', { count: readMinutes })}</span> : <span />}
-          <div className="flex-1" />
-          {pendingRead ? (
-            <button
-              type="button"
-              aria-label={t('feed.undoReadAria')}
-              onClick={(event) => {
-                event.stopPropagation();
-                onUndoRead?.();
-              }}
-              className="mr-1 inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] bg-[var(--bg-elevated)] px-3 py-2 text-[10.5px] font-medium text-[var(--text-3)] shadow-[inset_0_0_0_1px_var(--border)] transition-colors hover:text-[var(--accent)] md:min-h-0 md:min-w-0 md:px-2 md:py-[3px]"
-            >
-              {t('feed.readUndo')}
-            </button>
-          ) : onMarkRead && !item.is_read ? (
-            <button
-              type="button"
-              aria-label={t('feed.markRead')}
-              onClick={(event) => {
-                event.stopPropagation();
-                onMarkRead();
-              }}
-              className="mr-1 inline-flex min-h-11 min-w-11 items-center justify-center rounded p-[3px] text-[var(--text-3)] opacity-100 transition-[color,opacity] hover:text-[var(--accent)] md:min-h-0 md:min-w-0 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
-            >
-              <CircleCheck size={15} strokeWidth={1.5} />
-            </button>
-          ) : null}
-          {onStar ? (
-            <button
-              type="button"
-              aria-label={item.is_starred ? 'Unstar article' : 'Star article'}
-              onClick={(event) => {
-                event.stopPropagation();
-                onStar(item.id);
-              }}
-              className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded p-[3px] transition-[opacity,color] duration-150 md:min-h-0 md:min-w-0 ${
-                item.is_starred
-                  ? 'text-[var(--star)] opacity-100'
-                  : 'text-[var(--text-3)] opacity-100 hover:text-[var(--star)] md:opacity-0 md:group-hover:opacity-100'
+          {hasInteractiveActions ? (
+            <div
+              data-testid="feed-row-actions"
+              className={`flex items-center ${
+                compactLeft ? 'order-first mr-auto md:order-last md:ml-auto md:mr-0' : 'ml-auto'
               }`}
             >
-              <Star size={13} fill={item.is_starred ? 'currentColor' : 'none'} strokeWidth={item.is_starred ? 0 : 1.8} />
-            </button>
-          ) : item.is_starred ? (
-            <Star size={13} className="text-[var(--star)]" fill="currentColor" strokeWidth={0} />
+              {pendingRead ? (
+                <button
+                  type="button"
+                  aria-label={t('feed.undoReadAria')}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onUndoRead?.();
+                  }}
+                  className="mr-1 inline-flex min-h-11 min-w-11 items-center justify-center rounded-[10px] bg-[var(--bg-elevated)] px-3 py-2 text-[10.5px] font-medium text-[var(--text-3)] shadow-[inset_0_0_0_1px_var(--border)] transition-colors hover:text-[var(--accent)] md:min-h-0 md:min-w-0 md:px-2 md:py-[3px]"
+                >
+                  {t('feed.readUndo')}
+                </button>
+              ) : onMarkRead && !item.is_read ? (
+                <button
+                  type="button"
+                  aria-label={t('feed.markRead')}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onMarkRead();
+                  }}
+                  className="mr-1 inline-flex min-h-11 min-w-11 items-center justify-center rounded p-[3px] text-[var(--text-3)] opacity-100 transition-[color,opacity] hover:text-[var(--accent)] md:min-h-0 md:min-w-0 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
+                >
+                  <CircleCheck size={15} strokeWidth={1.5} />
+                </button>
+              ) : null}
+              {onStar ? (
+                <button
+                  type="button"
+                  aria-label={item.is_starred ? 'Unstar article' : 'Star article'}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onStar(item.id);
+                  }}
+                  className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded p-[3px] transition-[opacity,color] duration-150 md:min-h-0 md:min-w-0 ${
+                    item.is_starred
+                      ? 'text-[var(--star)] opacity-100'
+                      : 'text-[var(--text-3)] opacity-100 hover:text-[var(--star)] md:opacity-0 md:group-hover:opacity-100'
+                  }`}
+                >
+                  <Star size={13} fill={item.is_starred ? 'currentColor' : 'none'} strokeWidth={item.is_starred ? 0 : 1.8} />
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          {!onStar && item.is_starred ? (
+            <Star
+              data-testid="feed-row-static-star"
+              size={13}
+              className={`order-last text-[var(--star)] ${hasInteractiveActions ? '' : 'ml-auto'}`}
+              fill="currentColor"
+              strokeWidth={0}
+            />
           ) : null}
         </div>
       </article>

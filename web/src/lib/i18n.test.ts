@@ -50,4 +50,77 @@ describe('i18n', () => {
       expect(translate(language, 'reader.previousMarkFailed')).not.toBe(translate('en', 'reader.previousMarkFailed'));
     }
   });
+
+  test('fully localizes the core one-handed operation copy in English and Chinese', () => {
+    const expected = {
+      en: {
+        title: 'One-handed controls',
+        description: 'Place common phone controls on the side that feels easiest to reach.',
+        left: 'Left',
+        right: 'Right',
+        changed: 'One-handed controls moved to the Left',
+      },
+      'zh-CN': {
+        title: '单手操作',
+        description: '将手机上的常用操作放到顺手的一侧。',
+        left: '左侧',
+        right: '右侧',
+        changed: '单手操作已切换到左侧',
+      },
+      'zh-TW': {
+        title: '單手操作',
+        description: '將手機上的常用操作放到順手的一側。',
+        left: '左側',
+        right: '右側',
+        changed: '單手操作已切換到左側',
+      },
+    } as const;
+
+    for (const [language, messages] of Object.entries(expected)) {
+      expect(translate(language, 'operationSide.title')).toBe(messages.title);
+      expect(translate(language, 'operationSide.description')).toBe(messages.description);
+      expect(translate(language, 'operationSide.left')).toBe(messages.left);
+      expect(translate(language, 'operationSide.right')).toBe(messages.right);
+      expect(translate(language, 'operationSide.changed', { side: messages.left })).toBe(messages.changed);
+    }
+  });
+
+  test('provides native one-handed operation labels for every supported UI language', () => {
+    const expected = {
+      en: ['Left', 'Right', 'One-handed controls moved to the Left'],
+      'zh-CN': ['左侧', '右侧', '单手操作已切换到左侧'],
+      'zh-TW': ['左側', '右側', '單手操作已切換到左側'],
+      ja: ['左側', '右側', '片手操作を左側に切り替えました'],
+      ko: ['왼쪽', '오른쪽', '한 손 조작을 왼쪽으로 전환했습니다'],
+      es: ['Izquierda', 'Derecha', 'Controles movidos a la Izquierda'],
+      fr: ['Gauche', 'Droite', 'Commandes déplacées à Gauche'],
+      de: ['Links', 'Rechts', 'Einhandbedienung auf Links umgestellt'],
+      pt: ['Esquerda', 'Direita', 'Controles movidos para a Esquerda'],
+    } as const;
+
+    for (const [language, [left, right, changed]] of Object.entries(expected)) {
+      expect(translate(language, 'operationSide.left')).toBe(left);
+      expect(translate(language, 'operationSide.right')).toBe(right);
+      expect(translate(language, 'operationSide.changed', { side: left })).toBe(changed);
+      expect(translate(language, 'operationSide.left')).not.toBe('operationSide.left');
+      expect(translate(language, 'operationSide.changed', { side: left })).not.toBe('operationSide.changed');
+    }
+
+    for (const language of ['ja', 'ko', 'es', 'fr', 'de', 'pt']) {
+      expect(translate(language, 'operationSide.title')).not.toBe(translate('en', 'operationSide.title'));
+      expect(translate(language, 'operationSide.description')).not.toBe(translate('en', 'operationSide.description'));
+      expect(translate(language, 'operationSide.left')).not.toBe(translate('en', 'operationSide.left'));
+      expect(translate(language, 'operationSide.right')).not.toBe(translate('en', 'operationSide.right'));
+    }
+  });
+
+  test('describes reader preference location without a physical side', () => {
+    const english = translate('en', 'settings.description');
+    const chinese = translate('zh-CN', 'settings.description');
+
+    expect(english).toContain('reader');
+    expect(english).not.toMatch(/bottom-right|right|left/i);
+    expect(chinese).toContain('文章阅读器');
+    expect(chinese).not.toMatch(/右下角|左|右/);
+  });
 });

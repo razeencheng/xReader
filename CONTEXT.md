@@ -12,6 +12,16 @@ _Avoid_: 阅读完成, 读完
 A compound action that marks the current article as read and opens the next article in the active reading queue.
 _Avoid_: 下一篇, 读完并继续
 
+## One-handed operation
+
+**单手操作侧**:
+A reader preference indicating whether thumb-reachable controls use the left or right edge in compact layouts. It changes the control layer, not content order or the reader's biological handedness.
+_Avoid_: 惯用手, 整页镜像, 左手模式, 右手模式
+
+**操作边**:
+The physical screen edge selected by the single-hand operation side. Edge-anchored control groups and their overlays use this edge without reversing their internal order or directional meaning.
+_Avoid_: 布局方向, 文本方向, RTL
+
 ## AI summary
 
 **结构化摘要**:

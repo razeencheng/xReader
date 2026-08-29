@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useI18n } from '@/lib/i18n';
 import { useUIStore, type AccentColor, type Density, type Layout, type Theme } from '@/stores/useUIStore';
 import { applyReaderLayoutSelection, getActiveReaderLayout } from '@/lib/reader-layout';
+import { OperationSideControl } from '@/components/settings/OperationSideControl';
 
 const CHIP_BASE = 'rounded-md px-[11px] py-1 text-[12px]';
 
@@ -102,7 +103,11 @@ export function TweaksPanel({ externalOpen, onExternalClose }: TweaksPanelProps 
   if (!isOpen) return null;
 
   return (
-    <div ref={panelRef} className="absolute bottom-5 right-5 z-[100]">
+    <div
+      ref={panelRef}
+      className="operation-edge-anchor absolute bottom-5 z-[100]"
+      style={{ '--operation-edge-offset': '1.25rem' } as CSSProperties}
+    >
       <AnimatePresence>
         <motion.div
           initial={{ opacity: 0, y: 12, scale: 0.96 }}
@@ -186,6 +191,11 @@ export function TweaksPanel({ externalOpen, onExternalClose }: TweaksPanelProps 
               })}
             </div>
           </Section>
+
+          <OperationSideControl
+            className="mt-4 border-t border-[var(--border-light)] pt-4"
+            onSelected={closePanel}
+          />
         </motion.div>
       </AnimatePresence>
     </div>

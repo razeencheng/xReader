@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
 import {
   Check,
@@ -401,7 +401,7 @@ function SegmentButton<T extends string>({
   );
 }
 
-export function SourcesPage() {
+function SourcesPage() {
   const { t } = useI18n();
   const isGuest = useIsGuest();
   const { data: sources, isLoading } = useSources();
@@ -956,7 +956,10 @@ export function SourcesPage() {
 
       <button
         type="button"
-        className={`${styles.buttonSecondary} ${styles.tweaksButton}`}
+        className={`${styles.buttonSecondary} ${styles.tweaksButton} operation-edge-anchor`}
+        style={{ '--operation-edge-offset': '16px' } as CSSProperties}
+        aria-expanded={isTweaksOpen}
+        aria-controls="sources-tweaks-panel"
         onClick={() => setIsTweaksOpen((open) => !open)}
       >
         <Settings2 size={14} strokeWidth={1.5} />
@@ -964,7 +967,11 @@ export function SourcesPage() {
       </button>
 
       {isTweaksOpen ? (
-        <aside className={styles.tweaksPanel}>
+        <aside
+          id="sources-tweaks-panel"
+          className={`${styles.tweaksPanel} operation-edge-anchor`}
+          style={{ '--operation-edge-offset': '16px' } as CSSProperties}
+        >
           <div className={styles.tweaksHeader}>
             <span>{t('sources.tweaks')}</span>
             <button type="button" className={styles.iconButton} aria-label={t('sources.dismiss')} onClick={() => setIsTweaksOpen(false)}>

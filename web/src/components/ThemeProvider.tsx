@@ -21,6 +21,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const theme = useUIStore((s) => s.theme);
   const accent = useUIStore((s) => s.accentColor);
   const fontSize = useUIStore((s) => s.fontSize);
+  const operationSide = useUIStore((s) => s.operationSide);
 
   const systemTheme = useSyncExternalStore(
     subscribeToMediaQuery,
@@ -32,6 +33,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const el = document.documentElement;
     el.classList.remove('theme-light', 'theme-dark');
     el.setAttribute('data-accent', accent);
+    el.setAttribute('data-operation-side', operationSide);
     el.style.setProperty('--font-ui-size', `${fontSize}px`);
 
     const resolvedTheme = theme === 'system' ? systemTheme : theme;
@@ -41,7 +43,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } else {
       el.classList.add('theme-dark');
     }
-  }, [theme, accent, fontSize, systemTheme]);
+  }, [theme, accent, fontSize, operationSide, systemTheme]);
 
   return <>{children}</>;
 }

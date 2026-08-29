@@ -49,7 +49,7 @@ vi.mock('@/lib/api-client', () => ({
   },
 }));
 
-import { SourcesPage } from '@/app/(app)/sources/page';
+import SourcesPage from '@/app/(app)/sources/page';
 import { ApiError, apiFetch } from '@/lib/api-client';
 
 beforeEach(() => {

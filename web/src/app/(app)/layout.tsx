@@ -14,6 +14,7 @@ import { GuestBanner } from '@/components/layout/GuestBanner';
 import { KeyboardShortcutsModal } from '@/components/layout/KeyboardShortcutsModal';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileTopBar, TabletTopNav } from '@/components/layout/ResponsiveAppNav';
+import { OperationSideNotice } from '@/components/layout/OperationSideNotice';
 import { SourceImportStatus } from '@/components/layout/SourceImportStatus';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -89,6 +90,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <KeyboardShortcutsModal open={isShortcutsOpen} onClose={closeShortcuts} />
       <SourceImportStatus />
+      <OperationSideNotice />
     </div>
   );
 }
