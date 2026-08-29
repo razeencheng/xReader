@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-08-29
+
+### Added
+- Added a device-local one-handed operation-side preference for compact layouts,
+  covering mobile navigation, feed actions, reader controls, and Sources tweaks.
+- Added mobile menu and reader settings entry points with accessible status
+  feedback, safe-area positioning, local persistence, and desktop restoration.
+
 ## [0.1.12] - 2026-08-14
 
 ### Fixed
